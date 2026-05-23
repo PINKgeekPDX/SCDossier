@@ -1,0 +1,347 @@
+"""
+src/ui/tabs/org_tab.py
+OrganizationTab — displays standalone organization profile information.
+Uses GlassCard containers for the Aegis aesthetic.
+"""
+
+import os
+from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QLabel, QPushButton,
+    QFrame, QGridLayout
+)
+
+from src.core.events import EventBus
+from src.ui.theme import palette as P
+from src.ui.theme.fonts import headline_lg, headline_md, font_inter, label_caps
+from src.ui.widgets.avatar_widget import AvatarWidget
+from src.ui.widgets.data_field import DataField
+from src.ui.widgets.tech_label import TechLabel
+from src.ui.widgets.progress_overlay import ProgressOverlay
+from src.ui.widgets.search_input import SearchInput
+from src.ui.widgets.glass_card import GlassCard
+
+
+# Known SC manufacturer names mapped to their SVG file names
+MANUFACTURER_MAP = {
+    "RSI": "rsi",
+    "Robert Space Industries": "rsi",
+    "Anvil Aerospace": "anvil-aerospace",
+    "Anvil": "anvil-aerospace",
+    "Drake Interplanetary": "drake",
+    "Drake": "drake",
+    "Origin Jumpworks": "origin",
+    "Origin": "origin",
+    "MISC": "misc",
+    "Musashi Industrial & Starflight Concern": "misc",
+    "Mirai": "mirai",
+    "Crusader Industries": "crusader",
+    "Crusader": "crusader",
+    "Aegis Dynamics": "aegis",
+    "Aegis": "aegis",
+    "Banu": "banu",
+    "Esperia": "esperia",
+    "Kruger Intergalactic": "kruger-intergalactic",
+    "Kruger": "kruger-intergalactic",
+    "Tumbril": "tumbril",
+    "Greycat Industrial": "greycat",
+    "Greycat": "greycat",
+    "Consolidated Outland": "consolidated-outland",
+    "Outland": "consolidated-outland",
+    "Argo Astronautics": "argo-astronautics",
+    "Argo": "argo-astronautics",
+    "Gatac": "gatac",
+    "Aopoa": "aopoa",
+    "Shubin Interstellar": "shubin",
+    "Shubin": "shubin",
+}
+
+
+class OrgTab(QWidget):
+    """
+    Displays standalone organization details using GlassCard containers.
+    """
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.current_sid = ""
+        self._build_ui()
+        self._connect_signals()
+
+    def _build_ui(self) -> None:
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # --- Top Action Bar ---
+        action_bar = QWidget()
+        action_bar.setFixedHeight(64)
+        action_bar.setStyleSheet(f"background: {P.SURFACE_CONTAINER_LOW}; border-bottom: 1px solid {P.OUTLINE_VARIANT};")
+        ab_layout = QHBoxLayout(action_bar)
+        ab_layout.setContentsMargins(24, 10, 24, 10)
+        ab_layout.setSpacing(12)
+
+        self.search_input = SearchInput("ENTER ORG NAME OR SID...")
+        self.search_input.returnPressed.connect(self._on_search)
+
+        search_btn = QPushButton("SEARCH")
+        search_btn.setProperty("class", "primary")
+        search_btn.setFixedSize(100, 44)
+        search_btn.clicked.connect(self._on_search)
+
+        ab_layout.addWidget(self.search_input)
+        ab_layout.addWidget(search_btn)
+
+        # --- Scrollable Content ---
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("background: transparent;")
+
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(24, 24, 24, 24)
+        self.content_layout.setSpacing(20)
+        self.content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Empty state
+        self.empty_lbl = QLabel("SEARCH FOR AN ORGANIZATION TO VIEW DETAILS")
+        self.empty_lbl.setFont(label_caps())
+        self.empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
+        self.content_layout.addStretch()
+        self.content_layout.addWidget(self.empty_lbl)
+        self.content_layout.addStretch()
+
+        # Detail content (hidden until data loaded)
+        self.detail_container = QWidget()
+        self.detail_container.setVisible(False)
+        self._build_detail()
+
+        # CRITICAL FIX: add detail_container to content_layout so scraped data appears
+        self.content_layout.addWidget(self.detail_container)
+
+        scroll.setWidget(self.content_widget)
+
+        main_layout.addWidget(action_bar)
+        main_layout.addWidget(scroll)
+
+        self.overlay = ProgressOverlay(self)
+
+    def _build_detail(self) -> None:
+        dl = QVBoxLayout(self.detail_container)
+        dl.setContentsMargins(0, 0, 0, 0)
+        dl.setSpacing(20)
+
+        # Identity card
+        self.identity_card = GlassCard(title="ORGANIZATION IDENTITY")
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(20)
+        self.logo = AvatarWidget(size=120)
+
+        name_vbox = QVBoxLayout()
+        name_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        name_vbox.setSpacing(4)
+        self.name_lbl = QLabel("—")
+        self.name_lbl.setFont(headline_lg())
+        self.name_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+        self.name_lbl.setWordWrap(True)
+        self.sid_lbl = QLabel("—")
+        self.sid_lbl.setFont(headline_md())
+        self.sid_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; border: none;")
+        name_vbox.addWidget(self.name_lbl)
+        name_vbox.addWidget(self.sid_lbl)
+
+        header_layout.addWidget(self.logo)
+        header_layout.addLayout(name_vbox)
+        header_layout.addStretch()
+        self.identity_card.content_layout.addLayout(header_layout)
+        dl.addWidget(self.identity_card)
+
+        # Details grid card
+        self.grid_card = GlassCard(title="ORGANIZATION DATA")
+        grid = QGridLayout()
+        grid.setSpacing(12)
+        self.f_archetype = DataField("ARCHETYPE")
+        self.f_language = DataField("LANGUAGE")
+        self.f_commitment = DataField("COMMITMENT")
+        self.f_members = DataField("MEMBERS")
+        self.f_recruiting = DataField("RECRUITING")
+        self.f_roleplay = DataField("ROLEPLAY")
+        grid.addWidget(self.f_archetype, 0, 0)
+        grid.addWidget(self.f_language, 0, 1)
+        grid.addWidget(self.f_commitment, 0, 2)
+        grid.addWidget(self.f_members, 1, 0)
+        grid.addWidget(self.f_recruiting, 1, 1)
+        grid.addWidget(self.f_roleplay, 1, 2)
+        self.grid_card.content_layout.addLayout(grid)
+        dl.addWidget(self.grid_card)
+
+        # Focus card
+        self.focus_card = GlassCard(title="PRIMARY & SECONDARY FOCUS")
+        focus_layout = QHBoxLayout()
+        focus_layout.setSpacing(12)
+        self.f_primary = DataField("PRIMARY FOCUS")
+        self.f_secondary = DataField("SECONDARY FOCUS")
+        focus_layout.addWidget(self.f_primary)
+        focus_layout.addWidget(self.f_secondary)
+        self.focus_card.content_layout.addLayout(focus_layout)
+        dl.addWidget(self.focus_card)
+
+        # Description card
+        self.desc_card = GlassCard(title="ORGANIZATION HISTORY / DESCRIPTION")
+        self.desc_lbl = QLabel("—")
+        self.desc_lbl.setFont(font_inter(14))
+        self.desc_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; border: none;")
+        self.desc_lbl.setWordWrap(True)
+        self.desc_card.content_layout.addWidget(self.desc_lbl)
+        dl.addWidget(self.desc_card)
+
+        dl.addStretch()
+
+    def _get_manufacturer_logo_path(self, org_name: str) -> str | None:
+        """Check if org name matches a known SC manufacturer and return logo path."""
+        for name_key, file_key in MANUFACTURER_MAP.items():
+            if name_key.lower() in org_name.lower():
+                logo_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                    "assets", "icons", "manufact-names",
+                    f"sc-logo-{file_key}.svg"
+                )
+                if os.path.exists(logo_path):
+                    return logo_path
+        return None
+
+    def _connect_signals(self) -> None:
+        bus = EventBus.instance()
+        bus.org_loaded.connect(self._on_org_loaded)
+        bus.org_candidates_found.connect(self._on_org_candidates)
+        bus.status_message.connect(self._on_status_msg)
+
+    def _on_search(self) -> None:
+        query = self.search_input.text().strip()
+        if query:
+            EventBus.instance().search_org_requested.emit(query)
+
+    @pyqtSlot(list)
+    def _on_org_candidates(self, candidates: list) -> None:
+        """Show a simple dialog for the user to pick from multiple candidates."""
+        from src.ui.widgets.confirm_dialog import ConfirmDialog
+        from PyQt6.QtWidgets import QListWidget, QListWidgetItem
+
+        dlg = ConfirmDialog(
+            title="SELECT ORGANIZATION",
+            message="Multiple organizations match your search. Select one:",
+            confirm_text="SELECT",
+            cancel_text="CANCEL",
+            parent=self.window(),
+        )
+        # Replace the message label with a list
+        list_widget = QListWidget()
+        list_widget.setFixedHeight(200)
+        list_widget.setStyleSheet(f"""
+            QListWidget {{
+                background: rgba(5, 11, 15, 0.85);
+                color: {P.ON_SURFACE};
+                border: 1px solid {P.OUTLINE_VARIANT};
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{
+                background: rgba(0, 170, 255, 0.20);
+            }}
+        """)
+        for c in candidates:
+            item = QListWidgetItem(f"{c['name']} ({c['sid']})")
+            item.setData(Qt.ItemDataRole.UserRole, c['sid'])
+            list_widget.addItem(item)
+        list_widget.setCurrentRow(0)
+
+        # Find the message label in the dialog and replace it
+        for child in dlg.findChildren(QLabel):
+            if child.wordWrap():
+                parent_layout = child.parent().layout()
+                idx = parent_layout.indexOf(child)
+                parent_layout.removeWidget(child)
+                child.deleteLater()
+                parent_layout.insertWidget(idx, list_widget)
+                break
+
+        if dlg.exec() == ConfirmDialog.DialogCode.Accepted and list_widget.currentItem():
+            sid = list_widget.currentItem().data(Qt.ItemDataRole.UserRole)
+            EventBus.instance().request_org_scrape.emit(sid)
+
+    @pyqtSlot(str, str)
+    def _on_status_msg(self, msg: str, severity: str) -> None:
+        if severity == "info" and "RETRIEVING ORG" in msg:
+            self.overlay.set_message(msg)
+            self.overlay.show_overlay()
+        elif severity in ("success", "error"):
+            self.overlay.hide_overlay()
+
+    @pyqtSlot(dict)
+    def _on_org_loaded(self, data: dict) -> None:
+        self.overlay.hide_overlay()
+        self.current_sid = data.get("sid", "")
+        self.search_input.clear()
+
+        # Show detail, hide empty state
+        self.empty_lbl.setVisible(False)
+        self.detail_container.setVisible(True)
+
+        # Header
+        self.name_lbl.setText(data.get("name", "—"))
+        self.sid_lbl.setText(f"@{data.get('sid', '—')}")
+
+        if data.get("logo_local"):
+            self.logo.set_image(data["logo_local"])
+        else:
+            self.logo.clear()
+        # Add manufacturer logo decoration if org name matches a known manufacturer
+        org_name = data.get("name", "")
+        mfr_logo_path = self._get_manufacturer_logo_path(org_name)
+        if mfr_logo_path:
+            from PyQt6.QtGui import QPixmap
+            logo_pixmap = QPixmap(mfr_logo_path)
+            if not logo_pixmap.isNull():
+                # Add a small decorative manufacturer logo to the identity card header
+                from PyQt6.QtWidgets import QLabel as QLbl
+                mfr_logo_lbl = QLbl()
+                mfr_logo_lbl.setPixmap(logo_pixmap.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                mfr_logo_lbl.setStyleSheet("background: transparent; border: none;")
+                mfr_logo_lbl.setToolTip(org_name)
+                # Add it to the header next to the name block
+                if self.name_lbl.parent():
+                    self.name_lbl.parent().layout().addWidget(mfr_logo_lbl)
+        # Details
+        self.f_archetype.set_value(data.get("archetype"))
+        self.f_language.set_value(data.get("language"))
+        self.f_commitment.set_value(data.get("commitment"))
+        self.f_members.set_value(str(data.get("member_count", 0)))
+        self.f_recruiting.set_value("YES" if data.get("recruiting") else "NO")
+        self.f_roleplay.set_value("YES" if data.get("roleplay") else "NO")
+        self.f_primary.set_value(data.get("focus_primary"))
+        self.f_secondary.set_value(data.get("focus_secondary"))
+
+        desc = data.get("description")
+        if desc:
+            self.desc_lbl.setText(desc)
+            self.desc_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+        else:
+            self.desc_lbl.setText("NO DESCRIPTION PROVIDED.")
+            self.desc_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;")
+
+        # Add manufacturer logo decoration if org name matches a known manufacturer
+        org_name = data.get("name", "")
+        mfr_logo_path = self._get_manufacturer_logo_path(org_name)
+        if mfr_logo_path:
+            from PyQt6.QtGui import QPixmap
+            logo_pixmap = QPixmap(mfr_logo_path)
+            if not logo_pixmap.isNull():
+                # Add a small decorative manufacturer logo to the identity card header
+                from PyQt6.QtWidgets import QLabel as QLbl
+                mfr_logo_lbl = QLbl()
+                mfr_logo_lbl.setPixmap(logo_pixmap.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                mfr_logo_lbl.setStyleSheet("background: transparent; border: none;")
+                mfr_logo_lbl.setToolTip(f"{org_name}")
+                # Add it to the header next to the name block
+                self.name_lbl.parent().layout().addWidget(mfr_logo_lbl) if self.name_lbl.parent() else None

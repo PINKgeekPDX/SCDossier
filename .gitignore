@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+tmp/
+output.log
+opencode.jsonc
+.kilo/
+.kilocode/
+.opencode/
+ui-example-files/
