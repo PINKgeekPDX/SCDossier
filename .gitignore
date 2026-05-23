@@ -8,8 +8,10 @@ dist/
 build/
 tmp/
 output.log
-opencode.jsonc
+.opcode/
 .kilo/
 .kilocode/
 .opencode/
 ui-example-files/
+.venv/
+.pytest_cache/
