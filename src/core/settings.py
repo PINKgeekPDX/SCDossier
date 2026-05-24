@@ -76,6 +76,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # Diagnostics & Logs
     "log_level": "normal",
     "include_debug_in_diagnostics": False,
+    "search_history_limit": 5,
+    "search_history": [],
     "_version": APP_VERSION,
 }
 
@@ -482,20 +484,28 @@ class SettingsManager(QObject):
 
     # Diagnostics & Logs
     @property
-    def log_level(self) -> str:
-        return str(self.get("log_level", "normal"))
-
-    @log_level.setter
-    def log_level(self, v: str) -> None:
-        self.set("log_level", v)
-
-    @property
     def include_debug_in_diagnostics(self) -> bool:
         return bool(self.get("include_debug_in_diagnostics", False))
 
     @include_debug_in_diagnostics.setter
     def include_debug_in_diagnostics(self, v: bool) -> None:
         self.set("include_debug_in_diagnostics", v)
+
+    @property
+    def search_history_limit(self) -> int:
+        return int(self.get("search_history_limit", 5))
+
+    @search_history_limit.setter
+    def search_history_limit(self, v: int) -> None:
+        self.set("search_history_limit", max(0, min(15, v)))
+
+    @property
+    def search_history(self) -> list:
+        return self.get("search_history", [])
+
+    @search_history.setter
+    def search_history(self, value: list) -> None:
+        self.set("search_history", value)
 
     def force_save(self) -> None:
         """Force an immediate save regardless of dirty state."""

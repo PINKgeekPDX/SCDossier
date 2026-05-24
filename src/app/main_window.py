@@ -48,6 +48,7 @@ class MainWindow(BaseWindow):
         self.setWindowTitle("SC Dossier")
         self.resize(1024, 768)
         self.setMinimumSize(800, 600)
+        self.setMaximumSize(1600, 1200)
 
         self._build_ui()
         self._connect_signals()
@@ -107,6 +108,7 @@ class MainWindow(BaseWindow):
         # Title bar controls window state
         self.title_bar.hide_requested.connect(self._on_hide_requested)
         self.title_bar.pin_toggled.connect(self._toggle_always_on_top)
+        self.title_bar.clear_results_requested.connect(self._on_clear_results)
 
         # Nav sidebar changes tabs
         self.sidebar.tab_selected.connect(self._on_tab_selected)

@@ -24,12 +24,22 @@ _BTN_BASE = (
     "QPushButton:disabled {{ opacity: 0.4; }}"
 )
 
+# Clear results button style (yellow hover)
+_CLEAR_BTN_BASE = (
+    "QPushButton {{ color: {color}; font-size: 16px; border: none; "
+    "background: {bg}; border-radius: 6px; }}"
+    "QPushButton:hover {{ background: {hover_bg}; color: {hover_color}; }}"
+    "QPushButton:pressed {{ background: {pressed_bg}; }}"
+    "QPushButton:disabled {{ opacity: 0.4; }}"
+)
+
 from src.core.paths import get_asset_path
 
 _APP_ICON = get_asset_path("assets/appicon.png")
 _PIN_UNLOCKED_ICON = get_asset_path("assets/icons/ships/default/Unlock.png")
 _PIN_LOCKED_ICON = get_asset_path("assets/icons/ships/default/Lock.png")
 _HIDE_ICON = get_asset_path("assets/icons/ships/default/Return.png")
+_CLEAR_ICON = get_asset_path("assets/icons/Icons/Close.png")
 
 class CustomTitleBar(QWidget):
     pin_toggled = pyqtSignal(bool)
@@ -52,6 +62,9 @@ class CustomTitleBar(QWidget):
         self._anim_timer.timeout.connect(self._update_animation)
         self._anim_timer.start(100) # every 100ms
 
+        # Clear results signal
+        self.clear_results_requested = pyqtSignal()
+
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -59,29 +72,39 @@ class CustomTitleBar(QWidget):
         layout.setContentsMargins(16, 0, 12, 0)
         layout.setSpacing(0)
 
-        # App Icon
+        # App Icon - slightly increased size (from 24 to 28)
         icon_lbl = QLabel()
         if os.path.exists(_APP_ICON):
-            pix = QPixmap(_APP_ICON).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pix = QPixmap(_APP_ICON).scaled(28, 28, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             icon_lbl.setPixmap(pix)
         else:
             icon_lbl.setText("🚀")
-        
         layout.addWidget(icon_lbl)
         layout.addSpacing(12)
 
-        # Animated Title Label
+        # Animated Title Label (already has hover animation in _update_animation)
         self._title_lbl = QLabel("SCD: Star Citizen Dossier")
         font = label_caps()
         font.setPointSize(10)
         font.setBold(True)
         self._title_lbl.setFont(font)
         self._title_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.15em;")
+        self._title_lbl.setMouseTracking(True)
         layout.addWidget(self._title_lbl)
 
         layout.addStretch(1)
 
-        # Right: Pin + Hide buttons
+        # Clear results button (new, on left side of pin button)
+        self._clear_btn = QPushButton()
+        self._clear_btn.setProperty("class", "icon")
+        self._clear_btn.setFixedSize(32, 32)
+        self._clear_btn.setToolTip("Clear all search results")
+        self._clear_btn.clicked.connect(self.clear_results_requested.emit)
+        self._update_clear_style()
+        layout.addWidget(self._clear_btn)
+        layout.addSpacing(4)
+
+        # Pin button
         self._pin_btn = QPushButton()
         self._pin_btn.setProperty("class", "icon")
         self._pin_btn.setFixedSize(32, 32)
@@ -90,6 +113,7 @@ class CustomTitleBar(QWidget):
         self._pin_btn.clicked.connect(self._on_pin_clicked)
         self._update_pin_style()
 
+        # Hide button
         self._hide_btn = QPushButton()
         self._hide_btn.setProperty("class", "icon")
         self._hide_btn.setFixedSize(32, 32)
@@ -144,6 +168,22 @@ class CustomTitleBar(QWidget):
             color=P.TEXT_DIM, bg="transparent",
             hover_bg="rgba(255,59,59,0.15)", hover_color=P.HAZARD_RED,
             pressed_bg="rgba(255,59,59,0.25)",
+        ))
+
+    def _update_clear_style(self) -> None:
+        self._load_button_icon(self._clear_btn, _CLEAR_ICON, "✕")
+        self._clear_btn.setStyleSheet(_CLEAR_BTN_BASE.format(
+            color=P.TEXT_DIM, bg="transparent",
+            hover_bg="rgba(255,255,0,0.2)", hover_color="#FFFF00",  # Yellowish hover
+            pressed_bg="rgba(255,255,0,0.3)",
+        ))
+
+    def _update_clear_style(self) -> None:
+        self._load_button_icon(self._clear_btn, _CLEAR_ICON, "✕")
+        self._clear_btn.setStyleSheet(_CLEAR_BTN_BASE.format(
+            color=P.TEXT_DIM, bg="transparent",
+            hover_bg="rgba(255,255,0,0.2)", hover_color="#FFFF00",  # Yellowish hover
+            pressed_bg="rgba(255,255,0,0.3)",
         ))
 
     @property

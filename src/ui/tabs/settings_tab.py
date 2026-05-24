@@ -639,6 +639,14 @@ class SettingsTab(QWidget):
         self.debug_diag_cb.setToolTip("Include additional troubleshooting detail in user-visible diagnostics and status messages")
         form.addRow(TechLabel("DEBUG DETAIL"), self.debug_diag_cb)
 
+        # Search history limit
+        self.history_limit_spin = QSpinBox()
+        self.history_limit_spin.setRange(0, 15)
+        self.history_limit_spin.setSuffix(" items")
+        self.history_limit_spin.setStyleSheet(self._compact_input_style())
+        self.history_limit_spin.setToolTip("Number of recent searches to remember in the search boxes (0 disables history)")
+        form.addRow(TechLabel("SEARCH HISTORY"), self.history_limit_spin)
+
         layout.addLayout(form)
 
         btn_layout = QHBoxLayout()
@@ -859,6 +867,10 @@ class SettingsTab(QWidget):
         if idx >= 0:
             self.log_level_combo.setCurrentIndex(idx)
         self.debug_diag_cb.setChecked(getattr(self.sm, 'include_debug_in_diagnostics', False))
+        
+        # Search history limit
+        history_limit = getattr(self.sm, 'search_history_limit', 5)
+        self.history_limit_spin.setValue(history_limit)
 
     def _connect_signals(self) -> None:
         # General
@@ -909,6 +921,9 @@ class SettingsTab(QWidget):
             lambda: setattr(self.sm, 'log_level', self.log_level_combo.currentData())
         )
         self.debug_diag_cb.toggled.connect(lambda v: setattr(self.sm, 'include_debug_in_diagnostics', v))
+        
+        # Search history limit
+        self.history_limit_spin.valueChanged.connect(lambda v: setattr(self.sm, 'search_history_limit', v))
 
     def _on_ocr_changed(self, value: int) -> None:
         self.ocr_val_lbl.setText(f"{value}%")

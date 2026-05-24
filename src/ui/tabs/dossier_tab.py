@@ -24,6 +24,7 @@ from src.ui.widgets.search_input import SearchInput
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.wrap_layout import WrapLayout
 import os
+from src.core.settings import SettingsManager
 
 class ClickableOrgCard(GlassCard):
     """
@@ -235,7 +236,7 @@ class DossierTab(QWidget):
         # Badges card
         self.badges_card = GlassCard(title="ACCREDITATIONS & CLEARANCES")
         self.badges_wrap = WrapLayout()
-        self.badges_wrap.setMinimumHeight(40)
+        self.badges_wrap.setMinimumHeight(44)
         self.badges_card.content_layout.addWidget(self.badges_wrap)
         dl.addWidget(self.badges_card)
 
@@ -259,7 +260,29 @@ class DossierTab(QWidget):
     def _on_search(self) -> None:
         handle = self.search_input.text().strip()
         if handle:
+            # Add to search history
+            self._add_to_search_history(handle)
             EventBus.instance().search_player_requested.emit(handle)
+
+    def _add_to_search_history(self, query: str) -> None:
+        """Add a search query to the history."""
+        settings = SettingsManager.instance()
+        history = settings.search_history
+        
+        # Remove if already exists to avoid duplicates
+        if query in history:
+            history.remove(query)
+        
+        # Add to the end (most recent)
+        history.append(query)
+        
+        # Apply limit
+        limit = settings.search_history_limit
+        if limit >= 0 and len(history) > limit:
+            history = history[-limit:]
+        
+        # Save back to settings
+        settings.search_history = history
 
     def _on_archive_clicked(self) -> None:
         if self.current_handle:

@@ -19,10 +19,9 @@ from src.ui.theme.fonts import headline_xl, font_inter, label_caps
 from src.ui.widgets.search_input import SearchInput
 
 from src.core.paths import get_asset_path
+from src.core.settings import SettingsManager
 
-_USER_ICON = get_asset_path("assets/icons/Icons/USER.png")
 _RIGHT_ICON = get_asset_path("assets/icons/Icons/RIGHT.png")
-_INFO_ICON = get_asset_path("assets/icons/misc/info.png")
 
 
 class StyledToggleButton(QPushButton):
@@ -282,33 +281,6 @@ class SearchTab(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(32)
 
-        # --- Title ---
-        title_hbox = QHBoxLayout()
-        title_hbox.setSpacing(16)
-        title_hbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        icon_lbl = QLabel()
-        if os.path.exists(_USER_ICON):
-            pix = QPixmap(_USER_ICON).scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            icon_lbl.setPixmap(pix)
-        icon_lbl.setToolTip("Citizen Dossier - Star Citizen Profile Search")
-
-        title_lbl = QLabel("CITIZEN DOSSIER")
-        font = headline_xl()
-        font.setUnderline(True)
-        title_lbl.setFont(font)
-        title_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; letter-spacing: 0.15em;")
-        title_lbl.setToolTip("Search for Star Citizen player profiles and organizations")
-
-        glow_title = QGraphicsDropShadowEffect()
-        glow_title.setBlurRadius(20)
-        glow_title.setColor(QColor(0, 170, 255, 120))
-        glow_title.setOffset(0, 0)
-        title_lbl.setGraphicsEffect(glow_title)
-
-        title_hbox.addWidget(icon_lbl)
-        title_hbox.addWidget(title_lbl)
-
         # --- Mode Toggle ---
         mode_widget = QWidget()
         mode_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
@@ -358,31 +330,12 @@ class SearchTab(QWidget):
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(self.search_btn)
 
-        # --- Footer ---
-        hint_hbox = QHBoxLayout()
-        hint_hbox.setSpacing(8)
-        hint_hbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        info_icon = QLabel()
-        if os.path.exists(_INFO_ICON):
-            pix = QPixmap(_INFO_ICON).scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            info_icon.setPixmap(pix)
-        info_icon.setToolTip("Search help information")
-
-        self.hint_lbl = QLabel("Enter player name or RSI dossier URL to find information")
-        self.hint_lbl.setFont(font_inter(12))
-        self.hint_lbl.setStyleSheet(f"color: {P.TEXT_DIM};")
-        self.hint_lbl.setToolTip("Type an RSI handle (e.g., PINKgeekPDX) or paste a full RSI profile URL")
-
-        hint_hbox.addWidget(info_icon)
-        hint_hbox.addWidget(self.hint_lbl)
 
         # Assembly
         layout.addStretch(1)
-        layout.addLayout(title_hbox)
         layout.addWidget(mode_widget, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(search_container, 0, Qt.AlignmentFlag.AlignCenter)
-        layout.addLayout(hint_hbox)
         layout.addStretch(2)
 
     def _set_mode(self, mode: str) -> None:
@@ -402,6 +355,9 @@ class SearchTab(QWidget):
         query = self.search_input.text().strip()
         if not query:
             return
+        # Add to search history
+        self._add_to_search_history(query)
+        
         if self._mode == "player":
             EventBus.instance().search_player_requested.emit(query)
             EventBus.instance().navigate_to_tab.emit("dossier")
@@ -409,3 +365,23 @@ class SearchTab(QWidget):
             EventBus.instance().search_org_requested.emit(query)
             EventBus.instance().navigate_to_tab.emit("organization")
         self.search_input.clear()
+
+    def _add_to_search_history(self, query: str) -> None:
+        """Add a search query to the history."""
+        settings = SettingsManager.instance()
+        history = settings.search_history
+        
+        # Remove if already exists to avoid duplicates
+        if query in history:
+            history.remove(query)
+        
+        # Add to the end (most recent)
+        history.append(query)
+        
+        # Apply limit
+        limit = settings.search_history_limit
+        if limit >= 0 and len(history) > limit:
+            history = history[-limit:]
+        
+        # Save back to settings
+        settings.search_history = history
