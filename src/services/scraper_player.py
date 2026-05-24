@@ -109,7 +109,7 @@ class PlayerScraperWorker(QThread):
 
             soup = BeautifulSoup(resp.text, "lxml")
 
-            # --- Identity: moniker and handle ---
+            # --- Identity: moniker, handle, and badges ---
             # 1st <p class="entry"> in div.profile.left-col div.info has no <span.label> — that's the moniker
             info_entries = soup.select("div.profile.left-col div.info > p.entry")
             if info_entries:
@@ -118,23 +118,31 @@ class PlayerScraperWorker(QThread):
                 if moniker_raw:
                     data["moniker"] = moniker_raw
 
-                # Find Handle from entries with explicit labels
+                # Find Handle from entries with explicit labels, and extract Badges (which have span.icon)
                 for entry in info_entries:
                     label_elem = entry.select_one("span.label")
-                    if not label_elem:
-                        continue
-                    label_text = label_elem.get_text(strip=True).lower()
-                    value_elem = entry.select_one("strong.value") or entry.select_one("a.value")
-                    if not value_elem:
-                        continue
-                    val = value_elem.get_text(strip=True)
-
-                    if "handle" in label_text:
-                        data["handle"] = val
-                    elif "location" in label_text:
-                        data["location"] = val
-                    elif "fluency" in label_text:
-                        data["fluency"] = [f.strip() for f in val.split(",") if f.strip()]
+                    icon_span = entry.select_one("span.icon")
+                    
+                    if label_elem:
+                        label_text = label_elem.get_text(strip=True).lower()
+                        value_elem = entry.select_one("strong.value") or entry.select_one("a.value")
+                        if value_elem:
+                            val = value_elem.get_text(strip=True)
+                            if "handle" in label_text:
+                                data["handle"] = val
+                    elif icon_span:
+                        img_elem = icon_span.select_one("img")
+                        val_elem = entry.select_one("span.value") or entry.select_one("strong.value") or entry.select_one("a.value")
+                        if img_elem and img_elem.has_attr("src") and val_elem:
+                            badge_name = val_elem.get_text(strip=True)
+                            badge_url = img_elem["src"]
+                            if not badge_url.startswith("http"):
+                                badge_url = "https://robertsspaceindustries.com" + badge_url
+                            data["badges"].append({
+                                "name": badge_name,
+                                "image_url": badge_url,
+                                "image_local": ""
+                            })
 
             # --- Avatar ---
             avatar_img = soup.select_one("div.profile.left-col div.thumb img")
@@ -144,7 +152,7 @@ class PlayerScraperWorker(QThread):
                     src = "https://robertsspaceindustries.com" + src
                 data["avatar_url"] = src
 
-            # --- Enlisted date ---
+            # --- Enlisted, Location, and Fluency ---
             # Located in div.left-col div.inner p.entry
             for entry in soup.select("div.left-col div.inner p.entry"):
                 label_elem = entry.select_one("span.label")
@@ -157,7 +165,10 @@ class PlayerScraperWorker(QThread):
                 val = val_elem.get_text(strip=True)
                 if "enlisted" in label_text:
                     data["enlisted"] = val
-                    break
+                elif "location" in label_text:
+                    data["location"] = val
+                elif "fluency" in label_text:
+                    data["fluency"] = [f.strip() for f in val.split(",") if f.strip()]
 
             # --- Bio ---
             # Located in div.right-col div.inner div.entry.bio div.value

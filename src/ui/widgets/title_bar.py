@@ -24,11 +24,12 @@ _BTN_BASE = (
     "QPushButton:disabled {{ opacity: 0.4; }}"
 )
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-_APP_ICON = os.path.join(_PROJECT_ROOT, "assets", "appicon.png")
-_PIN_UNLOCKED_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "ships", "default", "Unlock.png")
-_PIN_LOCKED_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "ships", "default", "Lock.png")
-_HIDE_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "ships", "default", "Return.png")
+from src.core.paths import get_asset_path
+
+_APP_ICON = get_asset_path("assets/appicon.png")
+_PIN_UNLOCKED_ICON = get_asset_path("assets/icons/ships/default/Unlock.png")
+_PIN_LOCKED_ICON = get_asset_path("assets/icons/ships/default/Lock.png")
+_HIDE_ICON = get_asset_path("assets/icons/ships/default/Return.png")
 
 class CustomTitleBar(QWidget):
     pin_toggled = pyqtSignal(bool)
@@ -176,23 +177,7 @@ class CustomTitleBar(QWidget):
     def set_status(self, text: str, ok: bool = True) -> None:
         pass # Removed per request
 
-    def mousePressEvent(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_active = True
-            self._drag_start_pos = event.globalPosition().toPoint()
-            if self.window():
-                self._drag_start_window_pos = self.window().pos()
-            event.accept()
 
-    def mouseMoveEvent(self, event) -> None:
-        if self._drag_active and self.window():
-            delta = event.globalPosition().toPoint() - self._drag_start_pos
-            self.window().move(self._drag_start_window_pos + delta)
-            event.accept()
-
-    def mouseReleaseEvent(self, event) -> None:
-        self._drag_active = False
-        event.accept()
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)

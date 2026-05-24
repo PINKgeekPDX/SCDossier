@@ -3,6 +3,13 @@ src/main.py
 Application Entry Point.
 """
 
+# Workaround for DLL collision on Windows: import onnxruntime before PyQt6/Qt6 DLLs are loaded.
+try:
+    import onnxruntime
+except ImportError:
+    pass
+
+import os
 import sys
 import logging
 from PyQt6.QtWidgets import QApplication
@@ -37,9 +44,9 @@ def main():
     app.setApplicationName("SC Dossier")
     app.setOrganizationName("PINK")
     
-    import os
     from PyQt6.QtGui import QIcon
-    appicon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "appicon.png")
+    from src.core.paths import get_asset_path
+    appicon_path = get_asset_path("assets/appicon.png")
     if os.path.exists(appicon_path):
         app.setWindowIcon(QIcon(appicon_path))
 
@@ -60,7 +67,7 @@ def main():
     # Also set the app icon for taskbar purposes
     if os.path.exists(appicon_path):
         app_icon_ico = QIcon()
-        ico_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "appicon.ico")
+        ico_path = get_asset_path("assets/appicon.ico")
         if os.path.exists(ico_path):
             app_icon_ico = QIcon(ico_path)
             app.setWindowIcon(app_icon_ico)

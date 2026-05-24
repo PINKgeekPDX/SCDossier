@@ -37,8 +37,9 @@ class MainWindow(BaseWindow):
         self.controller = controller
 
         # Set window icon on the instance so the taskbar entry uses the correct icon
-        _ico_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "appicon.ico")
-        _png_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "appicon.png")
+        from src.core.paths import get_asset_path
+        _ico_path = get_asset_path("assets/appicon.ico")
+        _png_path = get_asset_path("assets/appicon.png")
         if os.path.exists(_ico_path):
             self.setWindowIcon(QIcon(_ico_path))
         elif os.path.exists(_png_path):

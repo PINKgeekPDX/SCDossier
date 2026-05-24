@@ -66,6 +66,7 @@ class OrgTab(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.current_sid = ""
+        self.mfr_logo_lbl = None
         self._build_ui()
         self._connect_signals()
 
@@ -88,8 +89,8 @@ class OrgTab(QWidget):
         self.search_input.setToolTip("Enter an organization name or SID (e.g., REBELS) to search for org details")
         # Base styling is handled by SearchInput class
 
-        _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        search_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_search.svg")
+        from src.core.paths import get_asset_path
+        search_icon = get_asset_path("assets/icons/misc/icon_search.svg")
 
         search_btn = QPushButton()
         search_btn.setProperty("class", "primary")
@@ -144,8 +145,8 @@ class OrgTab(QWidget):
 
         # Identity card
         self.identity_card = GlassCard(title="ORGANIZATION IDENTITY")
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(20)
+        self.header_layout = QHBoxLayout()
+        self.header_layout.setSpacing(20)
         self.logo = AvatarWidget(size=120)
 
         name_vbox = QVBoxLayout()
@@ -161,10 +162,10 @@ class OrgTab(QWidget):
         name_vbox.addWidget(self.name_lbl)
         name_vbox.addWidget(self.sid_lbl)
 
-        header_layout.addWidget(self.logo)
-        header_layout.addLayout(name_vbox)
-        header_layout.addStretch()
-        self.identity_card.content_layout.addLayout(header_layout)
+        self.header_layout.addWidget(self.logo)
+        self.header_layout.addLayout(name_vbox)
+        self.header_layout.addStretch()
+        self.identity_card.content_layout.addLayout(self.header_layout)
         dl.addWidget(self.identity_card)
 
         # Details grid card
@@ -212,11 +213,8 @@ class OrgTab(QWidget):
         """Check if org name matches a known SC manufacturer and return logo path."""
         for name_key, file_key in MANUFACTURER_MAP.items():
             if name_key.lower() in org_name.lower():
-                logo_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    "assets", "icons", "manufact-names",
-                    f"sc-logo-{file_key}.svg"
-                )
+                from src.core.paths import get_asset_path
+                logo_path = get_asset_path(f"assets/icons/manufact-names/sc-logo-{file_key}.svg")
                 if os.path.exists(logo_path):
                     return logo_path
         return None
@@ -305,22 +303,30 @@ class OrgTab(QWidget):
             self.logo.set_image(data["logo_local"])
         else:
             self.logo.clear()
+        # Remove any existing manufacturer logo decoration
+        if self.mfr_logo_lbl:
+            self.header_layout.removeWidget(self.mfr_logo_lbl)
+            self.mfr_logo_lbl.deleteLater()
+            self.mfr_logo_lbl = None
+
         # Add manufacturer logo decoration if org name matches a known manufacturer
         org_name = data.get("name", "")
         mfr_logo_path = self._get_manufacturer_logo_path(org_name)
         if mfr_logo_path:
-            from PyQt6.QtGui import QPixmap
-            logo_pixmap = QPixmap(mfr_logo_path)
-            if not logo_pixmap.isNull():
-                # Add a small decorative manufacturer logo to the identity card header
+            from src.ui.theme.icon_utils import load_tinted_icon
+            # Tint with Aegis Cyan/Blue with 60% opacity for a premium watermark look
+            tint_color = (0, 170, 255, 153)
+            icon_size = 48
+            tinted_icon = load_tinted_icon(mfr_logo_path, tint_color, icon_size)
+            if tinted_icon and not tinted_icon.isNull():
                 from PyQt6.QtWidgets import QLabel as QLbl
-                mfr_logo_lbl = QLbl()
-                mfr_logo_lbl.setPixmap(logo_pixmap.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-                mfr_logo_lbl.setStyleSheet("background: transparent; border: none;")
-                mfr_logo_lbl.setToolTip(org_name)
-                # Add it to the header next to the name block
-                if self.name_lbl.parent():
-                    self.name_lbl.parent().layout().addWidget(mfr_logo_lbl)
+                self.mfr_logo_lbl = QLbl()
+                self.mfr_logo_lbl.setPixmap(tinted_icon.pixmap(icon_size, icon_size))
+                self.mfr_logo_lbl.setFixedSize(icon_size, icon_size)
+                self.mfr_logo_lbl.setStyleSheet("background: transparent; border: none;")
+                self.mfr_logo_lbl.setToolTip(org_name)
+                self.header_layout.addWidget(self.mfr_logo_lbl, alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+
         # Details
         self.f_archetype.set_value(data.get("archetype"))
         self.f_language.set_value(data.get("language"))
@@ -338,19 +344,3 @@ class OrgTab(QWidget):
         else:
             self.desc_lbl.setText("NO DESCRIPTION PROVIDED.")
             self.desc_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;")
-
-        # Add manufacturer logo decoration if org name matches a known manufacturer
-        org_name = data.get("name", "")
-        mfr_logo_path = self._get_manufacturer_logo_path(org_name)
-        if mfr_logo_path:
-            from PyQt6.QtGui import QPixmap
-            logo_pixmap = QPixmap(mfr_logo_path)
-            if not logo_pixmap.isNull():
-                # Add a small decorative manufacturer logo to the identity card header
-                from PyQt6.QtWidgets import QLabel as QLbl
-                mfr_logo_lbl = QLbl()
-                mfr_logo_lbl.setPixmap(logo_pixmap.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-                mfr_logo_lbl.setStyleSheet("background: transparent; border: none;")
-                mfr_logo_lbl.setToolTip(f"{org_name}")
-                # Add it to the header next to the name block
-                self.name_lbl.parent().layout().addWidget(mfr_logo_lbl) if self.name_lbl.parent() else None

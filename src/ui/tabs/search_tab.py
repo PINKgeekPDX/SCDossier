@@ -18,10 +18,11 @@ from src.ui.theme import palette as P
 from src.ui.theme.fonts import headline_xl, font_inter, label_caps
 from src.ui.widgets.search_input import SearchInput
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-_USER_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "USER.png")
-_RIGHT_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "RIGHT.png")
-_INFO_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "info.png")
+from src.core.paths import get_asset_path
+
+_USER_ICON = get_asset_path("assets/icons/Icons/USER.png")
+_RIGHT_ICON = get_asset_path("assets/icons/Icons/RIGHT.png")
+_INFO_ICON = get_asset_path("assets/icons/misc/info.png")
 
 
 class StyledToggleButton(QPushButton):

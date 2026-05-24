@@ -178,5 +178,33 @@ class PathManager:
         base_dir = self.archived_dir(player_name) if archived else self.temp_cache_dir(player_name)
         return base_dir / "profile.json"
 
+    @property
+    def assets_root(self) -> Path:
+        """Resolve the assets directory root in both development and PyInstaller contexts."""
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            return Path(sys._MEIPASS) / "src" / "assets"
+        # In development: paths.py is in src/core/paths.py, so parent's parent is src/
+        return Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "assets"
+
+    def get_asset_path(self, relative: str) -> str:
+        """
+        Resolve an asset path relative to the assets root.
+        Handles paths starting with 'assets/' for compatibility.
+        """
+        path_str = relative
+        if path_str.startswith("assets/"):
+            path_str = path_str[7:]
+        elif path_str.startswith("assets\\"):
+            path_str = path_str[7:]
+        return str(self.assets_root / path_str)
+
     def __repr__(self) -> str:
         return f"PathManager(base={self._base})"
+
+
+def get_asset_path(relative: str) -> str:
+    """
+    Resolve an asset path correctly in both development and PyInstaller contexts
+    using the PathManager singleton.
+    """
+    return PathManager.instance().get_asset_path(relative)

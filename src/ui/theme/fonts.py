@@ -23,7 +23,8 @@ FONT_SORA_FALLBACK = "Segoe UI, Arial, sans-serif"
 FONT_INTER_FALLBACK = "Segoe UI, Arial, sans-serif"
 FONT_MONO_FALLBACK = "Consolas, Courier New, monospace"
 
-_FONTS_DIR = Path(__file__).parent.parent.parent / "assets" / "fonts"
+from src.core.paths import get_asset_path
+_FONTS_DIR = Path(get_asset_path("assets/fonts"))
 
 _FONT_FILES = [
     # Sora

@@ -1,10 +1,4 @@
-"""
-src/ui/widgets/wrap_layout.py
-WrapLayout — a simple flow/wrap layout for badge chips and similar items.
-Extracted from dossier_tab.py for reuse across tabs.
-"""
-
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import QWidget
 
 
@@ -25,11 +19,22 @@ class WrapLayout(QWidget):
         for w in self._widgets:
             w.deleteLater()
         self._widgets = []
+        self.setFixedHeight(0)
+        self.updateGeometry()
 
     def _do_layout(self):
         if not self._widgets:
+            if self.height() != 0:
+                self.setFixedHeight(0)
+                self.updateGeometry()
             return
+
         w = self.width()
+        # Fallback to parent's width if width hasn't been set yet
+        if w <= 100 and self.parentWidget():
+            w = self.parentWidget().width() - 32
+        w = max(100, w)
+
         x, y = self._margin, self._margin
         max_h = 0
         for widget in self._widgets:
@@ -42,7 +47,19 @@ class WrapLayout(QWidget):
             widget.show()
             x += widget_w + self._spacing
             max_h = max(max_h, widget.sizeHint().height())
-        self.setMinimumHeight(y + max_h + self._margin)
+
+        new_h = y + max_h + self._margin
+        if self.height() != new_h or self.minimumHeight() != new_h:
+            self.setFixedHeight(new_h)
+            self.updateGeometry()
+
+    def sizeHint(self) -> QSize:
+        if not self._widgets:
+            return QSize(100, 0)
+        return QSize(self.width(), self.minimumHeight())
+
+    def minimumSizeHint(self) -> QSize:
+        return self.sizeHint()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

@@ -58,15 +58,11 @@ _SPINE_GLOW  = QColor(0, 180, 255,  55)    # energy spine soft halo
 _SHEEN_START = QColor(0, 170, 255,  22)    # inner surface sheen (edge side)
 _SEP         = QColor(0, 170, 255,  38)    # separator line
 _TICK        = QColor(0, 210, 255,  80)    # tick-marks on separator
-_SCAN_CORE   = QColor(190, 240, 255, 175)  # scan-sweep bright centre
-_SCAN_HALO   = QColor( 80, 200, 255,  55)  # scan-sweep soft halo
+
 _STRIPE      = QColor(0, 170, 255,   6)    # background scanline texture
 _BRAK        = QColor(0, 220, 255, 150)    # corner bracket
 
-_ICONS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "assets", "icons",
-)
+from src.core.paths import get_asset_path
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -277,30 +273,10 @@ class OverlayToolbar(QWidget):
         self._pulse_timer.timeout.connect(self._tick_pulse)
         self._pulse_timer.start(33)   # ~30 fps
 
-        # ── Periodic scan sweep ───────────────────────────────────────────────
-        self._scan_pos     = -0.05
-        self._scan_active  = False
-        self._scan_anim    = QPropertyAnimation(self, b"_scan_prop", self)
-        self._scan_anim.setDuration(850)
-        self._scan_anim.setEasingCurve(QEasingCurve.Type.InOutSine)
-        self._scan_anim.finished.connect(self._on_scan_done)
 
-        self._scan_trigger = QTimer(self)
-        self._scan_trigger.timeout.connect(self._start_scan)
-        self._scan_trigger.start(5500)   # sweep every 5.5 s
 
         self._build_ui()
         self._set_orientation(self._edge)
-
-    # ── pyqtProperty — scan sweep position (0 → 1) ───────────────────────────
-    def _get_scan(self) -> float:
-        return self._scan_pos
-
-    def _set_scan(self, v: float) -> None:
-        self._scan_pos = float(v)
-        self.update()
-
-    _scan_prop = pyqtProperty(float, fget=_get_scan, fset=_set_scan)
 
     # ── Animations ────────────────────────────────────────────────────────────
     def _tick_pulse(self) -> None:
@@ -308,24 +284,13 @@ class OverlayToolbar(QWidget):
         self._pulse = 38.0 + 34.0 * math.sin(self._pulse_phase)
         self.update()
 
-    def _start_scan(self) -> None:
-        self._scan_active = True
-        self._scan_anim.stop()
-        self._scan_anim.setStartValue(-0.04)
-        self._scan_anim.setEndValue(1.04)
-        self._scan_anim.start()
-
-    def _on_scan_done(self) -> None:
-        self._scan_active = False
-        self.update()
-
     # ── UI ────────────────────────────────────────────────────────────────────
     def _build_ui(self) -> None:
-        expand_icon  = os.path.join(_ICONS_DIR, "ships", "default", "MobiGlas.png")
+        expand_icon = get_asset_path("assets/icons/ships/default/MobiGlas.png")
         self._expand_btn = ToolbarButton(expand_icon, "Open SC Dossier", self)
         self._expand_btn.clicked.connect(self.expand_requested.emit)
 
-        capture_icon = os.path.join(_ICONS_DIR, "ships", "default", "Target_Lock.png")
+        capture_icon = get_asset_path("assets/icons/ships/default/Target_Lock.png")
         self._capture_btn = ToolbarButton(capture_icon, "OCR Screen Capture", self)
         self._capture_btn.clicked.connect(self.capture_requested.emit)
 
@@ -335,7 +300,8 @@ class OverlayToolbar(QWidget):
         if old is not None:
             while old.count():
                 old.takeAt(0)
-            old.deleteLater()
+            # Detach layout from self by setting it on a temporary dummy widget
+            QWidget().setLayout(old)
 
         if edge in (ScreenEdge.TOP, ScreenEdge.BOTTOM):
             layout = QHBoxLayout(self)
@@ -555,9 +521,7 @@ class OverlayToolbar(QWidget):
         # ── Layer 8: corner bracket ornaments ─────────────────────────────────
         self._draw_brackets(p, w, h, pulse)
 
-        # ── Layer 9: scan sweep ───────────────────────────────────────────────
-        if self._scan_active:
-            self._draw_scan(p, w, h, edge, body)
+
 
         p.end()
 
@@ -586,31 +550,4 @@ class OverlayToolbar(QWidget):
         p.drawLine(QPointF(w - c,   h - 1.5),  QPointF(w - c - arm, h - 1.5))
         p.drawLine(QPointF(w - 1.5, h - c),    QPointF(w - 1.5,    h - c - arm))
 
-    def _draw_scan(
-        self,
-        p: QPainter,
-        w: float,
-        h: float,
-        edge: ScreenEdge,
-        body: QPainterPath,
-    ) -> None:
-        """Animated scan-sweep line — clips to chamfered body."""
-        t = self._scan_pos   # −0.04 → 1.04
 
-        p.save()
-        p.setClipPath(body)
-
-        if edge in (ScreenEdge.TOP, ScreenEdge.BOTTOM):
-            x = t * w
-            p.setPen(QPen(_SCAN_HALO, 6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
-            p.drawLine(QPointF(x, 1), QPointF(x, h - 1))
-            p.setPen(QPen(_SCAN_CORE, 1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
-            p.drawLine(QPointF(x, 1), QPointF(x, h - 1))
-        else:
-            y = t * h
-            p.setPen(QPen(_SCAN_HALO, 6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
-            p.drawLine(QPointF(1, y), QPointF(w - 1, y))
-            p.setPen(QPen(_SCAN_CORE, 1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
-            p.drawLine(QPointF(1, y), QPointF(w - 1, y))
-
-        p.restore()

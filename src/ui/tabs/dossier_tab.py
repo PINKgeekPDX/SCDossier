@@ -25,6 +25,49 @@ from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.wrap_layout import WrapLayout
 import os
 
+class ClickableOrgCard(GlassCard):
+    """
+    A GlassCard that represents an organization affiliation. Clicking anywhere
+    on the card (except the avatar which handles its own clicks) switches to the
+    Organization tab and searches for this organization's SID.
+    """
+    def __init__(self, sid: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent=parent)
+        self.sid = sid
+        self._hovered = False
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(f"Click card to view organization @{sid} profile")
+        self.setMouseTracking(True)
+
+    def enterEvent(self, event) -> None:
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            from src.core.events import EventBus
+            EventBus.instance().navigate_to_tab.emit("organization")
+            EventBus.instance().request_org_scrape.emit(self.sid)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if self._hovered:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            rect = self.rect()
+            painter.fillRect(rect, QColor(0, 170, 255, 15)) # rgba(0, 170, 255, 0.06) hover highlight overlay
+            painter.end()
+
+
 class DossierTab(QWidget):
     """
     Displays the active profile using GlassCard containers.
@@ -32,6 +75,8 @@ class DossierTab(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        from src.services.cache_manager import CacheManager
+        self.cache_mgr = CacheManager()
         self.current_handle = ""
         self._current_data = None
         self._build_ui()
@@ -56,9 +101,9 @@ class DossierTab(QWidget):
         self.search_input.setToolTip("Enter an RSI handle (e.g., PINKgeekPDX) to search for a citizen profile")
         # Base styling is handled by SearchInput class - remove redundant inline style
 
-        _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        search_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_search.svg")
-        archive_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_save.svg")
+        from src.core.paths import get_asset_path
+        search_icon = get_asset_path("assets/icons/misc/icon_search.svg")
+        archive_icon = get_asset_path("assets/icons/misc/icon_save.svg")
 
         search_btn = QPushButton()
         search_btn.setProperty("class", "primary")
@@ -144,17 +189,22 @@ class DossierTab(QWidget):
         header_layout.addStretch()
 
         # Add RSI brand icon decoration
-        rsi_logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons", "brand-icons", "sc-icon-brand-rsi.svg")
+        from src.core.paths import get_asset_path
+        rsi_logo_path = get_asset_path("assets/icons/brand-icons/sc-icon-brand-rsi.svg")
         if os.path.exists(rsi_logo_path):
-            from PyQt6.QtGui import QPixmap
-            rsi_pixmap = QPixmap(rsi_logo_path)
-            if not rsi_pixmap.isNull():
+            from src.ui.theme.icon_utils import load_tinted_icon
+            # Tint with Aegis Cyan/Blue with 60% opacity for a premium watermark look
+            tint_color = (0, 170, 255, 153)
+            icon_size = 48
+            tinted_icon = load_tinted_icon(rsi_logo_path, tint_color, icon_size)
+            if tinted_icon and not tinted_icon.isNull():
                 from PyQt6.QtWidgets import QLabel as QLbl
                 rsi_logo_lbl = QLbl()
-                rsi_logo_lbl.setPixmap(rsi_pixmap.scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                rsi_logo_lbl.setPixmap(tinted_icon.pixmap(icon_size, icon_size))
+                rsi_logo_lbl.setFixedSize(icon_size, icon_size)
                 rsi_logo_lbl.setStyleSheet("background: transparent; border: none;")
                 rsi_logo_lbl.setToolTip("RSI")
-                header_layout.addWidget(rsi_logo_lbl)
+                header_layout.addWidget(rsi_logo_lbl, alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
         self.identity_card.content_layout.addLayout(header_layout)
         dl.addWidget(self.identity_card)
 
@@ -197,12 +247,14 @@ class DossierTab(QWidget):
         dl.addWidget(self.orgs_card)
 
         dl.addStretch()
+        self._setup_archive_glow()
 
     def _connect_signals(self) -> None:
         bus = EventBus.instance()
         bus.scrape_completed.connect(self._on_scrape_completed)
         bus.image_downloaded.connect(self._on_image_downloaded)
         bus.status_message.connect(self._on_status_msg)
+        bus.archive_updated.connect(self._on_archive_updated)
 
     def _on_search(self) -> None:
         handle = self.search_input.text().strip()
@@ -274,6 +326,8 @@ class DossierTab(QWidget):
             lbl.setStyleSheet(f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;")
             self.orgs_layout.addWidget(lbl)
 
+        self._update_archive_glow()
+
     def _clear_orgs(self) -> None:
         while self.orgs_layout.count():
             item = self.orgs_layout.takeAt(0)
@@ -281,7 +335,8 @@ class DossierTab(QWidget):
                 item.widget().deleteLater()
 
     def _add_org_widget(self, org: dict) -> None:
-        card = GlassCard()
+        sid = org.get("sid", "")
+        card = ClickableOrgCard(sid, self)
         inner = QWidget()
         layout = QHBoxLayout(inner)
         layout.setContentsMargins(12, 8, 12, 8)
@@ -345,3 +400,38 @@ class DossierTab(QWidget):
                 for org in data.get("orgs", []):
                     self._add_org_widget(org)
                 return
+
+    def _setup_archive_glow(self) -> None:
+        from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+        from PyQt6.QtCore import QPropertyAnimation, QEasingCurve
+        from PyQt6.QtGui import QColor
+
+        self._archive_glow_shadow = QGraphicsDropShadowEffect(self.archive_btn)
+        self._archive_glow_shadow.setBlurRadius(0)
+        self._archive_glow_shadow.setColor(QColor(0, 170, 255, 200))  # Aegis Cyan/Blue glow
+        self._archive_glow_shadow.setOffset(0, 0)
+        self.archive_btn.setGraphicsEffect(self._archive_glow_shadow)
+
+        self._archive_pulse_anim = QPropertyAnimation(self._archive_glow_shadow, b"blurRadius")
+        self._archive_pulse_anim.setDuration(1500)
+        self._archive_pulse_anim.setStartValue(0)
+        self._archive_pulse_anim.setKeyValueAt(0.5, 12)
+        self._archive_pulse_anim.setEndValue(0)
+        self._archive_pulse_anim.setLoopCount(-1)
+        self._archive_pulse_anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+
+    @pyqtSlot()
+    def _on_archive_updated(self) -> None:
+        self._update_archive_glow()
+
+    def _update_archive_glow(self) -> None:
+        if not self.current_handle:
+            self._archive_pulse_anim.stop()
+            self._archive_glow_shadow.setBlurRadius(0)
+            return
+
+        if self.cache_mgr.is_archived(self.current_handle):
+            self._archive_pulse_anim.stop()
+            self._archive_glow_shadow.setBlurRadius(0)
+        else:
+            self._archive_pulse_anim.start()

@@ -304,9 +304,7 @@ del "%~f0"
     def _on_update_error(self, error_msg: str) -> None:
         self.update_status.emit(f"UPDATE CHECK FAILED")
         self.update_checked.emit(False, error_msg)
-
-        from src.core.events import EventBus
-        EventBus.instance().status_message.emit(f"UPDATE ERROR: {error_msg}", "error")
+        log.error(f"Update check failed: {error_msg}")
 
     def _on_check_complete(self, available: bool) -> None:
         pass

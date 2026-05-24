@@ -37,6 +37,7 @@ class AppController(QObject):
         self.img_dl = ImageDownloader()
         
         self._active_scraper: QObject | None = None
+        self._org_search_worker = None
         
         self._connect_bus()
 
@@ -61,6 +62,7 @@ class AppController(QObject):
         bus.request_export_archive.connect(self._on_request_export_archive)
         
         bus.request_org_scrape.connect(self._on_request_org_scrape)
+        bus.app_exit.connect(self.cleanup)
 
     # -------------------------------------------------------------------------
     # Flow: Search -> Scrape -> Download Images -> UI Update
@@ -88,10 +90,10 @@ class AppController(QObject):
             from src.core.settings import SettingsManager
             sm = SettingsManager.instance()
             from src.services.scraper_org import OrgSearchWorker
-            worker = OrgSearchWorker(query, sm.user_agent)
-            worker.candidates_found.connect(self._on_org_candidates_found)
-            worker.finished_error.connect(self._on_org_search_error)
-            worker.start()
+            self._org_search_worker = OrgSearchWorker(query, sm.user_agent)
+            self._org_search_worker.candidates_found.connect(self._on_org_candidates_found)
+            self._org_search_worker.finished_error.connect(self._on_org_search_error)
+            self._org_search_worker.start()
 
     @pyqtSlot(list)
     def _on_org_candidates_found(self, candidates: list) -> None:
@@ -310,3 +312,33 @@ class AppController(QObject):
             dest = base_dir / f"banner.{ext}"
             data["banner_local"] = str(dest)
             self.img_dl.download(url, dest)
+
+    @pyqtSlot()
+    def cleanup(self) -> None:
+        """Stop and wait for all running background threads on application shutdown."""
+        log.info("AppController cleaning up background threads...")
+        
+        # 1. Stop active scraper
+        if self._active_scraper and self._active_scraper.isRunning():
+            self._active_scraper.quit()
+            self._active_scraper.wait(1000)
+            
+        # 2. Stop org search worker
+        if self._org_search_worker and self._org_search_worker.isRunning():
+            self._org_search_worker.quit()
+            self._org_search_worker.wait(1000)
+
+        # 3. Stop updater threads
+        if hasattr(self, "updater") and self.updater:
+            if self.updater._worker and self.updater._worker.isRunning():
+                self.updater._worker.quit()
+                self.updater._worker.wait(1000)
+            if self.updater._downloader and self.updater._downloader.isRunning():
+                self.updater._downloader.quit()
+                self.updater._downloader.wait(1000)
+
+        # 4. Stop OCR service worker
+        if hasattr(self, "ocr_svc") and self.ocr_svc:
+            if self.ocr_svc._worker and self.ocr_svc._worker.isRunning():
+                self.ocr_svc._worker.quit()
+                self.ocr_svc._worker.wait(1000)

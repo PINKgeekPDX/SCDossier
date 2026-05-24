@@ -40,35 +40,15 @@ class RegionSelector(QWidget):
             return
 
         geo = screen.geometry()
-        # Set the overlay to cover only the primary screen for reliable coordinate mapping
-        self._virtual_rect = geo
         self.setGeometry(geo)
 
-        # Grab the entire desktop (root window 0 captures all monitors)
-        self._full_screen_pixmap = screen.grabWindow(0)
-
-        # The root window pixmap may span multiple monitors. We need to use the portion
-        # that corresponds to our overlay widget (the primary screen).
-        # If the primary screen is at a non-zero position in the virtual desktop, offset
-        # within the root window pixmap accordingly.
-        if not self._full_screen_pixmap.isNull():
-            px = self._full_screen_pixmap
-            if geo.x() >= 0 and geo.y() >= 0 and geo.width() > 0 and geo.height() > 0:
-                if (geo.x() + geo.width() <= px.width() and
-                        geo.y() + geo.height() <= px.height()):
-                    self._full_screen_pixmap = px.copy(
-                        geo.x(), geo.y(), geo.width(), geo.height()
-                    )
-                else:
-                    # Pixmap doesn't cover the required offset; crop from top-left
-                    self._full_screen_pixmap = px.copy(0, 0, geo.width(), geo.height())
-            else:
-                # Primary screen has negative coordinates — just grab primary screen directly
-                self._full_screen_pixmap = screen.grabWindow(0, 0, 0, geo.width(), geo.height())
-            log.debug(
-                "RegionSelector: geo=%s, pixmap after crop=%s",
-                geo, self._full_screen_pixmap.size(),
-            )
+        # Grab the primary screen directly using its device-independent coordinates.
+        # This returns a physical pixel pixmap.
+        self._full_screen_pixmap = screen.grabWindow(0, geo.x(), geo.y(), geo.width(), geo.height())
+        log.debug(
+            "RegionSelector: geo=%s, dpr=%s, pixmap size=%s",
+            geo, self.devicePixelRatio(), self._full_screen_pixmap.size(),
+        )
 
     def keyPressEvent(self, event) -> None:
         if event.key() == Qt.Key.Key_Escape:
@@ -106,7 +86,15 @@ class RegionSelector(QWidget):
             self.capture_cancelled.emit()
             return
 
-        cropped = self._full_screen_pixmap.copy(self._current_rect)
+        # self._current_rect is in device-independent pixels; scale to physical pixels for cropping
+        dpr = self.devicePixelRatio()
+        physical_rect = QRect(
+            int(self._current_rect.x() * dpr),
+            int(self._current_rect.y() * dpr),
+            int(self._current_rect.width() * dpr),
+            int(self._current_rect.height() * dpr)
+        )
+        cropped = self._full_screen_pixmap.copy(physical_rect)
 
         if cropped.isNull():
             log.error("Cropped pixmap is null (rect may be outside desktop bounds)")
@@ -132,10 +120,17 @@ class RegionSelector(QWidget):
 
         if self._is_dragging and self._current_rect.isValid():
             if not self._full_screen_pixmap.isNull():
+                dpr = self.devicePixelRatio()
+                physical_rect = QRect(
+                    int(self._current_rect.x() * dpr),
+                    int(self._current_rect.y() * dpr),
+                    int(self._current_rect.width() * dpr),
+                    int(self._current_rect.height() * dpr)
+                )
                 painter.drawPixmap(
                     self._current_rect,
                     self._full_screen_pixmap,
-                    self._current_rect
+                    physical_rect
                 )
 
             pen = QPen(QColor(0, 170, 255, 200), 1)

@@ -99,10 +99,15 @@ class BaseWindow(QWidget):
     # ------------------------------------------------------------------
 
     def eventFilter(self, obj, event):
-        """Handle drag events on the designated drag widget."""
+        """Handle drag and double-click events on the designated drag widget."""
         from PyQt6.QtCore import QEvent
         if obj is self._drag_widget:
-            if event.type() == QEvent.Type.MouseButtonPress:
+            if event.type() == QEvent.Type.MouseButtonDblClick:
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self._drag_active = False
+                    self._toggle_size_limits()
+                    return True
+            elif event.type() == QEvent.Type.MouseButtonPress:
                 if event.button() == Qt.MouseButton.LeftButton:
                     self._drag_active = True
                     self._drag_start_pos = event.globalPosition().toPoint()
@@ -121,6 +126,41 @@ class BaseWindow(QWidget):
     def _on_drag_released(self) -> None:
         """Override in subclasses to handle post-drag behavior (e.g., snap to edge)."""
         pass
+
+    def _toggle_size_limits(self) -> None:
+        """Alternate the window size between its minimum and maximum limits, centering it on the screen."""
+        screen = self.screen()
+        if not screen:
+            screen = QApplication.primaryScreen()
+        if not screen:
+            return
+
+        screen_geo = screen.availableGeometry()
+
+        min_size = self.minimumSize()
+        if min_size.width() <= 0 or min_size.height() <= 0:
+            min_size = QSize(800, 600)
+
+        max_w = self.maximumWidth()
+        max_h = self.maximumHeight()
+        # QWidget default maximum width/height is QWIDGETSIZE_MAX (16777215)
+        if max_w > screen_geo.width():
+            max_w = screen_geo.width()
+        if max_h > screen_geo.height():
+            max_h = screen_geo.height()
+        max_size = QSize(max_w, max_h)
+
+        current_size = self.size()
+
+        # If we are close to minimum size, toggle to maximum size
+        if abs(current_size.width() - min_size.width()) < 10 and abs(current_size.height() - min_size.height()) < 10:
+            new_x = screen_geo.left() + (screen_geo.width() - max_size.width()) // 2
+            new_y = screen_geo.top() + (screen_geo.height() - max_size.height()) // 2
+            self.setGeometry(new_x, new_y, max_size.width(), max_size.height())
+        else:
+            new_x = screen_geo.left() + (screen_geo.width() - min_size.width()) // 2
+            new_y = screen_geo.top() + (screen_geo.height() - min_size.height()) // 2
+            self.setGeometry(new_x, new_y, min_size.width(), min_size.height())
 
     # ------------------------------------------------------------------
     # Mouse Events — Resizing

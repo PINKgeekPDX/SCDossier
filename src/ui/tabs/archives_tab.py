@@ -27,7 +27,6 @@ from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.confirm_dialog import show_confirm
 
 import os
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.ui.theme.icon_utils import set_button_icon
 
@@ -335,9 +334,10 @@ class ArchivesTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        sync_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "Refresh.png")
-        export_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_file.svg")
-        delete_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "No_Access.png")
+        from src.core.paths import get_asset_path
+        sync_icon = get_asset_path("assets/icons/Icons/Refresh.png")
+        export_icon = get_asset_path("assets/icons/misc/icon_file.svg")
+        delete_icon = get_asset_path("assets/icons/Icons/No_Access.png")
 
         self.sync_btn = StyledArchiveButton(sync_icon, "Sync selected profile with latest RSI data")
         self.sync_btn.setEnabled(False)
@@ -601,6 +601,8 @@ class ArchivesTab(QWidget):
         self.detail_orgs_layout.addWidget(card)
 
     def _clear_layout(self, layout) -> None:
+        if not layout:
+            return
         while layout.count():
             item = layout.takeAt(0)
             if item.widget():

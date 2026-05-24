@@ -82,11 +82,9 @@ class BadgeChip(QWidget):
         if event.button() == Qt.MouseButton.LeftButton and self._image_path:
             pix = QPixmap(str(self._image_path))
             if not pix.isNull():
-                from src.ui.widgets.image_preview import ImagePreviewDialog
-                from PyQt6.QtCore import QPoint
+                from src.ui.widgets.image_preview import show_image_preview
                 origin = self.mapToGlobal(self.rect().center())
-                dlg = ImagePreviewDialog(pix, self, origin)
-                dlg.show()
+                show_image_preview(pix, self, origin)
         super().mousePressEvent(event)
 
     def paintEvent(self, event) -> None:

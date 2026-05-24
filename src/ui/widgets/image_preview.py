@@ -36,9 +36,9 @@ class ImagePreviewDialog(QWidget):
         # Use Popup flag — Qt auto-dismisses on outside click; no parent ownership
         super().__init__(None)
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.Tool
-            | Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.Popup
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.NoDropShadowWindowHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
@@ -54,13 +54,28 @@ class ImagePreviewDialog(QWidget):
 
         screen_geo: QRect = screen.availableGeometry() if screen else QRect(0, 0, 1920, 1080)
 
-        # --- Scale image to 92% of screen (leaving visible border context) ---
+        # --- Scale image dynamically for a clear, larger preview ---
         max_w = int(screen_geo.width() * 0.92)
         max_h = int(screen_geo.height() * 0.92)
 
-        if pixmap.width() > max_w or pixmap.height() > max_h:
+        # Scale up small images (like standard 150x150 avatars) to at least 512px
+        target_size = 512
+        w, h = pixmap.width(), pixmap.height()
+        if w > 0 and h > 0:
+            if w < target_size and h < target_size:
+                factor = target_size / min(w, h)
+                w = int(w * factor)
+                h = int(h * factor)
+
+        # Clamp/scale down if it exceeds the maximum screen boundaries
+        if w > max_w or h > max_h:
+            factor = min(max_w / w, max_h / h)
+            w = int(w * factor)
+            h = int(h * factor)
+
+        if w > 0 and h > 0 and (w != pixmap.width() or h != pixmap.height()):
             pixmap = pixmap.scaled(
-                max_w, max_h,
+                w, h,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -124,6 +139,12 @@ class ImagePreviewDialog(QWidget):
         else:
             super().keyPressEvent(event)
 
+    def closeEvent(self, event) -> None:
+        """Clear active global preview reference on close."""
+        global _active_preview
+        _active_preview = None
+        super().closeEvent(event)
+
     # ── Paint ─────────────────────────────────────────────────────────────────
 
     def paintEvent(self, event) -> None:
@@ -164,6 +185,10 @@ class ImagePreviewDialog(QWidget):
         painter.end()
 
 
+# Keep a global reference to prevent garbage collection of the modeless Popup window
+_active_preview = None
+
+
 def show_image_preview(
     pixmap: QPixmap,
     parent: QWidget | None = None,
@@ -173,9 +198,17 @@ def show_image_preview(
     Convenience function — show the overlay preview and return immediately.
     The dialog owns itself (WA_DeleteOnClose) and dismisses on any click.
     """
+    global _active_preview
     if pixmap.isNull():
         return
-    dlg = ImagePreviewDialog(pixmap, parent, origin_pos)
-    dlg.show()
-    dlg.raise_()
-    dlg.activateWindow()
+    # Close any existing active preview first
+    if _active_preview:
+        try:
+            _active_preview.close()
+        except Exception:
+            pass
+            
+    _active_preview = ImagePreviewDialog(pixmap, parent, origin_pos)
+    _active_preview.show()
+    _active_preview.raise_()
+    _active_preview.activateWindow()

@@ -32,15 +32,7 @@ from src.app.constants import (
 
 log = logging.getLogger(__name__)
 
-# Resolve icon paths
-_ICONS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "assets", "icons"
-)
-_ICONS_MISC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "assets", "icons", "misc"
-)
+from src.core.paths import get_asset_path
 
 
 class NavItem(QWidget):
@@ -184,11 +176,11 @@ class NavSidebar(QWidget):
     tab_selected = pyqtSignal(str)
 
     NAV_ITEMS = [
-        (TabId.SEARCH.value,       os.path.join(_ICONS_MISC_DIR, "icon_search.svg"),  "SEARCH"),
-        (TabId.DOSSIER.value,      os.path.join(_ICONS_DIR, "Icons", "FOIP.png"),     "DOSSIER"),
-        (TabId.ORGANIZATION.value, os.path.join(_ICONS_DIR, "Icons", "SHLD.png"),     "ORGANIZATION"),
-        (TabId.ARCHIVE.value,      os.path.join(_ICONS_DIR, "Icons", "JOURNAL.png"),  "ARCHIVE"),
-        (TabId.SETTINGS.value,     os.path.join(_ICONS_MISC_DIR, "icon_settings.svg"), "SETTINGS"),
+        (TabId.SEARCH.value,       "assets/icons/misc/icon_search.svg",  "SEARCH"),
+        (TabId.DOSSIER.value,      "assets/icons/Icons/FOIP.png",     "DOSSIER"),
+        (TabId.ORGANIZATION.value, "assets/icons/Icons/SHLD.png",     "ORGANIZATION"),
+        (TabId.ARCHIVE.value,      "assets/icons/Icons/JOURNAL.png",  "ARCHIVE"),
+        (TabId.SETTINGS.value,     "assets/icons/misc/icon_settings.svg", "SETTINGS"),
     ]
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -217,7 +209,8 @@ class NavSidebar(QWidget):
             TabId.SETTINGS.value: "Settings — App preferences and updates"
         }
 
-        for tab_id, icon_path, label in self.NAV_ITEMS:
+        for tab_id, icon_rel, label in self.NAV_ITEMS:
+            icon_path = get_asset_path(icon_rel)
             item = NavItem(tab_id, icon_path, label, self)
             item.setToolTip(tooltips.get(tab_id, ""))
             item.clicked.connect(self._on_item_clicked)
@@ -228,7 +221,7 @@ class NavSidebar(QWidget):
 
         # Github profile button at bottom (replaced broken toggle)
         self._toggle_btn = QPushButton()
-        icon_path = os.path.join(_ICONS_DIR, "Icons", "!.png")
+        icon_path = get_asset_path("assets/icons/Icons/!.png")
         if os.path.exists(icon_path):
             self._toggle_btn.setIcon(QIcon(icon_path))
         self._toggle_btn.setFixedHeight(40)
