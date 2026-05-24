@@ -27,14 +27,19 @@ class AvatarWidget(QWidget):
         super().__init__(parent)
         self._size = size
         self._pixmap: QPixmap | None = None
+        self._image_path: str | Path | None = None
+        self._original_pixmap: QPixmap | None = None
         self.setFixedSize(QSize(size, size))
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def set_image(self, path: str | Path | None) -> None:
         """
         Load and display an image from a file path.
         Pass None to clear and show placeholder.
         """
+        self._image_path = path
+        self._original_pixmap = None
         if path is None:
             self._pixmap = None
             self.update()
@@ -53,6 +58,8 @@ class AvatarWidget(QWidget):
 
     def set_pixmap(self, pixmap: QPixmap | None) -> None:
         """Set a pixmap directly."""
+        self._original_pixmap = pixmap
+        self._image_path = None
         if pixmap and not pixmap.isNull():
             self._pixmap = pixmap.scaled(
                 self._size, self._size,
@@ -65,8 +72,24 @@ class AvatarWidget(QWidget):
 
     def clear(self) -> None:
         """Reset to placeholder."""
+        self._image_path = None
+        self._original_pixmap = None
         self._pixmap = None
         self.update()
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            pix = None
+            if self._original_pixmap and not self._original_pixmap.isNull():
+                pix = self._original_pixmap
+            elif self._image_path:
+                pix = QPixmap(str(self._image_path))
+                
+            if pix and not pix.isNull():
+                from src.ui.widgets.image_preview import ImagePreviewDialog
+                dlg = ImagePreviewDialog(pix, self)
+                dlg.exec()
+        super().mousePressEvent(event)
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)

@@ -31,8 +31,10 @@ class BadgeChip(QWidget):
     ) -> None:
         super().__init__(parent)
         self._name = name
+        self._image_path = image_path
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setFixedHeight(36)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._build_ui(name, image_path)
 
     def _build_ui(self, name: str, image_path: str | Path | None) -> None:
@@ -57,6 +59,7 @@ class BadgeChip(QWidget):
         layout.addWidget(self._name_label)
 
     def _set_image(self, path: str | Path | None) -> None:
+        self._image_path = path
         if path:
             pix = QPixmap(str(path))
             if not pix.isNull():
@@ -74,6 +77,15 @@ class BadgeChip(QWidget):
     def update_image(self, path: str | Path | None) -> None:
         """Refresh the badge image from a new path."""
         self._set_image(path)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._image_path:
+            pix = QPixmap(str(self._image_path))
+            if not pix.isNull():
+                from src.ui.widgets.image_preview import ImagePreviewDialog
+                dlg = ImagePreviewDialog(pix, self)
+                dlg.exec()
+        super().mousePressEvent(event)
 
     def paintEvent(self, event) -> None:
         """Paint pill-shaped border."""
