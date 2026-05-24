@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 from src.core.events import EventBus
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import headline_lg, headline_md, font_inter, label_caps
+from src.ui.theme.icon_utils import set_button_icon, load_icon
 from src.ui.widgets.avatar_widget import AvatarWidget
 from src.ui.widgets.data_field import DataField
 from src.ui.widgets.badge_chip import BadgeChip
@@ -52,22 +53,8 @@ class DossierTab(QWidget):
         self.search_input = SearchInput("ENTER RSI HANDLE...")
         self.search_input.returnPressed.connect(self._on_search)
         self.search_input.setFixedHeight(44)
-        self.search_input.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(10, 20, 30, 0.8);
-                color: {P.ON_SURFACE};
-                border: 2px solid {P.OUTLINE};
-                border-radius: 8px;
-                padding: 0 16px;
-            }}
-            QLineEdit:focus {{
-                border: 2px solid {P.PRIMARY};
-                background: rgba(15, 30, 45, 0.9);
-            }}
-            QLineEdit:hover {{
-                border: 2px solid {P.PRIMARY_CONTAINER};
-            }}
-        """)
+        self.search_input.setToolTip("Enter an RSI handle (e.g., PINKgeekPDX) to search for a citizen profile")
+        # Base styling is handled by SearchInput class - remove redundant inline style
 
         _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         search_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_search.svg")
@@ -76,21 +63,17 @@ class DossierTab(QWidget):
         search_btn = QPushButton()
         search_btn.setProperty("class", "primary")
         search_btn.setFixedSize(56, 44)
-        if os.path.exists(search_icon):
-            search_btn.setIcon(QIcon(search_icon))
-            search_btn.setIconSize(QSize(20, 20))
+        set_button_icon(search_btn, search_icon, (20, 20))
         search_btn.clicked.connect(self._on_search)
-        search_btn.setToolTip("Search")
+        search_btn.setToolTip("Search for the entered RSI handle")
 
         self.archive_btn = QPushButton()
         self.archive_btn.setProperty("class", "ghost")
         self.archive_btn.setFixedSize(56, 44)
-        if os.path.exists(archive_icon):
-            self.archive_btn.setIcon(QIcon(archive_icon))
-            self.archive_btn.setIconSize(QSize(20, 20))
+        set_button_icon(self.archive_btn, archive_icon, (20, 20))
         self.archive_btn.setEnabled(False)
         self.archive_btn.clicked.connect(self._on_archive_clicked)
-        self.archive_btn.setToolTip("Archive Profile")
+        self.archive_btn.setToolTip("Save the current profile to the archive")
 
         ab_layout.addWidget(self.search_input)
         ab_layout.addWidget(search_btn)

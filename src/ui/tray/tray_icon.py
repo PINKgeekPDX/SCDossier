@@ -23,22 +23,29 @@ class TrayIcon(QSystemTrayIcon):
     def __init__(self, icon: QIcon, parent: QObject | None = None) -> None:
         super().__init__(icon, parent)
         
+        self.setToolTip("SC Dossier — Right-click for options")
+        
         # Build Context Menu
         self.menu = QMenu()
         
         self.action_show_toolbar = QAction("Show Toolbar")
+        self.action_show_toolbar.setToolTip("Display the overlay toolbar on screen")
         self.action_show_toolbar.triggered.connect(self.show_toolbar_requested.emit)
         
         self.action_open_dossier = QAction("Open Dossier")
+        self.action_open_dossier.setToolTip("Open the main SC Dossier application window")
         self.action_open_dossier.triggered.connect(self.show_main_requested.emit)
         
         self.action_quick_capture = QAction("Quick Capture")
+        self.action_quick_capture.setToolTip("Start an OCR screen capture session")
         self.action_quick_capture.triggered.connect(self.quick_capture_requested.emit)
         
         self.action_settings = QAction("Settings")
+        self.action_settings.setToolTip("Open application settings")
         self.action_settings.triggered.connect(self.open_settings_requested.emit)
         
         self.action_quit = QAction("Quit")
+        self.action_quit.setToolTip("Exit SC Dossier completely")
         self.action_quit.triggered.connect(self.quit_requested.emit)
         
         self.menu.addAction(self.action_show_toolbar)

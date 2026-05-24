@@ -92,7 +92,7 @@ class CustomTitleBar(QWidget):
         self._hide_btn = QPushButton()
         self._hide_btn.setProperty("class", "icon")
         self._hide_btn.setFixedSize(32, 32)
-        self._hide_btn.setToolTip("Hide (return to toolbar)")
+        self._hide_btn.setToolTip("Minimize to toolbar — hides main window and shows the overlay toolbar")
         self._hide_btn.clicked.connect(self.hide_requested.emit)
         self._update_hide_style()
 
@@ -154,9 +154,11 @@ class CustomTitleBar(QWidget):
         self._update_pin_style()
         self._hide_btn.setEnabled(not self._pinned)
         if self._pinned:
-            self._hide_btn.setToolTip("Unpin first to hide")
+            self._pin_btn.setToolTip("Unpin window — allow other windows to overlap")
+            self._hide_btn.setToolTip("Unpin the window first before hiding")
         else:
-            self._hide_btn.setToolTip("Hide (return to toolbar)")
+            self._pin_btn.setToolTip("Pin window (stay on top)")
+            self._hide_btn.setToolTip("Minimize to toolbar — hides main window and shows the overlay toolbar")
         self.pin_toggled.emit(self._pinned)
 
     def set_pinned(self, pinned: bool) -> None:
@@ -164,6 +166,12 @@ class CustomTitleBar(QWidget):
             self._pinned = pinned
             self._update_pin_style()
             self._hide_btn.setEnabled(not pinned)
+            if self._pinned:
+                self._pin_btn.setToolTip("Unpin window — allow other windows to overlap")
+                self._hide_btn.setToolTip("Unpin the window first before hiding")
+            else:
+                self._pin_btn.setToolTip("Pin window (stay on top)")
+                self._hide_btn.setToolTip("Minimize to toolbar — hides main window and shows the overlay toolbar")
 
     def set_status(self, text: str, ok: bool = True) -> None:
         pass # Removed per request

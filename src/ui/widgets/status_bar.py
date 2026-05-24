@@ -1,9 +1,10 @@
 """
 src/ui/widgets/status_bar.py
-CustomStatusBar — thin bottom strip with system status display.
+CustomStatusBar — thin bottom strip with minimal status display.
+No ping/uptime/connection indicators - just clean status text.
 
 Layout:
-  [● STATUS TEXT]          [◉]
+  [● STATUS TEXT]
 """
 
 import time
@@ -32,28 +33,25 @@ class CustomStatusBar(QWidget):
 
         font = label_caps()
 
-        # Status dot
+        # Status dot - shows green when idle, changes color on activity
         self._dot = QLabel("●")
         self._dot.setFont(font)
         self._dot.setStyleSheet("color: #00FF88; background: transparent; font-size: 9px;")
+        self._dot.setToolTip("System status indicator")
 
         # Status text
         self._status_lbl = QLabel("IDLE")
         self._status_lbl.setFont(font)
         self._status_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
         self._status_lbl.setObjectName("StatusText")
+        self._status_lbl.setToolTip("Current system status message")
 
         layout.addWidget(self._dot)
         layout.addSpacing(4)
         layout.addWidget(self._status_lbl)
         layout.addStretch(1)
 
-        # Connection icon
-        self._conn_lbl = QLabel("◉")
-        self._conn_lbl.setFont(font)
-        self._conn_lbl.setStyleSheet(f"color: {P.PRIMARY_CONTAINER}; background: transparent; font-size: 9px;")
-
-        layout.addWidget(self._conn_lbl)
+        # Note: Connection/ping indicators removed per user request
 
     def set_status(self, text: str, level: str = "info") -> None:
         """Update the status message. level: 'info'|'success'|'warning'|'error'"""

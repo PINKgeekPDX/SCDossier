@@ -1,14 +1,16 @@
 """
 src/ui/tabs/search_tab.py
 SearchTab — Landing page with player/org mode toggle for starting searches.
+Enhanced with rich animations, styling, and tooltips.
 """
 
 import os
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QColor, QIcon, QPixmap
+from PyQt6.QtCore import Qt, QSize, QTimer, QPropertyAnimation, QEasingCurve, QRectF
+from PyQt6.QtGui import QColor, QIcon, QPixmap, QPainter, QPen, QLinearGradient, QBrush
+from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QGraphicsDropShadowEffect
+    QFrame, QGraphicsDropShadowEffect, QGraphicsOpacityEffect
 )
 
 from src.core.events import EventBus
@@ -22,13 +24,256 @@ _RIGHT_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "RIGHT.png
 _INFO_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "info.png")
 
 
+class StyledToggleButton(QPushButton):
+    """Enhanced toggle button with hover/active animations."""
+
+    def __init__(self, text: str, parent=None):
+        super().__init__(text, parent)
+        self._active = False
+        self._hovered = False
+        self.setFixedHeight(44)
+        self.setMinimumWidth(170)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setMouseTracking(True)
+
+    def set_active(self, active: bool) -> None:
+        self._active = active
+        self.update()
+
+    def enterEvent(self, event) -> None:
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        self._hovered = False
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(1, 1, -1, -1)
+
+        if self._active:
+            # Active state: filled primary gradient
+            grad = QLinearGradient(0, 0, rect.width(), 0)
+            grad.setColorAt(0, QColor(0, 130, 200, 200))
+            grad.setColorAt(1, QColor(0, 170, 255, 220))
+            painter.setBrush(QBrush(grad))
+            painter.setPen(QPen(QColor(0, 200, 255, 150), 1))
+            painter.drawRoundedRect(rect, 6, 6)
+
+            # Draw text
+            painter.setPen(QColor("#FFFFFF"))
+            painter.setFont(self.font())
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
+        elif self._hovered:
+            # Hover state: subtle glow
+            painter.setBrush(QColor(0, 170, 255, 30))
+            painter.setPen(QPen(QColor(0, 170, 255, 120), 1))
+            painter.drawRoundedRect(rect, 6, 6)
+
+            painter.setPen(QColor(P.ON_SURFACE))
+            painter.setFont(self.font())
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
+        else:
+            # Default: ghost style
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(0, 170, 255, 60), 1))
+            painter.drawRoundedRect(rect, 6, 6)
+
+            painter.setPen(QColor(P.TEXT_DIM))
+            painter.setFont(self.font())
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
+
+        painter.end()
+
+
+class AnimatedSearchInput(SearchInput):
+    """Search input with border paint animation on focus/hover."""
+
+    def __init__(self, placeholder: str, parent=None):
+        super().__init__(placeholder, parent)
+        self._focused = False
+        self._hovered = False
+        self._anim_progress = 0.0
+        self._anim_direction = 1
+
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._animate_border)
+        self._anim_timer.setInterval(30)
+
+        self.setFixedHeight(56)
+        self.setFont(font_inter(16))
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setToolTip("Enter an RSI handle, name, or profile URL to search")
+
+    def focusInEvent(self, event) -> None:
+        self._focused = True
+        self._anim_progress = 0.0
+        self._anim_direction = 1
+        self._anim_timer.start()
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event) -> None:
+        self._focused = False
+        self._anim_timer.stop()
+        self._anim_progress = 0.0
+        self.update()
+        super().focusOutEvent(event)
+
+    def enterEvent(self, event) -> None:
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        self._hovered = False
+        self.update()
+
+    def _animate_border(self):
+        self._anim_progress += 0.05 * self._anim_direction
+        if self._anim_progress >= 1.0:
+            self._anim_direction = -1
+        elif self._anim_progress <= 0.0:
+            self._anim_direction = 1
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(2, 2, -2, -2)
+
+        # Background
+        if self._focused:
+            bg = QColor(15, 30, 45, 230)
+        elif self._hovered:
+            bg = QColor(12, 25, 38, 210)
+        else:
+            bg = QColor(10, 20, 30, 200)
+
+        painter.setBrush(bg)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(rect, 8, 8)
+
+        # Border with animation when focused
+        if self._focused:
+            alpha = int(100 + 155 * self._anim_progress)
+            border_color = QColor(0, 170, 255, alpha)
+            painter.setPen(QPen(border_color, 2))
+            painter.drawRoundedRect(rect, 8, 8)
+
+            # Glow effect ring
+            glow_color = QColor(0, 170, 255, int(30 * self._anim_progress))
+            painter.setPen(QPen(glow_color, 4))
+            painter.drawRoundedRect(rect.adjusted(-2, -2, 2, 2), 10, 10)
+        elif self._hovered:
+            painter.setPen(QPen(QColor(0, 170, 255, 180), 2))
+            painter.drawRoundedRect(rect, 8, 8)
+        else:
+            painter.setPen(QPen(QColor(P.OUTLINE), 2))
+            painter.drawRoundedRect(rect, 8, 8)
+
+        # Draw placeholder text or content
+        text_rect = rect.adjusted(16, 0, -16, 0)
+        text_color = QColor(P.TEXT_DIM) if not self.text() else QColor(P.ON_SURFACE)
+        painter.setPen(text_color)
+        font = font_inter(15)
+        painter.setFont(font)
+
+        if not self.text():
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.placeholderText())
+        else:
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.text())
+
+        # Draw cursor if focused
+        if self._focused and self.text():
+            cursor_x = text_rect.x() + painter.fontMetrics().horizontalAdvance(self.text()[:self.cursorPosition()])
+            painter.setPen(QPen(QColor(P.PRIMARY), 2))
+            painter.drawLine(cursor_x, text_rect.center().y() - 10, cursor_x, text_rect.center().y() + 10)
+
+        painter.end()
+
+    def mousePressEvent(self, event) -> None:
+        super().mousePressEvent(event)
+        self.setFocus()
+
+
+class StyledActionButton(QPushButton):
+    """Icon-only action button with hover/click effects."""
+
+    def __init__(self, icon_path: str, tooltip: str, size: int = 56, parent=None):
+        super().__init__(parent)
+        self._icon_path = icon_path
+        self._hovered = False
+        self._pressed = False
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setMouseTracking(True)
+        self.setToolTip(tooltip)
+        self.setStyleSheet("background: transparent; border: none; padding: 0;")
+
+        # Load icon
+        if os.path.exists(icon_path):
+            self.setIcon(QIcon(icon_path))
+            self.setIconSize(QSize(size - 16, size - 16))
+
+    def enterEvent(self, event) -> None:
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        self._hovered = False
+        self.update()
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressed = True
+            self.update()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        self._pressed = False
+        self.update()
+        super().mouseReleaseEvent(event)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(1, 1, -1, -1)
+
+        if self._pressed:
+            painter.setBrush(QColor(0, 170, 255, 80))
+            painter.setPen(QPen(QColor(0, 200, 255, 150), 1))
+            painter.drawRoundedRect(rect, 8, 8)
+        elif self._hovered:
+            grad = QLinearGradient(0, 0, rect.width(), 0)
+            grad.setColorAt(0, QColor(0, 170, 255, 50))
+            grad.setColorAt(1, QColor(0, 170, 255, 80))
+            painter.setBrush(QBrush(grad))
+            painter.setPen(QPen(QColor(0, 200, 255, 120), 1))
+            painter.drawRoundedRect(rect, 8, 8)
+        else:
+            painter.setBrush(QColor(P.PRIMARY))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(rect, 8, 8)
+
+        painter.end()
+
+        # CRITICAL: Call super to render the QIcon properly
+        super().paintEvent(event)
+
+
 class SearchTab(QWidget):
     """
     Initial landing view with player/org mode toggle.
     """
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._mode = "player"  # "player" or "org"
+        self._mode = "player"
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -45,16 +290,18 @@ class SearchTab(QWidget):
         if os.path.exists(_USER_ICON):
             pix = QPixmap(_USER_ICON).scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             icon_lbl.setPixmap(pix)
-        
+        icon_lbl.setToolTip("Citizen Dossier - Star Citizen Profile Search")
+
         title_lbl = QLabel("CITIZEN DOSSIER")
         font = headline_xl()
         font.setUnderline(True)
         title_lbl.setFont(font)
         title_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; letter-spacing: 0.15em;")
-        
+        title_lbl.setToolTip("Search for Star Citizen player profiles and organizations")
+
         glow_title = QGraphicsDropShadowEffect()
-        glow_title.setBlurRadius(15)
-        glow_title.setColor(QColor(0, 170, 255, 100))
+        glow_title.setBlurRadius(20)
+        glow_title.setColor(QColor(0, 170, 255, 120))
         glow_title.setOffset(0, 0)
         title_lbl.setGraphicsEffect(glow_title)
 
@@ -63,45 +310,18 @@ class SearchTab(QWidget):
 
         # --- Mode Toggle ---
         mode_widget = QWidget()
+        mode_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         mode_layout = QHBoxLayout(mode_widget)
-        mode_layout.setSpacing(12)
+        mode_layout.setSpacing(16)
         mode_layout.setContentsMargins(0, 0, 0, 0)
 
-        btn_style = f"""
-            QPushButton {{
-                background: rgba(0, 170, 255, 0.1);
-                color: {P.TEXT_DIM};
-                border: 1px solid rgba(0, 170, 255, 0.3);
-                border-radius: 4px;
-                font-weight: bold;
-                transition: all 0.2s;
-            }}
-            QPushButton:hover {{
-                background: rgba(0, 170, 255, 0.2);
-                border: 1px solid rgba(0, 170, 255, 0.6);
-                color: {P.ON_SURFACE};
-            }}
-            QPushButton[class="primary"] {{
-                background: rgba(0, 170, 255, 0.4);
-                color: {P.ON_SURFACE};
-                border: 1px solid {P.PRIMARY};
-            }}
-        """
-
-        self.player_btn = QPushButton("SEARCH PLAYER")
-        self.player_btn.setProperty("class", "primary")
-        self.player_btn.setFixedHeight(40)
-        self.player_btn.setMinimumWidth(160)
-        self.player_btn.setStyleSheet(btn_style)
-        self.player_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.player_btn = StyledToggleButton("SEARCH PLAYER")
+        self.player_btn.set_active(True)
+        self.player_btn.setToolTip("Switch to player profile search mode")
         self.player_btn.clicked.connect(lambda: self._set_mode("player"))
 
-        self.org_btn = QPushButton("SEARCH ORG")
-        self.org_btn.setProperty("class", "ghost")
-        self.org_btn.setFixedHeight(40)
-        self.org_btn.setMinimumWidth(160)
-        self.org_btn.setStyleSheet(btn_style)
-        self.org_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.org_btn = StyledToggleButton("SEARCH ORG")
+        self.org_btn.setToolTip("Switch to organization search mode")
         self.org_btn.clicked.connect(lambda: self._set_mode("org"))
 
         mode_layout.addStretch()
@@ -111,58 +331,27 @@ class SearchTab(QWidget):
 
         # --- Search Bar ---
         search_container = QFrame()
-        search_container.setFixedWidth(540)
+        search_container.setFixedWidth(560)
         search_container.setStyleSheet("background: transparent;")
         search_layout = QHBoxLayout(search_container)
         search_layout.setContentsMargins(0, 0, 0, 0)
         search_layout.setSpacing(12)
 
-        self.search_input = SearchInput("IDENTIFY SUBJECT (RSI HANDLE)...")
-        self.search_input.setFixedHeight(56)
-        self.search_input.setFont(font_inter(16))
+        self.search_input = AnimatedSearchInput("IDENTIFY SUBJECT (RSI HANDLE)...")
         self.search_input.returnPressed.connect(self._on_search)
-        self.search_input.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(10, 20, 30, 0.8);
-                color: {P.ON_SURFACE};
-                border: 2px solid {P.OUTLINE};
-                border-radius: 8px;
-                padding: 0 16px;
-            }}
-            QLineEdit:focus {{
-                border: 2px solid {P.PRIMARY};
-                background: rgba(15, 30, 45, 0.9);
-            }}
-            QLineEdit:hover {{
-                border: 2px solid {P.PRIMARY_CONTAINER};
-            }}
-        """)
 
+        # Glow effect behind search input
         glow = QGraphicsDropShadowEffect()
-        glow.setBlurRadius(20)
-        glow.setColor(QColor(0, 170, 255, 60))
+        glow.setBlurRadius(25)
+        glow.setColor(QColor(0, 170, 255, 40))
         glow.setOffset(0, 0)
         self.search_input.setGraphicsEffect(glow)
 
-        self.search_btn = QPushButton()
-        self.search_btn.setFixedSize(56, 56)
-        self.search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        if os.path.exists(_RIGHT_ICON):
-            self.search_btn.setIcon(QIcon(_RIGHT_ICON))
-            self.search_btn.setIconSize(QSize(24, 24))
-        self.search_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {P.PRIMARY};
-                border: none;
-                border-radius: 8px;
-            }}
-            QPushButton:hover {{
-                background: {P.PRIMARY_CONTAINER};
-            }}
-            QPushButton:pressed {{
-                background: {P.ON_SURFACE};
-            }}
-        """)
+        self.search_btn = StyledActionButton(
+            _RIGHT_ICON,
+            "Execute search for the entered player or organization",
+            56
+        )
         self.search_btn.clicked.connect(self._on_search)
 
         search_layout.addWidget(self.search_input)
@@ -172,16 +361,18 @@ class SearchTab(QWidget):
         hint_hbox = QHBoxLayout()
         hint_hbox.setSpacing(8)
         hint_hbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         info_icon = QLabel()
         if os.path.exists(_INFO_ICON):
             pix = QPixmap(_INFO_ICON).scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             info_icon.setPixmap(pix)
-            
+        info_icon.setToolTip("Search help information")
+
         self.hint_lbl = QLabel("Enter player name or RSI dossier URL to find information")
         self.hint_lbl.setFont(font_inter(12))
         self.hint_lbl.setStyleSheet(f"color: {P.TEXT_DIM};")
-        
+        self.hint_lbl.setToolTip("Type an RSI handle (e.g., PINKgeekPDX) or paste a full RSI profile URL")
+
         hint_hbox.addWidget(info_icon)
         hint_hbox.addWidget(self.hint_lbl)
 
@@ -196,18 +387,15 @@ class SearchTab(QWidget):
     def _set_mode(self, mode: str) -> None:
         self._mode = mode
         if mode == "player":
-            self.player_btn.setProperty("class", "primary")
-            self.org_btn.setProperty("class", "ghost")
+            self.player_btn.set_active(True)
+            self.org_btn.set_active(False)
             self.search_input.setPlaceholderText("IDENTIFY SUBJECT (RSI HANDLE)...")
+            self.search_input.setToolTip("Enter an RSI handle (e.g., PINKgeekPDX) to search for a player profile")
         else:
-            self.org_btn.setProperty("class", "primary")
-            self.player_btn.setProperty("class", "ghost")
+            self.org_btn.set_active(True)
+            self.player_btn.set_active(False)
             self.search_input.setPlaceholderText("ENTER ORG NAME OR SID...")
-        # Force style refresh
-        self.player_btn.style().unpolish(self.player_btn)
-        self.player_btn.style().polish(self.player_btn)
-        self.org_btn.style().unpolish(self.org_btn)
-        self.org_btn.style().polish(self.org_btn)
+            self.search_input.setToolTip("Enter an organization name or SID (e.g., REBELS) to search for org details")
 
     def _on_search(self) -> None:
         query = self.search_input.text().strip()

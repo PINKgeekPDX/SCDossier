@@ -14,9 +14,10 @@ Features:
 import os
 import logging
 from PyQt6.QtCore import (
-    Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, QSize, QRect
+    Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, QSize, QRect, QByteArray
 )
-from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QFont, QBrush, QIcon
+from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPen, QFont, QBrush, QIcon, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QSizePolicy, QFrame
@@ -81,6 +82,29 @@ class NavItem(QWidget):
         self._hovered = False
         self.update()
 
+    def _load_icon_pixmap(self) -> QPixmap | None:
+        """Load and return a 22x22 pixmap from the icon path, handling SVGs properly."""
+        if not os.path.exists(self._icon_path):
+            return None
+
+        # Try QSvgRenderer first for SVGs
+        if self._icon_path.lower().endswith('.svg'):
+            renderer = QSvgRenderer(self._icon_path)
+            if renderer.isValid():
+                pixmap = QPixmap(22, 22)
+                pixmap.fill(Qt.GlobalColor.transparent)
+                p = QPainter(pixmap)
+                renderer.render(p)
+                p.end()
+                return pixmap
+
+        # Fallback to QIcon for PNGs
+        icon = QIcon(self._icon_path)
+        pixmap = icon.pixmap(22, 22)
+        if not pixmap.isNull():
+            return pixmap
+        return None
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -91,8 +115,8 @@ class NavItem(QWidget):
 
         # --- Active background (higher alpha = stronger glow) ---
         if self._active:
-            painter.fillRect(rect, QColor(0, 170, 255, 40))  # alpha 26 → 40
-            # Left accent bar (2px → 3px)
+            painter.fillRect(rect, QColor(0, 170, 255, 40))
+            # Left accent bar (3px)
             accent_pen = QPen(QColor(P.PRIMARY_CONTAINER), 3)
             painter.setPen(accent_pen)
             painter.drawLine(0, 4, 0, rect.height() - 4)
@@ -100,36 +124,29 @@ class NavItem(QWidget):
         # --- Hover gradient ---
         elif self._hovered:
             grad = QLinearGradient(0, 0, rect.width(), 0)
-            grad.setColorAt(0, QColor(79, 142, 255, 51))   # 0.20 alpha
+            grad.setColorAt(0, QColor(79, 142, 255, 51))
             grad.setColorAt(1, QColor(79, 142, 255, 0))
             painter.fillRect(rect, QBrush(grad))
 
-        # --- SVG Icon ---
-        icon_rect = QRect(0, 0, SIDEBAR_WIDTH_COLLAPSED, rect.height())
-        if os.path.exists(self._icon_path):
-            icon = QIcon(self._icon_path)
-            pixmap = icon.pixmap(22, 22)
-            if not pixmap.isNull():
-                # Tint the pixmap based on active state
-                if self._active:
-                    # Draw with primary color
-                    tmp_icon = QIcon()
-                    tmp_icon.addPixmap(pixmap)
-                    painter.drawPixmap(
-                        icon_rect.x() + (icon_rect.width() - 22) // 2,
-                        icon_rect.y() + (icon_rect.height() - 22) // 2,
-                        22, 22, pixmap
-                    )
-                else:
-                    painter.drawPixmap(
-                        icon_rect.x() + (icon_rect.width() - 22) // 2,
-                        icon_rect.y() + (icon_rect.height() - 22) // 2,
-                        22, 22, pixmap
-                    )
+        # --- Icon (render using _load_icon_pixmap) ---
+        icon_x = (SIDEBAR_WIDTH_COLLAPSED - 22) // 2
+        icon_y = (rect.height() - 22) // 2
+        pixmap = self._load_icon_pixmap()
+        if pixmap is not None:
+            if self._active:
+                # Tint for active state using a semi-transparent overlay
+                tinted = QPixmap(22, 22)
+                tinted.fill(Qt.GlobalColor.transparent)
+                tp = QPainter(tinted)
+                tp.drawPixmap(0, 0, pixmap)
+                tp.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceAtop)
+                tp.fillRect(tinted.rect(), QColor(0, 200, 255, 200))
+                tp.end()
+                painter.drawPixmap(icon_x, icon_y, tinted)
             else:
-                self._draw_fallback_icon(painter, icon_rect)
+                painter.drawPixmap(icon_x, icon_y, pixmap)
         else:
-            self._draw_fallback_icon(painter, icon_rect)
+            self._draw_fallback_icon(painter, QRect(0, 0, SIDEBAR_WIDTH_COLLAPSED, rect.height()))
 
         # --- Label (only when expanded) ---
         if expanded:
@@ -138,7 +155,7 @@ class NavItem(QWidget):
                 label_color = QColor(P.ON_SURFACE)
             painter.setPen(label_color)
             painter.setFont(label_caps())
-            label_rect = QRect(SIDEBAR_WIDTH_COLLAPSED, 0, rect.width() - SIDEBAR_WIDTH_COLLAPSED - 12, rect.height())
+            label_rect = QRect(SIDEBAR_WIDTH_COLLAPSED + 8, 0, rect.width() - SIDEBAR_WIDTH_COLLAPSED - 20, rect.height())
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._label)
 
         painter.end()
@@ -192,22 +209,31 @@ class NavSidebar(QWidget):
         layout.setContentsMargins(0, 8, 0, 8)
         layout.setSpacing(0)
 
+        tooltips = {
+            TabId.SEARCH.value: "Search — Find player profiles and orgs",
+            TabId.DOSSIER.value: "Dossier — View active player profile",
+            TabId.ORGANIZATION.value: "Organization — View active org details",
+            TabId.ARCHIVE.value: "Archive — Saved offline profiles",
+            TabId.SETTINGS.value: "Settings — App preferences and updates"
+        }
+
         for tab_id, icon_path, label in self.NAV_ITEMS:
             item = NavItem(tab_id, icon_path, label, self)
+            item.setToolTip(tooltips.get(tab_id, ""))
             item.clicked.connect(self._on_item_clicked)
             self._items[tab_id] = item
             layout.addWidget(item)
 
         layout.addStretch(1)
 
-        # Github profile button at bottom (replaced toggle)
+        # Github profile button at bottom (replaced broken toggle)
         self._toggle_btn = QPushButton()
         icon_path = os.path.join(_ICONS_DIR, "Icons", "!.png")
         if os.path.exists(icon_path):
             self._toggle_btn.setIcon(QIcon(icon_path))
         self._toggle_btn.setFixedHeight(40)
         self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_btn.setToolTip("Open GitHub Profile")
+        self._toggle_btn.setToolTip("Open PINKgeekPDX GitHub profile in your browser")
         self._toggle_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;

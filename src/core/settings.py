@@ -49,16 +49,33 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     },
     "last_tab": TabId.SEARCH.value,
     "pin_state": False,
+    "pin_on_startup": False,
+    "minimize_to_tray_on_close": True,
+    "show_tray_notifications": True,
     "ocr_engine": OCREngine.RAPIDOCR.value,
     "ocr_confidence_threshold": DEFAULT_OCR_CONFIDENCE_THRESHOLD,
+    "ocr_thread_count": 2,
     "scraper_delay_ms": DEFAULT_SCRAPER_DELAY_MS,
+    "scraper_timeout_sec": 30,
+    "scraper_proxy": "",
     "user_agent": DEFAULT_USER_AGENT,
     "sync_interval_hours": DEFAULT_SYNC_INTERVAL_HOURS,
     "sync_on_load": True,
     "temp_cache_auto_clear": False,
     "temp_cache_max_age_days": DEFAULT_TEMP_CACHE_MAX_AGE_DAYS,
+    "image_download_concurrency": 3,
     "toolbar_opacity": 1.0,
     "theme_accent_override": None,
+    "auto_check_updates": True,
+    "auto_download_updates": False,
+    "font_size_scaling": 100,
+    # Archive & Export Preferences
+    "export_destination": "",
+    "remember_export_folder": True,
+    "archive_default_sort": "date_desc",
+    # Diagnostics & Logs
+    "log_level": "normal",
+    "include_debug_in_diagnostics": False,
     "_version": APP_VERSION,
 }
 
@@ -352,6 +369,133 @@ class SettingsManager(QObject):
     @theme_accent_override.setter
     def theme_accent_override(self, v: str | None) -> None:
         self.set("theme_accent_override", v)
+
+    @property
+    def font_size_scaling(self) -> int:
+        return int(self.get("font_size_scaling", 100))
+
+    @font_size_scaling.setter
+    def font_size_scaling(self, v: int) -> None:
+        self.set("font_size_scaling", max(80, min(150, v)))
+
+    # General / behaviour
+    @property
+    def minimize_to_tray_on_close(self) -> bool:
+        return bool(self.get("minimize_to_tray_on_close", True))
+
+    @minimize_to_tray_on_close.setter
+    def minimize_to_tray_on_close(self, v: bool) -> None:
+        self.set("minimize_to_tray_on_close", v)
+
+    @property
+    def pin_on_startup(self) -> bool:
+        return bool(self.get("pin_on_startup", False))
+
+    @pin_on_startup.setter
+    def pin_on_startup(self, v: bool) -> None:
+        self.set("pin_on_startup", v)
+
+    @property
+    def show_tray_notifications(self) -> bool:
+        return bool(self.get("show_tray_notifications", True))
+
+    @show_tray_notifications.setter
+    def show_tray_notifications(self, v: bool) -> None:
+        self.set("show_tray_notifications", v)
+
+    # Scraper extras
+    @property
+    def scraper_timeout_sec(self) -> int:
+        return int(self.get("scraper_timeout_sec", 30))
+
+    @scraper_timeout_sec.setter
+    def scraper_timeout_sec(self, v: int) -> None:
+        self.set("scraper_timeout_sec", max(5, min(120, v)))
+
+    @property
+    def scraper_proxy(self) -> str:
+        return str(self.get("scraper_proxy", ""))
+
+    @scraper_proxy.setter
+    def scraper_proxy(self, v: str) -> None:
+        self.set("scraper_proxy", v)
+
+    # OCR extras
+    @property
+    def ocr_thread_count(self) -> int:
+        return int(self.get("ocr_thread_count", 2))
+
+    @ocr_thread_count.setter
+    def ocr_thread_count(self, v: int) -> None:
+        self.set("ocr_thread_count", max(1, min(8, v)))
+
+    # Sync / cache extras
+    @property
+    def image_download_concurrency(self) -> int:
+        return int(self.get("image_download_concurrency", 3))
+
+    @image_download_concurrency.setter
+    def image_download_concurrency(self, v: int) -> None:
+        self.set("image_download_concurrency", max(1, min(10, v)))
+
+    # Updater
+    @property
+    def auto_check_updates(self) -> bool:
+        return bool(self.get("auto_check_updates", True))
+
+    @auto_check_updates.setter
+    def auto_check_updates(self, v: bool) -> None:
+        self.set("auto_check_updates", v)
+
+    @property
+    def auto_download_updates(self) -> bool:
+        return bool(self.get("auto_download_updates", False))
+
+    @auto_download_updates.setter
+    def auto_download_updates(self, v: bool) -> None:
+        self.set("auto_download_updates", v)
+
+    # Archive & Export Preferences
+    @property
+    def export_destination(self) -> str:
+        return str(self.get("export_destination", ""))
+
+    @export_destination.setter
+    def export_destination(self, v: str) -> None:
+        self.set("export_destination", v)
+
+    @property
+    def remember_export_folder(self) -> bool:
+        return bool(self.get("remember_export_folder", True))
+
+    @remember_export_folder.setter
+    def remember_export_folder(self, v: bool) -> None:
+        self.set("remember_export_folder", v)
+
+    @property
+    def archive_default_sort(self) -> str:
+        return str(self.get("archive_default_sort", "date_desc"))
+
+    @archive_default_sort.setter
+    def archive_default_sort(self, v: str) -> None:
+        self.set("archive_default_sort", v)
+
+    # Diagnostics & Logs
+    @property
+    def log_level(self) -> str:
+        return str(self.get("log_level", "normal"))
+
+    @log_level.setter
+    def log_level(self, v: str) -> None:
+        self.set("log_level", v)
+
+    @property
+    def include_debug_in_diagnostics(self) -> bool:
+        return bool(self.get("include_debug_in_diagnostics", False))
+
+    @include_debug_in_diagnostics.setter
+    def include_debug_in_diagnostics(self, v: bool) -> None:
+        self.set("include_debug_in_diagnostics", v)
 
     def force_save(self) -> None:
         """Force an immediate save regardless of dirty state."""

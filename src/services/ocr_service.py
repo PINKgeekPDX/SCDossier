@@ -27,6 +27,22 @@ def _get_rapid_ocr():
     return _rapid_ocr_instance
 
 
+def warmup_ocr() -> None:
+    """
+    Pre-load the RapidOCR engine on the main thread.
+
+    On Windows, onnxruntime DLLs can fail to load when first imported
+    from a QThread worker context. Calling this once from the main thread
+    ensures the DLL is already resident in the process before any worker
+    attempts to use it.
+    """
+    try:
+        _get_rapid_ocr()
+        log.debug("RapidOCR warmup complete.")
+    except Exception as exc:
+        log.warning("RapidOCR warmup failed (will retry on first use): %s", exc)
+
+
 class OCRWorker(QThread):
     """
     Background worker that runs RapidOCR on an image file.
@@ -82,8 +98,8 @@ class OCRWorker(QThread):
             log.info("OCR successful. Extracted: '%s' (conf: %.2f)", cleaned, best_conf)
             self.finished_success.emit(cleaned)
 
-        except ImportError:
-            log.error("rapidocr_onnxruntime not installed.")
+        except ImportError as exc:
+            log.error("rapidocr_onnxruntime not installed or failed to load: %s", exc)
             self.finished_error.emit("RapidOCR library is not installed. Run: pip install rapidocr-onnxruntime")
         except Exception as e:
             log.exception("OCR processing failed")
@@ -98,6 +114,9 @@ class OCRService:
 
     def __init__(self) -> None:
         self._worker: OCRWorker | None = None
+        # Pre-load the engine on the main thread to avoid DLL-loading issues
+        # in QThread workers on Windows (onnxruntime limitation).
+        warmup_ocr()
 
     def process_image(self, image_path: Path) -> None:
         """Start OCR on the given image path."""

@@ -55,8 +55,18 @@ def main():
     main_window = MainWindow(controller)
     toolbar = OverlayToolbar()
 
-    # Create tray icon
-    tray_icon = TrayIcon(QIcon(appicon_path) if os.path.exists(appicon_path) else QIcon())
+    # Create tray icon with app icon
+    app_icon = QIcon(appicon_path) if os.path.exists(appicon_path) else QIcon()
+    # Also set the app icon for taskbar purposes
+    if os.path.exists(appicon_path):
+        app_icon_ico = QIcon()
+        ico_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "appicon.ico")
+        if os.path.exists(ico_path):
+            app_icon_ico = QIcon(ico_path)
+            app.setWindowIcon(app_icon_ico)
+        else:
+            app.setWindowIcon(app_icon)
+    tray_icon = TrayIcon(app_icon)
 
     active_selector = None
 

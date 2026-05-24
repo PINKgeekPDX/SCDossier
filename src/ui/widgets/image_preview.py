@@ -1,86 +1,181 @@
 """
 src/ui/widgets/image_preview.py
-ImagePreviewDialog — popup to view larger versions of images.
+ImagePreviewDialog — frameless overlay-style image popout.
+
+Pops out near the origin widget position, dismisses on any click
+anywhere on screen via a Qt.WindowType.Popup flag.
 """
 
-from PyQt6.QtCore import Qt, QRect
-from PyQt6.QtGui import QPixmap, QPainter, QColor, QPen
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel
+from PyQt6.QtCore import Qt, QPoint, QRect, QSize
+from PyQt6.QtGui import QPixmap, QPainter, QColor, QPen, QScreen
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
 
 from src.ui.theme import palette as P
 
-class ImagePreviewDialog(QDialog):
-    """
-    A frameless, modal dialog that displays a full-size image preview.
-    Clicking anywhere on the dialog closes it.
-    """
-    def __init__(self, pixmap: QPixmap, parent=None):
-        super().__init__(parent)
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setModal(True)
 
-        # Scale image if it's too large for the screen
-        screen_geo = self.screen().availableGeometry()
-        max_w = int(screen_geo.width() * 0.8)
-        max_h = int(screen_geo.height() * 0.8)
+class ImagePreviewDialog(QWidget):
+    """
+    A frameless overlay-style popout that displays a full-size image preview.
+
+    Uses Qt.WindowType.Popup so it automatically closes when the user
+    clicks anywhere outside it. Also closes on click inside.
+
+    Args:
+        pixmap:     The image to display.
+        parent:     The widget that triggered the preview (used for origin_pos).
+        origin_pos: Global screen position near which to show the popout.
+                    If None, uses parent.mapToGlobal(center) or screen center.
+    """
+
+    def __init__(
+        self,
+        pixmap: QPixmap,
+        parent: QWidget | None = None,
+        origin_pos: QPoint | None = None,
+    ) -> None:
+        # Use Popup flag — Qt auto-dismisses on outside click; no parent ownership
+        super().__init__(None)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+
+        # --- Determine target screen from origin ---
+        screen: QScreen | None = None
+        if origin_pos is not None:
+            screen = QApplication.screenAt(origin_pos)
+        if screen is None and parent is not None:
+            screen = parent.screen()
+        if screen is None:
+            screen = QApplication.primaryScreen()
+
+        screen_geo: QRect = screen.availableGeometry() if screen else QRect(0, 0, 1920, 1080)
+
+        # --- Scale image to 92% of screen (leaving visible border context) ---
+        max_w = int(screen_geo.width() * 0.92)
+        max_h = int(screen_geo.height() * 0.92)
 
         if pixmap.width() > max_w or pixmap.height() > max_h:
             pixmap = pixmap.scaled(
                 max_w, max_h,
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                Qt.TransformationMode.SmoothTransformation,
             )
 
         self._pixmap = pixmap
-        
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        
+        layout.setContentsMargins(10, 10, 10, 10)
+
         self.label = QLabel()
         self.label.setPixmap(self._pixmap)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.label)
-        
-        self.resize(self._pixmap.width() + 24, self._pixmap.height() + 24)
 
-    def mousePressEvent(self, event):
-        """Close on click."""
-        self.accept()
+        dialog_w = self._pixmap.width() + 20
+        dialog_h = self._pixmap.height() + 20
+        self.resize(dialog_w, dialog_h)
 
-    def paintEvent(self, event):
-        """Draw a dark background with a tech border."""
+        # --- Position near origin, clamped to screen ---
+        self._position_near(origin_pos, parent, screen_geo, dialog_w, dialog_h)
+
+    def _position_near(
+        self,
+        origin_pos: QPoint | None,
+        parent: QWidget | None,
+        screen_geo: QRect,
+        dw: int,
+        dh: int,
+    ) -> None:
+        """Position the dialog near the origin point, keeping it on screen."""
+        if origin_pos is not None:
+            ox, oy = origin_pos.x(), origin_pos.y()
+        elif parent is not None:
+            center = parent.rect().center()
+            global_center = parent.mapToGlobal(center)
+            ox, oy = global_center.x(), global_center.y()
+        else:
+            ox = screen_geo.center().x()
+            oy = screen_geo.center().y()
+
+        # Try to center the dialog on the origin point, then clamp to screen
+        x = ox - dw // 2
+        y = oy - dh // 2
+
+        # Clamp to screen bounds
+        x = max(screen_geo.left(), min(x, screen_geo.right() - dw))
+        y = max(screen_geo.top(), min(y, screen_geo.bottom() - dh))
+
+        self.move(x, y)
+
+    # ── Events ────────────────────────────────────────────────────────────────
+
+    def mousePressEvent(self, event) -> None:
+        """Close on any click inside the dialog."""
+        self.close()
+
+    def keyPressEvent(self, event) -> None:
+        """Close on Escape."""
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+        else:
+            super().keyPressEvent(event)
+
+    # ── Paint ─────────────────────────────────────────────────────────────────
+
+    def paintEvent(self, event) -> None:
+        """Draw dark background with 2px accent border and corner accents."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         rect = self.rect().adjusted(0, 0, -1, -1)
-        
+        radius = 6
+
         # Dark overlay background
-        painter.setBrush(QColor(10, 15, 20, 240))
-        pen = QPen(QColor(P.PRIMARY), 1)
-        painter.setPen(pen)
-        
-        radius = 8
+        painter.setBrush(QColor(8, 14, 20, 245))
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect, radius, radius)
-        
-        # Corner accents
-        accent_size = 15
+
+        # 2px accent border
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(QPen(QColor(P.PRIMARY), 2))
-        
-        # Top-Left
-        painter.drawLine(rect.left(), rect.top() + accent_size, rect.left(), rect.top() + radius)
-        painter.drawLine(rect.left() + radius, rect.top(), rect.left() + accent_size, rect.top())
-        
-        # Top-Right
-        painter.drawLine(rect.right(), rect.top() + accent_size, rect.right(), rect.top() + radius)
-        painter.drawLine(rect.right() - radius, rect.top(), rect.right() - accent_size, rect.top())
-        
-        # Bottom-Left
-        painter.drawLine(rect.left(), rect.bottom() - accent_size, rect.left(), rect.bottom() - radius)
-        painter.drawLine(rect.left() + radius, rect.bottom(), rect.left() + accent_size, rect.bottom())
-        
-        # Bottom-Right
-        painter.drawLine(rect.right(), rect.bottom() - accent_size, rect.right(), rect.bottom() - radius)
-        painter.drawLine(rect.right() - radius, rect.bottom(), rect.right() - accent_size, rect.bottom())
-        
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), radius, radius)
+
+        # Corner bracket accents
+        accent_size = 18
+        painter.setPen(QPen(QColor(P.PRIMARY_CONTAINER), 2))
+
+        # Top-left
+        painter.drawLine(rect.left() + 1, rect.top() + radius, rect.left() + 1, rect.top() + accent_size)
+        painter.drawLine(rect.left() + radius, rect.top() + 1, rect.left() + accent_size, rect.top() + 1)
+        # Top-right
+        painter.drawLine(rect.right() - 1, rect.top() + radius, rect.right() - 1, rect.top() + accent_size)
+        painter.drawLine(rect.right() - radius, rect.top() + 1, rect.right() - accent_size, rect.top() + 1)
+        # Bottom-left
+        painter.drawLine(rect.left() + 1, rect.bottom() - radius, rect.left() + 1, rect.bottom() - accent_size)
+        painter.drawLine(rect.left() + radius, rect.bottom() - 1, rect.left() + accent_size, rect.bottom() - 1)
+        # Bottom-right
+        painter.drawLine(rect.right() - 1, rect.bottom() - radius, rect.right() - 1, rect.bottom() - accent_size)
+        painter.drawLine(rect.right() - radius, rect.bottom() - 1, rect.right() - accent_size, rect.bottom() - 1)
+
         painter.end()
+
+
+def show_image_preview(
+    pixmap: QPixmap,
+    parent: QWidget | None = None,
+    origin_pos: QPoint | None = None,
+) -> None:
+    """
+    Convenience function — show the overlay preview and return immediately.
+    The dialog owns itself (WA_DeleteOnClose) and dismisses on any click.
+    """
+    if pixmap.isNull():
+        return
+    dlg = ImagePreviewDialog(pixmap, parent, origin_pos)
+    dlg.show()
+    dlg.raise_()
+    dlg.activateWindow()

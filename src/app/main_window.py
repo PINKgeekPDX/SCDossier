@@ -3,7 +3,10 @@ src/app/main_window.py
 MainWindow — the primary application window, assembling the UI components.
 """
 
+import os
+
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget
 
 from src.core.events import EventBus
@@ -32,6 +35,14 @@ class MainWindow(BaseWindow):
     def __init__(self, controller: AppController, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.controller = controller
+
+        # Set window icon on the instance so the taskbar entry uses the correct icon
+        _ico_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "appicon.ico")
+        _png_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "appicon.png")
+        if os.path.exists(_ico_path):
+            self.setWindowIcon(QIcon(_ico_path))
+        elif os.path.exists(_png_path):
+            self.setWindowIcon(QIcon(_png_path))
 
         self.setWindowTitle("SC Dossier")
         self.resize(1024, 768)

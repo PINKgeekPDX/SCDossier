@@ -1,15 +1,16 @@
 """
 src/ui/tabs/archives_tab.py
 ArchivesTab — two-pane layout with collapsible list, filter/sort, and detail pane.
+Enhanced with animations, effects, and tooltips.
 """
 
 from pathlib import Path
-from PyQt6.QtCore import Qt, pyqtSlot, QSize, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSlot, QSize, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QIcon
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QFileDialog, QSplitter,
-    QScrollArea, QFrame, QGridLayout, QComboBox, QLineEdit
+    QScrollArea, QFrame, QGridLayout, QComboBox, QLineEdit, QGraphicsDropShadowEffect
 )
 
 from src.core.events import EventBus
@@ -24,6 +25,181 @@ from src.ui.widgets.wrap_layout import WrapLayout
 from src.ui.widgets.tech_label import TechLabel
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.confirm_dialog import show_confirm
+
+import os
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+from src.ui.theme.icon_utils import set_button_icon
+
+
+class StyledFilterInput(QLineEdit):
+    """Filter input with hover/focus effects."""
+
+    def __init__(self, placeholder: str, parent=None):
+        super().__init__(parent)
+        self.setPlaceholderText(placeholder)
+        self.setFont(font_mono(10))
+        self.setFixedHeight(32)
+        self._hovered = False
+        self._focused = False
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setMouseTracking(True)
+        self.setToolTip("Type to filter archived profiles by name or handle")
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+
+    def focusInEvent(self, event):
+        self._focused = True
+        self.update()
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        self._focused = False
+        self.update()
+        super().focusOutEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(2, 2, -2, -2)
+
+        # Background
+        if self._focused:
+            bg = QColor(15, 30, 45, 230)
+        elif self._hovered:
+            bg = QColor(12, 25, 38, 210)
+        else:
+            bg = QColor(10, 20, 30, 200)
+        painter.setBrush(bg)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(rect, 4, 4)
+
+        # Border
+        if self._focused:
+            painter.setPen(QPen(QColor(0, 170, 255, 200), 2))
+        elif self._hovered:
+            painter.setPen(QPen(QColor(0, 170, 255, 120), 1))
+        else:
+            painter.setPen(QPen(QColor(P.OUTLINE), 1))
+        painter.drawRoundedRect(rect, 4, 4)
+
+        # Text
+        text_rect = rect.adjusted(10, 0, -10, 0)
+        if self.text():
+            painter.setPen(QColor(P.ON_SURFACE))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.text())
+        else:
+            painter.setPen(QColor(P.TEXT_DIM))
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.placeholderText())
+
+        painter.end()
+
+
+class StyledComboBox(QComboBox):
+    """Dropdown with consistent styling."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFont(font_mono(10))
+        self.setFixedHeight(28)
+        self.setToolTip("Select sorting order for archived profiles")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(2, 2, -2, -2)
+        painter.setBrush(QColor(10, 20, 30, 200))
+        painter.setPen(QPen(QColor(P.OUTLINE), 1))
+        painter.drawRoundedRect(rect, 4, 4)
+
+        # Draw current text
+        painter.setPen(QColor(P.ON_SURFACE))
+        painter.setFont(font_mono(10))
+        text_rect = rect.adjusted(10, 0, -30, 0)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.currentText())
+
+        # Draw dropdown arrow
+        arrow_rect = rect.adjusted(rect.width() - 25, 0, -8, 0)
+        painter.setPen(QColor(P.PRIMARY))
+        mid = arrow_rect.center()
+        painter.drawLine(mid.x() - 4, mid.y() - 2, mid.x(), mid.y() + 3)
+        painter.drawLine(mid.x() + 4, mid.y() - 2, mid.x(), mid.y() + 3)
+
+        painter.end()
+
+    def showPopup(self):
+        super().showPopup()
+
+
+class StyledArchiveList(QListWidget):
+    """Archive list with hover effects and smooth selection."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFrameShape(QListWidget.Shape.NoFrame)
+        self.setSpacing(4)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setToolTip("Select an archived profile to view its details")
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor(5, 12, 18, 100))
+        painter.end()
+        super().paintEvent(event)
+
+
+class StyledArchiveButton(QPushButton):
+    """Button with consistent hover/active effects for archive actions."""
+
+    def __init__(self, icon_path: str, tooltip: str, parent=None):
+        super().__init__(parent)
+        self._hovered = False
+        self._danger = "danger" in tooltip.lower()
+        self.setFixedHeight(36)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setStyleSheet("background: transparent; border: none; padding: 0;")
+        self.setMouseTracking(True)
+        self.setToolTip(tooltip)
+        set_button_icon(self, icon_path, (20, 20))
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(2, 2, -2, -2)
+
+        if self._hovered:
+            if self._danger:
+                painter.setBrush(QColor(255, 59, 59, 30))
+                painter.setPen(QPen(QColor(255, 59, 59, 120), 1))
+            else:
+                painter.setBrush(QColor(0, 170, 255, 30))
+                painter.setPen(QPen(QColor(0, 170, 255, 100), 1))
+        else:
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(P.OUTLINE_VARIANT), 1))
+
+        painter.drawRoundedRect(rect, 4, 4)
+        painter.end()
+        super().paintEvent(event)
 
 
 class ArchiveItemWidget(QWidget):
@@ -44,7 +220,7 @@ class ArchiveItemWidget(QWidget):
             ArchiveItemWidget {{
                 background-color: transparent;
                 border: 1px solid transparent;
-                border-radius: 4px;
+                border-radius: 6px;
             }}
             ArchiveItemWidget:hover {{
                 border-color: {P.GLASS_BORDER_SUBTLE};
@@ -126,51 +302,21 @@ class ArchivesTab(QWidget):
         left_widget = QWidget()
         left_widget.setMinimumWidth(200)
         left_widget.setMaximumWidth(320)
+        left_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(12, 12, 12, 12)
         left_layout.setSpacing(8)
 
-        # Filter input
-        self.filter_input = QLineEdit()
-        self.filter_input.setPlaceholderText("FILTER ARCHIVES...")
-        self.filter_input.setFont(font_mono(10))
-        self.filter_input.setFixedHeight(32)
-        self.filter_input.setStyleSheet(f"""
-            QLineEdit {{
-                background: rgba(10, 20, 30, 0.8);
-                color: {P.ON_SURFACE};
-                border: 1px solid {P.OUTLINE};
-                border-radius: 4px;
-                padding: 0 8px;
-            }}
-            QLineEdit:focus {{
-                border: 1px solid {P.PRIMARY};
-                background: rgba(15, 30, 45, 0.9);
-            }}
-        """)
+        # Filter input - enhanced
+        self.filter_input = StyledFilterInput("FILTER ARCHIVES...")
         self.filter_input.textChanged.connect(self._apply_filter)
         left_layout.addWidget(self.filter_input)
 
-        # Sort dropdown
+        # Sort dropdown - enhanced
         sort_layout = QHBoxLayout()
         sort_lbl = TechLabel("SORT BY")
         sort_lbl.setFixedWidth(50)
-        self.sort_combo = QComboBox()
-        self.sort_combo.setFont(font_mono(10))
-        self.sort_combo.setFixedHeight(28)
-        self.sort_combo.setStyleSheet(f"""
-            QComboBox {{
-                background: rgba(10, 20, 30, 0.8);
-                color: {P.ON_SURFACE};
-                border: 1px solid {P.OUTLINE};
-                border-radius: 4px;
-                padding: 0 8px;
-            }}
-            QComboBox:focus {{
-                border: 1px solid {P.PRIMARY};
-            }}
-            QComboBox::drop-down {{ border: none; }}
-        """)
+        self.sort_combo = StyledComboBox()
         self.sort_combo.addItem("Name A-Z", "name_asc")
         self.sort_combo.addItem("Name Z-A", "name_desc")
         self.sort_combo.addItem("Date Archived", "date_archived")
@@ -180,54 +326,30 @@ class ArchivesTab(QWidget):
         sort_layout.addWidget(self.sort_combo)
         left_layout.addLayout(sort_layout)
 
-        # List
-        self.list_widget = QListWidget()
-        self.list_widget.setFrameShape(QListWidget.Shape.NoFrame)
-        self.list_widget.setStyleSheet("QListWidget { background: transparent; outline: none; } QListWidget::item { background: transparent; }")
-        self.list_widget.setSpacing(4)
+        # List - enhanced
+        self.list_widget = StyledArchiveList()
         self.list_widget.currentRowChanged.connect(self._on_selection_changed)
         left_layout.addWidget(self.list_widget)
 
-        # Action buttons
+        # Action buttons - enhanced
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        import os
-        from PyQt6.QtGui import QIcon
-        _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         sync_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "Refresh.png")
         export_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_file.svg")
         delete_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "No_Access.png")
 
-        self.sync_btn = QPushButton()
-        self.sync_btn.setProperty("class", "ghost")
-        self.sync_btn.setFixedHeight(36)
-        if os.path.exists(sync_icon):
-            self.sync_btn.setIcon(QIcon(sync_icon))
-            self.sync_btn.setIconSize(QSize(20, 20))
+        self.sync_btn = StyledArchiveButton(sync_icon, "Sync selected profile with latest RSI data")
         self.sync_btn.setEnabled(False)
         self.sync_btn.clicked.connect(self._on_sync)
-        self.sync_btn.setToolTip("Sync Archive")
 
-        self.export_btn = QPushButton()
-        self.export_btn.setProperty("class", "ghost")
-        self.export_btn.setFixedHeight(36)
-        if os.path.exists(export_icon):
-            self.export_btn.setIcon(QIcon(export_icon))
-            self.export_btn.setIconSize(QSize(20, 20))
+        self.export_btn = StyledArchiveButton(export_icon, "Export selected profile as a self-contained archive")
         self.export_btn.setEnabled(False)
         self.export_btn.clicked.connect(self._on_export)
-        self.export_btn.setToolTip("Export Archive")
 
-        self.delete_btn = QPushButton()
-        self.delete_btn.setProperty("class", "danger")
-        self.delete_btn.setFixedHeight(36)
-        if os.path.exists(delete_icon):
-            self.delete_btn.setIcon(QIcon(delete_icon))
-            self.delete_btn.setIconSize(QSize(20, 20))
+        self.delete_btn = StyledArchiveButton(delete_icon, "Permanently delete selected archived profile")
         self.delete_btn.setEnabled(False)
         self.delete_btn.clicked.connect(self._on_delete)
-        self.delete_btn.setToolTip("Delete Archive")
 
         btn_layout.addWidget(self.sync_btn)
         btn_layout.addWidget(self.export_btn)
@@ -260,7 +382,6 @@ class ArchivesTab(QWidget):
         self.detail_content.setVisible(False)
         self._build_detail_content()
 
-        # CRITICAL FIX: add detail_content to detail_layout so archive detail view works
         self.detail_layout.addWidget(self.detail_content)
 
         right_scroll.setWidget(self.detail_widget)
@@ -351,11 +472,9 @@ class ArchivesTab(QWidget):
         self._refresh_display()
 
     def _apply_filter(self) -> None:
-        """Legacy wrapper — delegates to consolidated _refresh_display."""
         self._refresh_display()
 
     def _apply_sort(self) -> None:
-        """Legacy wrapper — delegates to consolidated _refresh_display."""
         self._refresh_display()
 
     def _refresh_display(self) -> None:
@@ -511,6 +630,5 @@ class ArchivesTab(QWidget):
     def _on_profile_loaded(self, data: dict) -> None:
         """Refresh list when a profile is loaded/scraped."""
         self.refresh_list()
-        # If the synced/loaded profile is currently selected, update detail view
         if data.get("handle") == self._selected_handle:
             self._load_detail(self._selected_handle)

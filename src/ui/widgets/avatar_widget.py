@@ -87,8 +87,10 @@ class AvatarWidget(QWidget):
                 
             if pix and not pix.isNull():
                 from src.ui.widgets.image_preview import ImagePreviewDialog
-                dlg = ImagePreviewDialog(pix, self)
-                dlg.exec()
+                from PyQt6.QtCore import QPoint
+                origin = self.mapToGlobal(self.rect().center())
+                dlg = ImagePreviewDialog(pix, self, origin)
+                dlg.show()
         super().mousePressEvent(event)
 
     def paintEvent(self, event) -> None:
