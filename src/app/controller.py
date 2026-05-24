@@ -40,6 +40,13 @@ class AppController(QObject):
         
         self._connect_bus()
 
+        # Check updates
+        from src.core.settings import SettingsManager
+        if getattr(SettingsManager.instance(), "auto_check_updates", True):
+            from src.services.updater_service import UpdaterService
+            self.updater = UpdaterService()
+            self.updater.check_for_updates()
+
     def _connect_bus(self) -> None:
         bus = EventBus.instance()
         bus.search_player_requested.connect(self._on_search_player_requested)

@@ -5,8 +5,8 @@ Uses GlassCard containers for the Aegis aesthetic.
 """
 
 import os
-from PyQt6.QtCore import Qt, pyqtSlot
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSlot, QSize
+from PyQt6.QtGui import QFont, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QLabel, QPushButton,
     QFrame, QGridLayout
@@ -83,11 +83,35 @@ class OrgTab(QWidget):
 
         self.search_input = SearchInput("ENTER ORG NAME OR SID...")
         self.search_input.returnPressed.connect(self._on_search)
+        self.search_input.setFixedHeight(44)
+        self.search_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(10, 20, 30, 0.8);
+                color: {P.ON_SURFACE};
+                border: 2px solid {P.OUTLINE};
+                border-radius: 8px;
+                padding: 0 16px;
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {P.PRIMARY};
+                background: rgba(15, 30, 45, 0.9);
+            }}
+            QLineEdit:hover {{
+                border: 2px solid {P.PRIMARY_CONTAINER};
+            }}
+        """)
 
-        search_btn = QPushButton("SEARCH")
+        _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        search_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_search.svg")
+
+        search_btn = QPushButton()
         search_btn.setProperty("class", "primary")
-        search_btn.setFixedSize(100, 44)
+        search_btn.setFixedSize(56, 44)
+        if os.path.exists(search_icon):
+            search_btn.setIcon(QIcon(search_icon))
+            search_btn.setIconSize(QSize(20, 20))
         search_btn.clicked.connect(self._on_search)
+        search_btn.setToolTip("Search")
 
         ab_layout.addWidget(self.search_input)
         ab_layout.addWidget(search_btn)

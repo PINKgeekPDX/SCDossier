@@ -50,15 +50,18 @@ class ToolbarButton(QPushButton):
     def _load_icon(self) -> None:
         """Load SVG icon with fallback to text character."""
         from PyQt6.QtCore import QSize
+        icon = QIcon()
         if os.path.exists(self._icon_path):
             icon = QIcon(self._icon_path)
+            if icon.isNull():
+                icon = QIcon()
+        if not icon.isNull():
             self.setIcon(icon)
             size = self.size()
             self.setIconSize(QSize(size.width() - 8, size.height() - 8))
             self.setText("")
         else:
-            # Fallback: use text character
-            self.setText("•")
+            self.setText("▶")
 
     def enterEvent(self, event) -> None:
         self._hovered = True
@@ -99,6 +102,8 @@ class ToolbarButton(QPushButton):
 
         painter.end()
 
+        super().paintEvent(event)
+
 
 class OverlayToolbar(QWidget):
     """
@@ -134,31 +139,25 @@ class OverlayToolbar(QWidget):
 
     def _build_ui(self) -> None:
         # Expand button
-        expand_icon = os.path.join(_ICONS_DIR, "expand.svg")
+        expand_icon = os.path.join(os.path.dirname(_ICONS_DIR), "icons", "ships", "default", "MobiGlas.png")
         self._expand_btn = ToolbarButton(expand_icon, "Open SC Dossier", self)
         self._expand_btn.clicked.connect(self.expand_requested.emit)
 
         # Capture button
-        capture_icon = os.path.join(_ICONS_DIR, "capture.svg")
+        capture_icon = os.path.join(os.path.dirname(_ICONS_DIR), "icons", "ships", "default", "Target_Lock.png")
         self._capture_btn = ToolbarButton(capture_icon, "OCR Screen Capture", self)
         self._capture_btn.clicked.connect(self.capture_requested.emit)
 
     def _set_orientation(self, edge: ScreenEdge) -> None:
         """Arrange buttons horizontally or vertically based on edge."""
-        # Remove existing layout
         old = self.layout()
-        if old:
+        if old is not None:
             while old.count():
-                item = old.takeAt(0)
-                if item.widget():
-                    item.widget().setParent(self)
-            try:
-                old.deleteLater()
-            except Exception:
-                pass
+                old.takeAt(0)
+            old.deleteLater()
 
         padding = 6
-        if edge in (ScreenEdge.LEFT, ScreenEdge.RIGHT):
+        if edge in (ScreenEdge.TOP, ScreenEdge.BOTTOM):
             layout = QHBoxLayout(self)
             self.setFixedSize(TOOLBAR_LENGTH, TOOLBAR_THICKNESS)
         else:
@@ -175,13 +174,54 @@ class OverlayToolbar(QWidget):
     # ------------------------------------------------------------------
 
     def restore_position(self, x: int, y: int, edge: str) -> None:
-        """Restore toolbar position from saved settings."""
+        """Restore toolbar position from saved settings.
+
+        Ensures the toolbar is always positioned on a visible screen.
+        If the saved coordinates are off-screen (e.g. after a monitor
+        was disconnected), the toolbar defaults to the left edge of the
+        primary screen.
+        """
         try:
             self._edge = ScreenEdge(edge)
         except ValueError:
             self._edge = ScreenEdge.LEFT
         self._set_orientation(self._edge)
-        self.move(x, y)
+
+        # Validate that the saved position lands on a visible screen.
+        # Use the known fixed size rather than self.width() / self.height()
+        # because the widget may not have been shown yet.
+        # LEFT/RIGHT -> vertical layout -> THICKNESS x LENGTH
+        # TOP/BOTTOM -> horizontal layout -> LENGTH x THICKNESS
+        w = TOOLBAR_THICKNESS if edge in ("left", "right") else TOOLBAR_LENGTH
+        h = TOOLBAR_LENGTH if edge in ("left", "right") else TOOLBAR_THICKNESS
+        target_rect = QRect(x, y, w, h)
+        on_screen = False
+        for screen in QApplication.screens():
+            if screen.availableGeometry().intersects(target_rect):
+                on_screen = True
+                break
+
+        if on_screen:
+            self.move(x, y)
+        else:
+            # Saved coords are off-screen — snap to default position
+            log.warning(
+                "Saved toolbar position (%d, %d) is off-screen; resetting to default.",
+                x, y,
+            )
+            self._edge = ScreenEdge.LEFT
+            self._set_orientation(self._edge)
+            primary = QApplication.primaryScreen()
+            if primary:
+                avail = primary.availableGeometry()
+                self.move(
+                    avail.left(),
+                    avail.top() + (avail.height() - h) // 2,
+                )
+            else:
+                self.move(0, 100)
+            # Immediately save the corrected position
+            self._save_position()
 
     def snap_to_nearest_edge(self) -> None:
         """Snap the toolbar flush to the nearest screen edge; save position."""

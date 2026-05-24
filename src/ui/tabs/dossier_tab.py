@@ -4,8 +4,8 @@ DossierTab — the primary view displaying scraped citizen and organization info
 Uses GlassCard containers for the Aegis aesthetic.
 """
 
-from PyQt6.QtCore import Qt, pyqtSlot
-from PyQt6.QtGui import QColor, QPainter, QFont
+from PyQt6.QtCore import Qt, pyqtSlot, QSize
+from PyQt6.QtGui import QColor, QPainter, QFont, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QLabel, QPushButton,
     QFrame, QSizePolicy
@@ -51,17 +51,46 @@ class DossierTab(QWidget):
 
         self.search_input = SearchInput("ENTER RSI HANDLE...")
         self.search_input.returnPressed.connect(self._on_search)
+        self.search_input.setFixedHeight(44)
+        self.search_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(10, 20, 30, 0.8);
+                color: {P.ON_SURFACE};
+                border: 2px solid {P.OUTLINE};
+                border-radius: 8px;
+                padding: 0 16px;
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {P.PRIMARY};
+                background: rgba(15, 30, 45, 0.9);
+            }}
+            QLineEdit:hover {{
+                border: 2px solid {P.PRIMARY_CONTAINER};
+            }}
+        """)
 
-        search_btn = QPushButton("SEARCH")
+        _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        search_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_search.svg")
+        archive_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_save.svg")
+
+        search_btn = QPushButton()
         search_btn.setProperty("class", "primary")
-        search_btn.setFixedSize(100, 44)
+        search_btn.setFixedSize(56, 44)
+        if os.path.exists(search_icon):
+            search_btn.setIcon(QIcon(search_icon))
+            search_btn.setIconSize(QSize(20, 20))
         search_btn.clicked.connect(self._on_search)
+        search_btn.setToolTip("Search")
 
-        self.archive_btn = QPushButton("ARCHIVE")
+        self.archive_btn = QPushButton()
         self.archive_btn.setProperty("class", "ghost")
-        self.archive_btn.setFixedSize(100, 44)
+        self.archive_btn.setFixedSize(56, 44)
+        if os.path.exists(archive_icon):
+            self.archive_btn.setIcon(QIcon(archive_icon))
+            self.archive_btn.setIconSize(QSize(20, 20))
         self.archive_btn.setEnabled(False)
         self.archive_btn.clicked.connect(self._on_archive_clicked)
+        self.archive_btn.setToolTip("Archive Profile")
 
         ab_layout.addWidget(self.search_input)
         ab_layout.addWidget(search_btn)

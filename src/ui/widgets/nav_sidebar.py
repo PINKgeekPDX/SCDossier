@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QSizePolicy, QFrame
 )
+import webbrowser
 
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
@@ -165,13 +166,12 @@ class NavSidebar(QWidget):
 
     tab_selected = pyqtSignal(str)
 
-    # Navigation item definitions: (tab_id, icon_path, label)
     NAV_ITEMS = [
-        (TabId.SEARCH.value,       os.path.join(_ICONS_MISC_DIR, "search.svg"),       "SEARCH"),
-        (TabId.DOSSIER.value,      os.path.join(_ICONS_MISC_DIR, "person.svg"),       "DOSSIER"),
-        (TabId.ORGANIZATION.value, os.path.join(_ICONS_MISC_DIR, "groups.svg"),       "ORGANIZATION"),
-        (TabId.ARCHIVE.value,      os.path.join(_ICONS_MISC_DIR, "archive.svg"),      "ARCHIVE"),
-        (TabId.SETTINGS.value,     os.path.join(_ICONS_MISC_DIR, "settings.svg"),     "SETTINGS"),
+        (TabId.SEARCH.value,       os.path.join(_ICONS_MISC_DIR, "icon_search.svg"),  "SEARCH"),
+        (TabId.DOSSIER.value,      os.path.join(_ICONS_DIR, "Icons", "FOIP.png"),     "DOSSIER"),
+        (TabId.ORGANIZATION.value, os.path.join(_ICONS_DIR, "Icons", "SHLD.png"),     "ORGANIZATION"),
+        (TabId.ARCHIVE.value,      os.path.join(_ICONS_DIR, "Icons", "JOURNAL.png"),  "ARCHIVE"),
+        (TabId.SETTINGS.value,     os.path.join(_ICONS_MISC_DIR, "icon_settings.svg"), "SETTINGS"),
     ]
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -200,12 +200,14 @@ class NavSidebar(QWidget):
 
         layout.addStretch(1)
 
-        # Expand/collapse toggle button at bottom (separate from nav items)
+        # Github profile button at bottom (replaced toggle)
         self._toggle_btn = QPushButton()
-        icon = QIcon(os.path.join(_ICONS_DIR, "expand.svg"))
-        self._toggle_btn.setIcon(icon)
+        icon_path = os.path.join(_ICONS_DIR, "Icons", "!.png")
+        if os.path.exists(icon_path):
+            self._toggle_btn.setIcon(QIcon(icon_path))
         self._toggle_btn.setFixedHeight(40)
         self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._toggle_btn.setToolTip("Open GitHub Profile")
         self._toggle_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent;
@@ -219,7 +221,7 @@ class NavSidebar(QWidget):
                 background: rgba(0, 170, 255, 0.10);
             }}
         """)
-        self._toggle_btn.clicked.connect(self._toggle_expand)
+        self._toggle_btn.clicked.connect(self._open_github)
         layout.addWidget(self._toggle_btn)
 
         # Set initial active
@@ -252,18 +254,8 @@ class NavSidebar(QWidget):
         self.set_active_tab(tab_id)
         self.tab_selected.emit(tab_id)
 
-    def _toggle_expand(self) -> None:
-        self._expanded = not self._expanded
-        target_w = SIDEBAR_WIDTH_EXPANDED if self._expanded else SIDEBAR_WIDTH_COLLAPSED
-        self._anim.stop()
-        self._anim.setStartValue(self.width())
-        self._anim.setEndValue(target_w)
-        self._anim.start()
-        # Update toggle button text
-        self._toggle_btn.setIcon(QIcon(os.path.join(_ICONS_DIR, "hide.svg" if self._expanded else "expand.svg")))
-        # Update all items so they redraw with/without labels
-        for item in self._items.values():
-            item.update()
+    def _open_github(self) -> None:
+        webbrowser.open("https://github.com/pinkgeekpdx")
 
     # ------------------------------------------------------------------
     # Paint

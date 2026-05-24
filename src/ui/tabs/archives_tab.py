@@ -133,18 +133,44 @@ class ArchivesTab(QWidget):
         # Filter input
         self.filter_input = QLineEdit()
         self.filter_input.setPlaceholderText("FILTER ARCHIVES...")
-        self.filter_input.setFont(font_mono(11))
-        self.filter_input.setFixedHeight(36)
+        self.filter_input.setFont(font_mono(10))
+        self.filter_input.setFixedHeight(32)
+        self.filter_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(10, 20, 30, 0.8);
+                color: {P.ON_SURFACE};
+                border: 1px solid {P.OUTLINE};
+                border-radius: 4px;
+                padding: 0 8px;
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {P.PRIMARY};
+                background: rgba(15, 30, 45, 0.9);
+            }}
+        """)
         self.filter_input.textChanged.connect(self._apply_filter)
         left_layout.addWidget(self.filter_input)
 
         # Sort dropdown
         sort_layout = QHBoxLayout()
         sort_lbl = TechLabel("SORT BY")
-        sort_lbl.setFixedWidth(60)
+        sort_lbl.setFixedWidth(50)
         self.sort_combo = QComboBox()
-        self.sort_combo.setFont(font_mono(11))
-        self.sort_combo.setFixedHeight(32)
+        self.sort_combo.setFont(font_mono(10))
+        self.sort_combo.setFixedHeight(28)
+        self.sort_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: rgba(10, 20, 30, 0.8);
+                color: {P.ON_SURFACE};
+                border: 1px solid {P.OUTLINE};
+                border-radius: 4px;
+                padding: 0 8px;
+            }}
+            QComboBox:focus {{
+                border: 1px solid {P.PRIMARY};
+            }}
+            QComboBox::drop-down {{ border: none; }}
+        """)
         self.sort_combo.addItem("Name A-Z", "name_asc")
         self.sort_combo.addItem("Name Z-A", "name_desc")
         self.sort_combo.addItem("Date Archived", "date_archived")
@@ -166,23 +192,42 @@ class ArchivesTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        self.sync_btn = QPushButton("SYNC")
+        import os
+        from PyQt6.QtGui import QIcon
+        _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        sync_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "Refresh.png")
+        export_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "misc", "icon_file.svg")
+        delete_icon = os.path.join(_PROJECT_ROOT, "assets", "icons", "Icons", "No_Access.png")
+
+        self.sync_btn = QPushButton()
         self.sync_btn.setProperty("class", "ghost")
         self.sync_btn.setFixedHeight(36)
+        if os.path.exists(sync_icon):
+            self.sync_btn.setIcon(QIcon(sync_icon))
+            self.sync_btn.setIconSize(QSize(20, 20))
         self.sync_btn.setEnabled(False)
         self.sync_btn.clicked.connect(self._on_sync)
+        self.sync_btn.setToolTip("Sync Archive")
 
-        self.export_btn = QPushButton("EXPORT")
+        self.export_btn = QPushButton()
         self.export_btn.setProperty("class", "ghost")
         self.export_btn.setFixedHeight(36)
+        if os.path.exists(export_icon):
+            self.export_btn.setIcon(QIcon(export_icon))
+            self.export_btn.setIconSize(QSize(20, 20))
         self.export_btn.setEnabled(False)
         self.export_btn.clicked.connect(self._on_export)
+        self.export_btn.setToolTip("Export Archive")
 
-        self.delete_btn = QPushButton("DELETE")
+        self.delete_btn = QPushButton()
         self.delete_btn.setProperty("class", "danger")
         self.delete_btn.setFixedHeight(36)
+        if os.path.exists(delete_icon):
+            self.delete_btn.setIcon(QIcon(delete_icon))
+            self.delete_btn.setIconSize(QSize(20, 20))
         self.delete_btn.setEnabled(False)
         self.delete_btn.clicked.connect(self._on_delete)
+        self.delete_btn.setToolTip("Delete Archive")
 
         btn_layout.addWidget(self.sync_btn)
         btn_layout.addWidget(self.export_btn)

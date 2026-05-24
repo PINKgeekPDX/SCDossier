@@ -36,6 +36,12 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("SC Dossier")
     app.setOrganizationName("PINK")
+    
+    import os
+    from PyQt6.QtGui import QIcon
+    appicon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "appicon.png")
+    if os.path.exists(appicon_path):
+        app.setWindowIcon(QIcon(appicon_path))
 
     # 2. Load Aegis Design System
     register_fonts()
@@ -50,10 +56,7 @@ def main():
     toolbar = OverlayToolbar()
 
     # Create tray icon
-    from PyQt6.QtGui import QIcon
-    import os
-    icon_path = os.path.join(os.path.dirname(__file__), "assets", "icons", "tray.svg")
-    tray_icon = TrayIcon(QIcon(icon_path) if os.path.exists(icon_path) else QIcon())
+    tray_icon = TrayIcon(QIcon(appicon_path) if os.path.exists(appicon_path) else QIcon())
 
     active_selector = None
 

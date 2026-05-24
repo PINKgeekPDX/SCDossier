@@ -1,30 +1,19 @@
 """
 src/ui/widgets/title_bar.py
 CustomTitleBar — draggable window chrome for the main window.
-
-Layout:
-  [App Name // Tagline]    [Status]    [Pin Btn] [Hide Btn]
-
-Features:
-- 48px fixed height
-- Drag-to-reposition the parent window
-- Pin button: toggles always-on-top + disables hide while pinned
-- Hide button: collapses main window back to toolbar
-- 1px bottom border in rgba(0,170,255,0.15)
 """
 
 import logging
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QPen
+import os
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QTimer
+from PyQt6.QtGui import QPainter, QColor, QPen, QLinearGradient, QIcon, QPixmap
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 
 from src.ui.theme import palette as P
-from src.ui.theme.fonts import label_caps
+from src.ui.theme.fonts import label_caps, font_inter
 from src.app.constants import APP_NAME, TITLEBAR_HEIGHT
 
 log = logging.getLogger(__name__)
-
-import os
 
 # Shared button base style
 _BTN_BASE = (
@@ -35,21 +24,13 @@ _BTN_BASE = (
     "QPushButton:disabled {{ opacity: 0.4; }}"
 )
 
-# Resolve icon paths
-_ICONS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "icons")
-_PIN_ICON = os.path.join(_ICONS_DIR, "pin.svg")
-_HIDE_ICON = os.path.join(_ICONS_DIR, "hide.svg")
-
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+_APP_ICON = os.path.join(_PROJECT_ROOT, "assets", "appicon.png")
+_PIN_UNLOCKED_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "ships", "default", "Unlock.png")
+_PIN_LOCKED_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "ships", "default", "Lock.png")
+_HIDE_ICON = os.path.join(_PROJECT_ROOT, "assets", "icons", "ships", "default", "Return.png")
 
 class CustomTitleBar(QWidget):
-    """
-    Custom title bar widget for the SC Dossier main window.
-
-    Signals:
-        pin_toggled(bool):  Emitted when pin state changes.
-        hide_requested():   Emitted when hide button is clicked.
-    """
-
     pin_toggled = pyqtSignal(bool)
     hide_requested = pyqtSignal()
 
@@ -64,6 +45,12 @@ class CustomTitleBar(QWidget):
         self._drag_start_pos = QPoint()
         self._drag_start_window_pos = QPoint()
 
+        # Animation states
+        self._anim_step = 0
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._update_animation)
+        self._anim_timer.start(100) # every 100ms
+
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -71,35 +58,29 @@ class CustomTitleBar(QWidget):
         layout.setContentsMargins(16, 0, 12, 0)
         layout.setSpacing(0)
 
-        # --- Left: App name + tagline ---
-        app_label = QLabel(APP_NAME.upper())
-        app_label.setFont(label_caps())
-        app_label.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.15em;")
-        app_label.setObjectName("AppTitleLabel")
+        # App Icon
+        icon_lbl = QLabel()
+        if os.path.exists(_APP_ICON):
+            pix = QPixmap(_APP_ICON).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            icon_lbl.setPixmap(pix)
+        else:
+            icon_lbl.setText("🚀")
+        
+        layout.addWidget(icon_lbl)
+        layout.addSpacing(12)
 
-        sub_label = QLabel("// CITIZEN INTEL")
-        sub_label.setFont(label_caps())
-        sub_label.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; margin-left: 8px;")
+        # Animated Title Label
+        self._title_lbl = QLabel("SCD: Star Citizen Dossier")
+        font = label_caps()
+        font.setPointSize(10)
+        font.setBold(True)
+        self._title_lbl.setFont(font)
+        self._title_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.15em;")
+        layout.addWidget(self._title_lbl)
 
-        layout.addWidget(app_label)
-        layout.addWidget(sub_label)
         layout.addStretch(1)
 
-        # --- Center: Connection status dot ---
-        self._status_dot = QLabel("●")
-        self._status_dot.setFont(label_caps())
-        self._status_dot.setStyleSheet("color: #00FF88; background: transparent; font-size: 10px;")
-        self._status_dot.setToolTip("System Online")
-
-        self._status_label = QLabel("SYSTEM NOMINAL")
-        self._status_label.setFont(label_caps())
-        self._status_label.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; margin-left: 6px;")
-
-        layout.addWidget(self._status_dot)
-        layout.addWidget(self._status_label)
-        layout.addStretch(1)
-
-        # --- Right: Pin + Hide buttons ---
+        # Right: Pin + Hide buttons
         self._pin_btn = QPushButton()
         self._pin_btn.setProperty("class", "icon")
         self._pin_btn.setFixedSize(32, 32)
@@ -120,26 +101,29 @@ class CustomTitleBar(QWidget):
         layout.addSpacing(4)
         layout.addWidget(self._hide_btn)
 
-    # ------------------------------------------------------------------
-    # Button Styles (deduplicated via template)
-    # ------------------------------------------------------------------
+    def _update_animation(self):
+        self._anim_step = (self._anim_step + 5) % 360
+        # Slowly pulse brightness of primary color
+        val = 0.5 + 0.5 * __import__("math").sin(self._anim_step * 3.14159 / 180.0)
+        c = QColor(0, int(170 + 85*val), 255)
+        self._title_lbl.setStyleSheet(f"color: {c.name()}; background: transparent; letter-spacing: 0.15em;")
 
     def _load_button_icon(self, btn: QPushButton, icon_path: str, fallback_text: str) -> None:
-        """Load SVG icon from path with text fallback."""
         from PyQt6.QtCore import QSize
-        from PyQt6.QtGui import QIcon
+        icon = QIcon()
         if os.path.exists(icon_path):
             icon = QIcon(icon_path)
+        if not icon.isNull():
             btn.setIcon(icon)
-            btn.setIconSize(QSize(18, 18))
+            btn.setIconSize(QSize(20, 20))
             btn.setText("")
         else:
             btn.setText(fallback_text)
             btn.setIcon(QIcon())
 
     def _update_pin_style(self) -> None:
-        """Update pin button appearance based on state."""
-        self._load_button_icon(self._pin_btn, _PIN_ICON, "◈" if self._pinned else "◇")
+        icon_path = _PIN_LOCKED_ICON if self._pinned else _PIN_UNLOCKED_ICON
+        self._load_button_icon(self._pin_btn, icon_path, "◈" if self._pinned else "◇")
         if self._pinned:
             self._pin_btn.setStyleSheet(_BTN_BASE.format(
                 color=P.PRIMARY_CONTAINER, bg="rgba(0,170,255,0.20)",
@@ -154,17 +138,12 @@ class CustomTitleBar(QWidget):
             ))
 
     def _update_hide_style(self) -> None:
-        """Update hide button appearance."""
         self._load_button_icon(self._hide_btn, _HIDE_ICON, "⊟")
         self._hide_btn.setStyleSheet(_BTN_BASE.format(
             color=P.TEXT_DIM, bg="transparent",
             hover_bg="rgba(255,59,59,0.15)", hover_color=P.HAZARD_RED,
             pressed_bg="rgba(255,59,59,0.25)",
         ))
-
-    # ------------------------------------------------------------------
-    # Pin Logic
-    # ------------------------------------------------------------------
 
     @property
     def is_pinned(self) -> bool:
@@ -181,25 +160,13 @@ class CustomTitleBar(QWidget):
         self.pin_toggled.emit(self._pinned)
 
     def set_pinned(self, pinned: bool) -> None:
-        """Programmatically set pin state."""
         if self._pinned != pinned:
             self._pinned = pinned
             self._update_pin_style()
             self._hide_btn.setEnabled(not pinned)
 
-    # ------------------------------------------------------------------
-    # Status Update
-    # ------------------------------------------------------------------
-
     def set_status(self, text: str, ok: bool = True) -> None:
-        """Update the center status indicator."""
-        self._status_label.setText(text.upper())
-        color = "#00FF88" if ok else P.HAZARD_RED
-        self._status_dot.setStyleSheet(f"color: {color}; background: transparent; font-size: 10px;")
-
-    # ------------------------------------------------------------------
-    # Drag
-    # ------------------------------------------------------------------
+        pass # Removed per request
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -219,16 +186,15 @@ class CustomTitleBar(QWidget):
         self._drag_active = False
         event.accept()
 
-    # ------------------------------------------------------------------
-    # Paint
-    # ------------------------------------------------------------------
-
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Background
-        painter.fillRect(self.rect(), QColor(10, 29, 41, 200))
+        # Darker background with gradient between darker blue and grey
+        grad = QLinearGradient(0, 0, self.width(), 0)
+        grad.setColorAt(0, QColor(4, 18, 30, 240)) # darker blue
+        grad.setColorAt(1, QColor(35, 40, 45, 240)) # grey
+        painter.fillRect(self.rect(), grad)
 
         # Bottom border
         pen = QPen(QColor(0, 170, 255, 38), 1)

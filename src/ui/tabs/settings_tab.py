@@ -124,7 +124,7 @@ class SettingsTab(QWidget):
         sync_form.addRow(TechLabel("INTERVAL"), self.sync_interval_spin)
 
         self.sync_on_load_cb = QCheckBox("Auto-sync on archive load")
-        self.sync_on_load_cb.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+        self.sync_on_load_cb.setStyleSheet(self._checkbox_style())
         sync_form.addRow(TechLabel("ON LOAD"), self.sync_on_load_cb)
 
         sync_card.content_layout.addLayout(sync_form)
@@ -143,7 +143,7 @@ class SettingsTab(QWidget):
         cache_form.addRow(TechLabel("MAX AGE"), self.cache_spin)
 
         self.cache_auto_cb = QCheckBox("Auto-clear expired temp cache")
-        self.cache_auto_cb.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+        self.cache_auto_cb.setStyleSheet(self._checkbox_style())
         cache_form.addRow(TechLabel("AUTO CLEAR"), self.cache_auto_cb)
 
         cache_card.content_layout.addLayout(cache_form)
@@ -195,14 +195,39 @@ class SettingsTab(QWidget):
         paths_card.content_layout.addLayout(paths_layout)
         layout.addWidget(paths_card)
 
-        # --- Section: About ---
-        about_card = GlassCard(title="ABOUT")
+        # --- Section: About & Updates ---
+        about_card = GlassCard(title="ABOUT & UPDATES")
         about_layout = QVBoxLayout()
-        about_layout.setSpacing(6)
+        about_layout.setSpacing(12)
         from src.app.constants import APP_NAME, APP_VERSION
         about_layout.addWidget(self._about_row("APPLICATION", f"{APP_NAME} v{APP_VERSION}"))
+        about_layout.addWidget(self._about_row("DEVELOPER", "PINKgeekPDX"))
         about_layout.addWidget(self._about_row("FRAMEWORK", "PyQt6"))
-        about_layout.addWidget(self._about_row("DESIGN", "Aegis Liquid Interface"))
+        about_layout.addWidget(self._about_row("LICENSE", "MIT License"))
+
+        disc_lbl = QLabel("DISCLAIMER: This is an unofficial tool and is not affiliated with the Cloud Imperium group of companies. All content, including Star Citizen and Squadron 42 materials, are property of Cloud Imperium Rights LLC and Cloud Imperium Rights Ltd.")
+        disc_lbl.setFont(font_inter(10))
+        disc_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
+        disc_lbl.setWordWrap(True)
+        about_layout.addWidget(disc_lbl)
+        
+        about_layout.addSpacing(8)
+
+        # Updater settings
+        update_form = QFormLayout()
+        update_form.setSpacing(12)
+        update_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        
+        self.auto_check_cb = QCheckBox("Automatically check for updates")
+        self.auto_check_cb.setStyleSheet(self._checkbox_style())
+        self.auto_download_cb = QCheckBox("Automatically download updates")
+        self.auto_download_cb.setStyleSheet(self._checkbox_style())
+
+        update_form.addRow(TechLabel("UPDATER"), self.auto_check_cb)
+        update_form.addRow(TechLabel("DOWNLOAD"), self.auto_download_cb)
+        
+        about_layout.addLayout(update_form)
+
         about_card.content_layout.addLayout(about_layout)
         layout.addWidget(about_card)
 
@@ -232,6 +257,33 @@ class SettingsTab(QWidget):
             padding: 6px 10px;
         """
 
+    def _checkbox_style(self) -> str:
+        return f"""
+            QCheckBox {{
+                color: {P.ON_SURFACE};
+                background: transparent;
+                border: none;
+                spacing: 12px;
+                font-weight: 500;
+            }}
+            QCheckBox::indicator {{
+                width: 20px;
+                height: 20px;
+                border: 2px solid {P.OUTLINE};
+                border-radius: 4px;
+                background: rgba(0, 0, 0, 0.3);
+            }}
+            QCheckBox::indicator:hover {{
+                border: 2px solid {P.PRIMARY_CONTAINER};
+                background: rgba(0, 170, 255, 0.1);
+            }}
+            QCheckBox::indicator:checked {{
+                border: 2px solid {P.PRIMARY};
+                background: {P.PRIMARY};
+                image: url(data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>);
+            }}
+        """
+
     def _load_values(self) -> None:
         self.delay_spin.setValue(self.sm.scraper_delay_ms)
         self.ua_input.setText(self.sm.user_agent)
@@ -250,6 +302,9 @@ class SettingsTab(QWidget):
         opacity = int(self.sm.toolbar_opacity * 100)
         self.toolbar_slider.setValue(opacity)
         self.toolbar_val_lbl.setText(f"{opacity}%")
+        
+        self.auto_check_cb.setChecked(getattr(self.sm, "auto_check_updates", True))
+        self.auto_download_cb.setChecked(getattr(self.sm, "auto_download_updates", False))
 
     def _connect_signals(self) -> None:
         self.delay_spin.valueChanged.connect(lambda v: setattr(self.sm, 'scraper_delay_ms', v))
@@ -267,6 +322,9 @@ class SettingsTab(QWidget):
         self.cache_auto_cb.toggled.connect(lambda v: setattr(self.sm, 'temp_cache_auto_clear', v))
 
         self.toolbar_slider.valueChanged.connect(self._on_toolbar_opacity_changed)
+        
+        self.auto_check_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_check_updates', v))
+        self.auto_download_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_download_updates', v))
 
     def _on_ocr_changed(self, value: int) -> None:
         self.ocr_val_lbl.setText(f"{value}%")

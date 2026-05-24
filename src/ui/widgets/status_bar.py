@@ -1,13 +1,13 @@
 """
 src/ui/widgets/status_bar.py
-CustomStatusBar — thin bottom strip with system status, ping, and uptime display.
+CustomStatusBar — thin bottom strip with system status display.
 
 Layout:
-  [● STATUS TEXT]          [PING: --ms] [UPTIME: --:--] [◉]
+  [● STATUS TEXT]          [◉]
 """
 
 import time
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPainter, QColor
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
 
@@ -23,9 +23,7 @@ class CustomStatusBar(QWidget):
         super().__init__(parent)
         self.setFixedHeight(STATUSBAR_HEIGHT)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-        self._start_time = time.time()
         self._build_ui()
-        self._start_timers()
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
@@ -40,7 +38,7 @@ class CustomStatusBar(QWidget):
         self._dot.setStyleSheet("color: #00FF88; background: transparent; font-size: 9px;")
 
         # Status text
-        self._status_lbl = QLabel("SYSTEM STATUS: NOMINAL")
+        self._status_lbl = QLabel("IDLE")
         self._status_lbl.setFont(font)
         self._status_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
         self._status_lbl.setObjectName("StatusText")
@@ -50,40 +48,12 @@ class CustomStatusBar(QWidget):
         layout.addWidget(self._status_lbl)
         layout.addStretch(1)
 
-        # Ping
-        self._ping_lbl = QLabel("PING: --")
-        self._ping_lbl.setFont(font)
-        self._ping_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
-
-        # Uptime
-        self._uptime_lbl = QLabel("UPTIME: 00:00")
-        self._uptime_lbl.setFont(font)
-        self._uptime_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
-
         # Connection icon
         self._conn_lbl = QLabel("◉")
         self._conn_lbl.setFont(font)
         self._conn_lbl.setStyleSheet(f"color: {P.PRIMARY_CONTAINER}; background: transparent; font-size: 9px;")
 
-        layout.addWidget(self._ping_lbl)
-        layout.addSpacing(16)
-        layout.addWidget(self._uptime_lbl)
-        layout.addSpacing(8)
         layout.addWidget(self._conn_lbl)
-
-    def _start_timers(self) -> None:
-        self._uptime_timer = QTimer(self)
-        self._uptime_timer.timeout.connect(self._update_uptime)
-        self._uptime_timer.start(1000)
-
-    def _update_uptime(self) -> None:
-        elapsed = int(time.time() - self._start_time)
-        minutes, seconds = divmod(elapsed, 60)
-        hours, minutes = divmod(minutes, 60)
-        if hours:
-            self._uptime_lbl.setText(f"UPTIME: {hours:02d}:{minutes:02d}:{seconds:02d}")
-        else:
-            self._uptime_lbl.setText(f"UPTIME: {minutes:02d}:{seconds:02d}")
 
     def set_status(self, text: str, level: str = "info") -> None:
         """Update the status message. level: 'info'|'success'|'warning'|'error'"""
@@ -105,15 +75,6 @@ class CustomStatusBar(QWidget):
         self._status_lbl.setText(text.upper())
         self._status_lbl.setStyleSheet(f"color: {color}; background: transparent;")
         self._dot.setStyleSheet(f"color: {dot_color}; background: transparent; font-size: 9px;")
-
-    def set_ping(self, ms: int | None) -> None:
-        """Update ping display."""
-        if ms is None:
-            self._ping_lbl.setText("PING: --")
-        else:
-            color = "#00FF88" if ms < 100 else ("#FFAA00" if ms < 300 else P.HAZARD_RED)
-            self._ping_lbl.setText(f"PING: {ms}ms")
-            self._ping_lbl.setStyleSheet(f"color: {color}; background: transparent;")
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
