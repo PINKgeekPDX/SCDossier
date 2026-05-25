@@ -9,7 +9,7 @@
   [![Status](https://img.shields.io/badge/Status-Active-FF0055?style=for-the-badge)](#)
 </div>
 
->## Retrieve, inspect, archive, and export player & organization dossiers—without ever leaving your ship.
+## **Retrieve player & organization dossiers—without ever leaving your ship**
 
 - `SCD` runs quietly as a sleek, edge-snapped overlay while you play. 
 
