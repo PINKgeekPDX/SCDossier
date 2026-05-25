@@ -126,10 +126,11 @@ All settings auto-save when changed.
 | Section | Options |
 |---|---|
 | Appearance | Accent color override, font size scale |
-| Scraper | Request delay, User-Agent string |
-| OCR | Engine (EasyOCR / Tesseract), confidence threshold |
+| Scraper | Request delay, timeout, User-Agent string |
+| OCR | Engine (RapidOCR), thread count, confidence threshold |
 | Cache | Auto-clear temp cache, max age limit, open cache folder |
 | Sync | Auto-sync toggle, sync interval, sync on archive load |
+| Updater | Auto-check for updates, auto-download updates |
 | Toolbar | Edge preference, toolbar opacity |
 | Paths | Display-only view of all data directories |
 | About | App version and links |

@@ -1,139 +1,121 @@
-# SC Dossier
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/appicon.png" width="180" alt="SC Dossier Logo">
 
-> A high-fidelity Star Citizen companion app — retrieve, inspect, archive, and export player and organization dossiers from the RSI website, without ever leaving your game session.
+  # `SCD: Star Citizen Dossier`
 
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Linux-blue)
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Framework](https://img.shields.io/badge/UI-PyQt6-brightgreen)
-![Status](https://img.shields.io/badge/status-In%20Development-yellow)
+  **`A Star Citizen Companion App`**
 
+  [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-00AAFF?style=for-the-badge)](https://github.com/PINKgeekPDX/SCDossier/releases)
+  [![License](https://img.shields.io/badge/License-MIT-00FF66?style=for-the-badge)](LICENSE)
+  [![Status](https://img.shields.io/badge/Status-Active-FF0055?style=for-the-badge)](#)
+</div>
+
+<br>
+
+> **"Retrieve, inspect, archive, and export player & organization dossiers—without ever leaving your ship."**
+
+- SCD runs quietly as a sleek, edge-snapped overlay while you play. 
+
+- When you encounter a mysterious player or organization in the Verse, **a couple of clicks** brings up their complete official RSI player or organization record without ever leaving the game.
+
+- Our incredibly easy-to-use passive OCR feature requires just a **single click** from the mini toolbar. Simply draw a selection box around a player's name or handle literally anywhere you see it on your screen (player list, chat, etc.). It almost instantly extracts the text and invokes a search to pull up their profile. No alt-tabbing. No manual typing. Just simple, fast.
+<br><br>
 ---
 
-## Overview
-
-**SC Dossier** is a standalone desktop tool for Star Citizen players. It runs quietly in your system tray as a compact edge-snapped overlay toolbar while you play. When you want to look up a player or org, one click expands into the full dossier interface.
-
-### Key Features
-
-- **Always-available overlay toolbar** — snaps to any screen edge, stays topmost, minimal footprint
-- **OCR screen capture** — click the capture button, drag a box over any visible player name on screen, and instantly search their dossier
-- **Player dossier lookup** — scrapes all real obtainable data from RSI: handle, moniker, enlist date, location, bio, fluency, avatar, badges, and all affiliated organizations
-- **Organization lookup** — search orgs by name or SID; view full org details, archetype, focus, commitment, and member roster
-- **Archive system** — save player profiles locally for persistent offline access
-- **Auto-sync** — archived profiles can be checked against live RSI data and updated
-- **Profile export** — export any archived profile to a ZIP (JSON, TXT, self-contained HTML card, all images)
-- **System tray presence** — full context menu for quick access to all features
-
+>## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/compass.svg" width="26" align="top"> INTEL AT YOUR FINGERTIPS
+### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/bullseye.svg" width="22" align="top"> OCR based playername extraction //
+See a name in global chat or above a ship? Click the capture button (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/ships/default/Target_Lock.png" width="18" align="top">), drag a box over the name on your screen, and SC Dossier will instantly read the text and pull their profile. No alt-tabbing. **No manual typing**.
+### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/person.svg" width="22" align="top"> Players profiles cards stored locally //
+Highly specialized RSI website scraping service finds, extracts data thats used to build a profile .json file and images related (player avatar, badges, org logos), organized and stored only locally. These assets are used to build a high quality player and/or organization dossier card.
+*   **Player Data:** Handle, Moniker, Enlist Date, Location, Biography, Associated Organizations, Badges, Accreditation.
+*   **Visual:** Avatars, Org logo(s), and badge images.
+### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/layers.svg" width="22" align="top"> Organization Intel //
+Look up Orgs by name or SID. Instantly view their Archetype, Primary Focus, Commitment Level, and Member Roster.
+### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/archive.svg" width="22" align="top"> Local Archiving & Export //
+Save profiles locally to your personal offline database. Sync them later to check for updates, or export them into self-contained ZIPs (complete all data, images, a generated HTML player card) to share with your Org mates.
+<br><br>
 ---
 
-## Design Aesthetic
-
-SC Dossier uses the **Aegis Liquid Interface** design system — a deep-space glassmorphism aesthetic with layered translucency, neon glow-states, tech-bracket corner ornaments, and Sora/Inter/JetBrains Mono typography. The visual language evokes a high-tech shipboard HUD rather than a standard desktop application.
-
+>## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/navigation.svg" width="26" align="top"> HOW TO USE
+**`SCD: Star Citizen Dossier`** is designed to be completely unobtrusive and lighting fast.
+- **1. Expand the Overlay:**
+Click the **Expand** button (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/ships/default/MobiGlas.png" width="18" align="top">) on the edge-snapped mini toolbar to open the main window.
+- **2. OCR Screen Capture:**
+Click the **Capture** button (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/ships/default/Target_Lock.png" width="18" align="top">) from the mini toolbar. Drag a box over any player's name on your screen to instantly pull their dossier.
+- **3. Navigating the App:**
+The left sidebar contains all your tools.
+   - **Search** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/icon_search.svg" width="18" align="top">): Manually   search for a player handle or organization SID.
+   - **Dossier** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/Icons/FOIP.png" width="18" align="top">): View the deep profile of a selected player.
+   - **Organization** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/Icons/SHLD.png" width="18" align="top">): View detailed intelligence on a selected org.
+   - **Archive** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/Icons/JOURNAL.png" width="18" align="top">): Browse, export, or delete your saved profiles.
+   - **Settings** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/icon_settings.svg" width="18" align="top">): Configure your auto-updater and app preferences.
+<br><br>
 ---
 
-## Requirements
-
-- Python 3.11 or higher
-- Windows 10/11 or Linux (Debian/Ubuntu/Mint/Arch)
-- Internet connection for live RSI data retrieval
-
+>## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/settings.svg" width="26" align="top"> INSTALLATION
+SC Dossier is designed to be plug-and-play. **No complex setups. No external dependencies.**
+### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/download.svg" width="22" align="top"> Download the App //
+- 1. Navigate to the [Releases](https://github.com/PINKgeekPDX/SCDossier/releases) page.
+- 2. Download the latest `SCDossier-windows.zip` (or `linux.zip`).
+- 3. Extract the folder anywhere on your PC.
+- 4. Run `SCDossier.exe` to launch the overlay.
+### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/sync.svg" width="22" align="top"> Auto-Updater //
+- Update check and download service built in, enable/disable this in the **Settings** tab (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/icon_settings.svg" width="18" align="top">) inside **SCD**. 
+- If a new version drops, the app will automatically download, extract, and apply the patch for you, or notify you to do it manually when ready.
+<br><br>
 ---
 
-## Installation (From Source)
+>## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/shield.svg" width="26" align="top"> PRIVACY FIRST
+*   **Zero Credentials Required:** *`SCD: Star Citizen Dossier`* uses public RSI data. You never log in.
+*   **100% Local Processing:** The OCR engine runs entirely on your own GPU/CPU. No screen images are ever sent over the internet.
+
+*   **Local Storage:** Your archived dossiers are saved locally on your own hard drive:
+    *   **Windows:** `%USERPROFILE%\Documents\PINK\SCDossier\`
+    *   **Linux:** `~/Documents/PINK/SCDossier/`
+*   **Temp Cache:** Temporary cached files and data are created during runtime to facilitate the OCR process and are cleaned up automatically on exit.
+    *   **Windows:** `%USERPROFILE%\Documents\PINK\SCDossier\Cache\Temp\`
+    *   **Linux:** `~/Documents/PINK/SCDossier/Cache/Temp/`
+<br><br>
+---
+
+>## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/terminal.svg" width="26" align="top"> FOR DEVELOPERS
+<details><summary><b>BUILD FROM SOURCE</b></summary>
+<br>
+Want to tinker with the code? SCD: Star Citizen Dossier is built in Python 3.11+ using PyQt6.
+<br>
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-repo/SCDossier.git
+# 1. Clone the repository
+git clone https://github.com/PINKgeekPDX/SCDossier.git
 cd SCDossier
 
-# Create virtual environment
+# 2. Setup your virtual environment
 python -m venv .venv
 
-# Windows
+# 3. Activate the environment
+# Windows:
 .venv\Scripts\activate
-
-# Linux
+# Linux:
 source .venv/bin/activate
 
-# Install dependencies
+# 4. Install dependencies
 pip install -r requirements.txt
 
-# Run the app
-python scripts/run_dev.py
+# 5. Run the app directly
+python run_quick.py
+
+# 6. Compile into a standalone executable (creates the ZIP in dist/)
+python build.py
 ```
 
----
-
-## Installation (Pre-built Binary)
-
-Download the latest release from the Releases page:
-
-- **Windows**: `SCDossier-windows.zip` → extract and run `SCDossier.exe`
-- **Linux (Debian/Ubuntu/Mint)**: `SCDossier.deb` → `sudo dpkg -i SCDossier.deb`
-- **Linux (Arch)**: See `build/linux/arch/` for PKGBUILD
+</details>
+<br>
 
 ---
+>## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/file-text.svg" width="26" align="top"> LICENSE
 
-## Usage
+`**SCD: Star Citizen Dossier**` is open-source software licensed under the **MIT License**. See the `LICENSE` file for more details. 
 
-### Overlay Toolbar
-
-The toolbar appears snapped to the left edge of your screen by default. You can drag it to any edge position. Two buttons:
-
-1. **Expand** `[≡]` — opens the main SC Dossier window
-2. **Capture** `[⊕]` — enters OCR region-select mode for in-game player name lookup
-
-### Main Window
-
-Left navigation tabs:
-
-| Tab | Purpose |
-|---|---|
-| **Search** | Choose player or org search, enter query |
-| **Dossier** | Full player profile display |
-| **Organization** | Standalone org lookup and display |
-| **Archive** | Browse, sync, export, or delete archived profiles |
-| **Settings** | Configure all app behavior and preferences |
-
-### System Tray
-
-Right-click the tray icon for quick access to: Show Toolbar, Open Dossier, Quick Capture, Settings, Quit.
-
----
-
-## Data & Privacy
-
-All data is retrieved directly from public RSI website pages. No credentials are required. All cached data is stored locally:
-
-- **Windows**: `%USERPROFILE%\Documents\PINK\SCDossier\`
-- **Linux**: `~/Documents/PINK/SCDossier/`
-
-No data is sent to any third-party service. The OCR engine runs entirely locally.
-
----
-
-## Project Structure
-
-```
-src/            Application source code
-scripts/        Dev runner and utility tools
-build/          Build scripts for each platform
-built/          Compiled distribution outputs
-docs/           Documentation and work tracking
-logs/           Dev/tool script output logs
-```
-
-See `docs/documentation/` for full documentation.
-
----
-
-## Contributing
-
-See `agent.md` for agent-specific instructions and architecture context.
-
----
-
-## License
-
-MIT License — see `LICENSE` for details.
+<div align="center">
+  <sub>Developed by <b><u>PINKgeekPDX</u></b> <i>(2026)</i> with 💖 for the Star Citizen Community</sub>
+</div>

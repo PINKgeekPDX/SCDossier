@@ -13,6 +13,12 @@ import platform
 import subprocess
 from pathlib import Path
 
+# Ensure src can be imported
+sys.path.insert(0, os.path.abspath("."))
+try:
+    from src.app.constants import APP_VERSION
+except ImportError:
+    APP_VERSION = "unknown"
 
 def clean_build_dirs():
     """Remove existing build/dist directories to ensure a clean build."""
@@ -30,8 +36,18 @@ def build_executable():
         "pyinstaller",
         "--name=SCDossier",
         "--windowed",     # No console window
+        "--onefile",      # Required for auto-updater replacement logic
         "--noconfirm",    # Overwrite output without asking
         "--clean",
+        "--exclude-module=PyQt5",  # Prevent conflict with PyQt6
+        "--exclude-module=torch",
+        "--exclude-module=torchvision",
+        "--exclude-module=torchaudio",
+        "--exclude-module=scipy",
+        "--exclude-module=pandas",
+        "--exclude-module=pygame",
+        "--exclude-module=matplotlib",
+        "--icon=src/assets/appicon.ico",  # Add the app icon to the executable
     ]
 
     # Handle assets/fonts data inclusion
@@ -68,7 +84,27 @@ def build_executable():
     
     if result.returncode == 0:
         print("\nBuild completed successfully!")
-        print(f"Executable is located in the 'dist' directory.")
+        
+        # Package into a zip file for distribution / auto-updater
+        import zipfile
+        
+        sys_name = platform.system().lower()
+        if sys_name == "darwin":
+            sys_name = "mac"
+            
+        zip_name = f"SCDossier-{sys_name}-v{APP_VERSION}.zip"
+        zip_path = Path("dist") / zip_name
+        
+        exe_name = "SCDossier.exe" if sys_name == "windows" else "SCDossier"
+        exe_path = Path("dist") / exe_name
+        
+        if exe_path.exists():
+            print(f"Zipping output to {zip_path} ...")
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.write(exe_path, arcname=exe_name)
+            print(f"Archive created: {zip_path}")
+        else:
+            print(f"Error: Executable '{exe_name}' not found in dist/")
     else:
         print("\nBuild failed.")
         sys.exit(result.returncode)

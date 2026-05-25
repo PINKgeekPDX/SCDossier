@@ -54,14 +54,16 @@ class UpdaterWorker(QThread):
                     download_url = data.get("html_url", "")
 
                     # Find the right asset for this platform
+                    import platform
+                    sys_name = platform.system().lower()
+                    if sys_name == "darwin":
+                        sys_name = "mac"
+
                     assets = data.get("assets", [])
                     for asset in assets:
                         name = asset.get("name", "").lower()
-                        # Match .exe for Windows
-                        if sys.platform == "win32" and name.endswith(".exe"):
-                            self._asset_url = asset.get("browser_download_url", "")
-                            break
-                        elif name.endswith(".zip"):
+                        # Match the zipped asset for the specific platform
+                        if name.endswith(".zip") and sys_name in name:
                             self._asset_url = asset.get("browser_download_url", "")
                             break
 
@@ -192,12 +194,12 @@ class UpdaterService(QObject):
         try:
             self.update_status.emit("INSTALLING UPDATE...")
 
-            # Extract exe from zip if needed
+            # Extract binary from zip if needed
             actual_path = downloaded_path
             if downloaded_path.lower().endswith(".zip"):
-                actual_path = self._extract_exe_from_zip(downloaded_path)
+                actual_path = self._extract_binary_from_zip(downloaded_path)
                 if not actual_path:
-                    self.update_status.emit("INSTALL FAILED: No .exe found in ZIP")
+                    self.update_status.emit("INSTALL FAILED: No valid executable found in ZIP")
                     return
 
             if sys.platform == "win32":
@@ -209,19 +211,24 @@ class UpdaterService(QObject):
             log.error(f"Install failed: {e}")
             self.update_status.emit(f"INSTALL FAILED: {e}")
 
-    def _extract_exe_from_zip(self, zip_path: str) -> str:
-        """Extract the first .exe from a ZIP archive; return its local path or ''."""
+    def _extract_binary_from_zip(self, zip_path: str) -> str:
+        """Extract the target binary from a ZIP archive; return its local path or ''."""
         try:
             extract_dir = Path(zip_path).parent / "extracted"
             extract_dir.mkdir(parents=True, exist_ok=True)
+            
+            target_ext = ".exe" if sys.platform == "win32" else ""
+            target_name = "scdossier.exe" if sys.platform == "win32" else "scdossier"
+            
             with zipfile.ZipFile(zip_path, "r") as zf:
                 for name in zf.namelist():
-                    if name.lower().endswith(".exe"):
+                    lower_name = name.lower()
+                    if lower_name == target_name or (target_ext and lower_name.endswith(target_ext)):
                         zf.extract(name, extract_dir)
                         exe_path = extract_dir / name
-                        log.info("Extracted update exe: %s", exe_path)
+                        log.info("Extracted update binary: %s", exe_path)
                         return str(exe_path)
-            log.error("No .exe found in ZIP: %s", zip_path)
+            log.error("No valid binary found in ZIP: %s", zip_path)
             return ""
         except Exception as e:
             log.error("ZIP extraction failed: %s", e)
@@ -272,16 +279,37 @@ del "%~f0"
         self.update_status.emit("UPDATE INSTALLED — RESTARTING...")
 
     def _install_posix(self, download_path: str) -> None:
-        """POSIX: Handle update installation."""
+        """POSIX: Handle update installation (rename, copy, restart)."""
         current_exe = sys.executable
         if not current_exe.endswith("SCDossier"):
             self.update_status.emit("Cannot auto-update in development mode")
             return
 
         import stat
-        os.chmod(download_path, os.stat(download_path).st_mode | stat.S_IEXEC)
-        shutil.copy2(download_path, current_exe)
-        self.update_status.emit("UPDATE INSTALLED — RESTARTING...")
+        try:
+            # Overwriting a running binary yields 'Text file busy'.
+            # Renaming the running binary is allowed.
+            old_exe = current_exe + ".old"
+            if os.path.exists(old_exe):
+                os.remove(old_exe)
+            os.rename(current_exe, old_exe)
+            
+            shutil.copy2(download_path, current_exe)
+            os.chmod(current_exe, os.stat(current_exe).st_mode | stat.S_IEXEC)
+            
+            # Start the new version
+            subprocess.Popen([current_exe])
+            
+            # Exit this one
+            from src.core.events import EventBus
+            EventBus.instance().app_exit.emit()
+            self.update_status.emit("UPDATE INSTALLED — RESTARTING...")
+        except Exception as e:
+            # Fallback to rollback
+            log.error(f"POSIX install failed: {e}")
+            if not os.path.exists(current_exe) and os.path.exists(current_exe + ".old"):
+                os.rename(current_exe + ".old", current_exe)
+            raise
 
     def _on_update_available(self, version: str, url: str, notes: str) -> None:
         self._pending_version = version
