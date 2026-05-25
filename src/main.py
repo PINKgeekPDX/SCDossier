@@ -3,11 +3,7 @@ src/main.py
 Application Entry Point.
 """
 
-# Workaround for DLL collision on Windows: import onnxruntime before PyQt6/Qt6 DLLs are loaded.
-try:
-    import onnxruntime
-except ImportError:
-    pass
+# Workaround removed to prevent "cannot load module more than once per process" in PyInstaller 3.12
 
 import os
 import sys

@@ -1,6 +1,6 @@
 [project]
 name = "sc-dossier"
-version = "0.1.0"
+version = "0.3.0"
 description = "A high-fidelity Star Citizen companion app for player and organization dossiers."
 authors = [
     {name = "PINK"}

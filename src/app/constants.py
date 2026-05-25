@@ -11,7 +11,7 @@ from enum import Enum, auto
 # Application Metadata
 # ---------------------------------------------------------------------------
 APP_NAME = "SC Dossier"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.3.0"
 APP_AUTHOR = "PINK"
 APP_VENDOR = "PINK"
 ORG_FOLDER = "PINK"

@@ -212,21 +212,20 @@ class UpdaterService(QObject):
             self.update_status.emit(f"INSTALL FAILED: {e}")
 
     def _extract_binary_from_zip(self, zip_path: str) -> str:
-        """Extract the target binary from a ZIP archive; return its local path or ''."""
+        """Extract the target installer binary from a ZIP archive; return its local path or ''."""
         try:
             extract_dir = Path(zip_path).parent / "extracted"
             extract_dir.mkdir(parents=True, exist_ok=True)
             
             target_ext = ".exe" if sys.platform == "win32" else ""
-            target_name = "scdossier.exe" if sys.platform == "win32" else "scdossier"
             
             with zipfile.ZipFile(zip_path, "r") as zf:
                 for name in zf.namelist():
                     lower_name = name.lower()
-                    if lower_name == target_name or (target_ext and lower_name.endswith(target_ext)):
+                    if lower_name.endswith("setup.exe") or (target_ext and lower_name.endswith(target_ext)):
                         zf.extract(name, extract_dir)
                         exe_path = extract_dir / name
-                        log.info("Extracted update binary: %s", exe_path)
+                        log.info("Extracted installer binary: %s", exe_path)
                         return str(exe_path)
             log.error("No valid binary found in ZIP: %s", zip_path)
             return ""
@@ -235,48 +234,25 @@ class UpdaterService(QObject):
             return ""
 
     def _install_windows(self, download_path: str) -> None:
-        """Windows: Create a batch script that replaces the exe and restarts."""
+        """Windows: Launch the setup installer and restart the application."""
         current_exe = sys.executable
         if not current_exe.endswith(".exe"):
             # Running from python, not a bundled exe
             self.update_status.emit("Cannot auto-update in development mode")
             return
 
-        temp_dir = Path(download_path).parent
-        update_script = temp_dir / "update.bat"
-
-        script_content = f"""@echo off
-echo Waiting for SC Dossier to close...
-:wait
-tasklist /fi "IMAGENAME eq SCDossier.exe" 2>nul | find /i "SCDossier.exe" >nul
-if %errorlevel%==0 (
-    timeout /t 2 /nobreak >nul
-    goto wait
-)
-
-echo Installing update...
-copy /Y "{download_path}" "{current_exe}"
-if %errorlevel%==0 (
-    echo Update installed successfully.
-    start "" "{current_exe}"
-) else (
-    echo Failed to install update.
-    pause
-)
-del "%~f0"
-"""
-        with open(update_script, "w") as f:
-            f.write(script_content)
-
-        # Launch the update script and exit
-        subprocess.Popen(
-            ["cmd.exe", "/c", str(update_script)],
-            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-        )
-        # Schedule app exit
-        from src.core.events import EventBus
-        EventBus.instance().app_exit.emit()
-        self.update_status.emit("UPDATE INSTALLED — RESTARTING...")
+        # Launch the installer interactively
+        try:
+            log.info(f"Launching installer: {download_path}")
+            subprocess.Popen([download_path])
+            
+            # Schedule app exit so the installer can overwrite files
+            from src.core.events import EventBus
+            EventBus.instance().app_exit.emit()
+            self.update_status.emit("LAUNCHING INSTALLER — CLOSING APP...")
+        except Exception as e:
+            log.error(f"Failed to launch installer: {e}")
+            self.update_status.emit(f"INSTALL FAILED: {e}")
 
     def _install_posix(self, download_path: str) -> None:
         """POSIX: Handle update installation (rename, copy, restart)."""

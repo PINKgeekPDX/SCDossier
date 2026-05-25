@@ -2,25 +2,41 @@
   <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/appicon.png" width="180" alt="SC Dossier Logo">
 
   # `SCD: Star Citizen Dossier`
-
-  **`A Star Citizen Companion App`**
+ **`A Star Citizen Companion App`**
 
   [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-00AAFF?style=for-the-badge)](https://github.com/PINKgeekPDX/SCDossier/releases)
   [![License](https://img.shields.io/badge/License-MIT-00FF66?style=for-the-badge)](LICENSE)
   [![Status](https://img.shields.io/badge/Status-Active-FF0055?style=for-the-badge)](#)
 </div>
 
+>## Retrieve, inspect, archive, and export player & organization dossiers—without ever leaving your ship.
+
+- `SCD` runs quietly as a sleek, edge-snapped overlay while you play. 
+
+- When you encounter a mysterious player or organization in the Verse, **a couple of clicks** brings up their complete official `RSI` player or organization record without ever leaving the game.
+
+- Our incredibly easy-to-use passive `OCR` feature requires just a **single click** from the mini toolbar. Simply draw a selection box around a player's name or handle literally anywhere you see it on your screen (player list, chat, etc.). It almost instantly extracts the text and invokes a search to pull up their profile. No alt-tabbing. No manual typing. Just simple, fast.
 <br>
 
-> **"Retrieve, inspect, archive, and export player & organization dossiers—without ever leaving your ship."**
+>## SCREENSHOTS & LIVE DEMO (OCR Player Name Capture)
 
-- SCD runs quietly as a sleek, edge-snapped overlay while you play. 
+<div align="center">
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-archive.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-archive.png" width="100"></a>&nbsp;&nbsp;
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-org.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-org.png" width="100"></a>&nbsp;&nbsp;
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player.png" width="100"></a>
+  <br>
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-search.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-search.png" width="100"></a>&nbsp;&nbsp;
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-settings.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-settings.png" width="100"></a>&nbsp;&nbsp;
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-toolbar.jpg" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-toolbar.jpg" width="100"></a>
+</div>
 
-- When you encounter a mysterious player or organization in the Verse, **a couple of clicks** brings up their complete official RSI player or organization record without ever leaving the game.
+<br>
 
-- Our incredibly easy-to-use passive OCR feature requires just a **single click** from the mini toolbar. Simply draw a selection box around a player's name or handle literally anywhere you see it on your screen (player list, chat, etc.). It almost instantly extracts the text and invokes a search to pull up their profile. No alt-tabbing. No manual typing. Just simple, fast.
-<br><br>
----
+<div align="center">
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-ocr-capture.gif" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-ocr-capture.gif" width="400"></a>
+</div>
+
+<br>
 
 >## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/compass.svg" width="26" align="top"> INTEL AT YOUR FINGERTIPS
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/bullseye.svg" width="22" align="top"> OCR based playername extraction //
@@ -56,12 +72,12 @@ The left sidebar contains all your tools.
 SC Dossier is designed to be plug-and-play. **No complex setups. No external dependencies.**
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/download.svg" width="22" align="top"> Download the App //
 - 1. Navigate to the [Releases](https://github.com/PINKgeekPDX/SCDossier/releases) page.
-- 2. Download the latest `SCDossier-windows.zip` (or `linux.zip`).
-- 3. Extract the folder anywhere on your PC.
-- 4. Run `SCDossier.exe` to launch the overlay.
+- 2. Download the latest `SCDossier-windows-v...zip`.
+- 3. Extract the ZIP to find `SCDossier-Setup.exe`.
+- 4. Run the installer and launch SC Dossier!
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/sync.svg" width="22" align="top"> Auto-Updater //
 - Update check and download service built in, enable/disable this in the **Settings** tab (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/icon_settings.svg" width="18" align="top">) inside **SCD**. 
-- If a new version drops, the app will automatically download, extract, and apply the patch for you, or notify you to do it manually when ready.
+- If a new version drops, the app will automatically download the new installer and apply the patch for you, or notify you to do it manually when ready.
 <br><br>
 ---
 
@@ -104,7 +120,7 @@ pip install -r requirements.txt
 # 5. Run the app directly
 python run_quick.py
 
-# 6. Compile into a standalone executable (creates the ZIP in dist/)
+# 6. Compile into a Windows Installer (requires Inno Setup 6)
 python build.py
 ```
 

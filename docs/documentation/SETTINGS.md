@@ -55,7 +55,7 @@ Settings auto-save on change. The file is created with defaults on first launch.
   "search_history": [],
   "search_history_player": [],
   "search_history_org": [],
-  "_version": "0.1.0"
+  "_version": "0.3.0"
 }
 ```
 
