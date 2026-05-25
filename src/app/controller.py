@@ -133,6 +133,7 @@ class AppController(QObject):
 
         # Start Scrape
         self._start_player_scrape(handle)
+        EventBus.instance().navigate_to_tab.emit("dossier")
 
     @pyqtSlot(str)
     def _on_capture_failed(self, error_msg: str) -> None:

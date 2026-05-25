@@ -64,26 +64,24 @@ class OCRWorker(QThread):
             reader = _get_rapid_ocr()
 
             log.info("Running OCR on %s", self.image_path)
-            # RapidOCR returns (boxes, txts, scores) tuple
-            result = reader(str(self.image_path))
+            # RapidOCR returns (result, elapse_list) tuple
+            output = reader(str(self.image_path))
 
-            if result is None:
+            if output is None or not output[0]:
                 self.finished_error.emit("No text detected in the selected region.")
                 return
 
-            boxes, txts, scores = result
-
-            if not txts or not scores:
-                self.finished_error.emit("No text detected in the selected region.")
-                return
+            result, elapse = output
 
             best_text = ""
             best_conf = 0.0
 
-            for text, conf in zip(txts, scores):
-                if conf > best_conf and conf >= self.confidence_threshold:
-                    best_conf = conf
-                    best_text = text
+            for entry in result:
+                if len(entry) >= 3:
+                    box, text, conf = entry[0], entry[1], entry[2]
+                    if conf > best_conf and conf >= self.confidence_threshold:
+                        best_conf = conf
+                        best_text = text
 
             if not best_text:
                 self.finished_error.emit(f"Text detected, but confidence too low (< {self.confidence_threshold:.2f}).")

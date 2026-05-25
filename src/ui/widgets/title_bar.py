@@ -39,11 +39,12 @@ _APP_ICON = get_asset_path("assets/appicon.png")
 _PIN_UNLOCKED_ICON = get_asset_path("assets/icons/ships/default/Unlock.png")
 _PIN_LOCKED_ICON = get_asset_path("assets/icons/ships/default/Lock.png")
 _HIDE_ICON = get_asset_path("assets/icons/ships/default/Return.png")
-_CLEAR_ICON = get_asset_path("assets/icons/Icons/Close.png")
+_CLEAR_ICON = get_asset_path("assets/icons/Icons/default/RESET_Text.png")
 
 class CustomTitleBar(QWidget):
     pin_toggled = pyqtSignal(bool)
     hide_requested = pyqtSignal()
+    clear_results_requested = pyqtSignal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -61,9 +62,6 @@ class CustomTitleBar(QWidget):
         self._anim_timer = QTimer(self)
         self._anim_timer.timeout.connect(self._update_animation)
         self._anim_timer.start(100) # every 100ms
-
-        # Clear results signal
-        self.clear_results_requested = pyqtSignal()
 
         self._build_ui()
 
@@ -94,16 +92,6 @@ class CustomTitleBar(QWidget):
 
         layout.addStretch(1)
 
-        # Clear results button (new, on left side of pin button)
-        self._clear_btn = QPushButton()
-        self._clear_btn.setProperty("class", "icon")
-        self._clear_btn.setFixedSize(32, 32)
-        self._clear_btn.setToolTip("Clear all search results")
-        self._clear_btn.clicked.connect(self.clear_results_requested.emit)
-        self._update_clear_style()
-        layout.addWidget(self._clear_btn)
-        layout.addSpacing(4)
-
         # Pin button
         self._pin_btn = QPushButton()
         self._pin_btn.setProperty("class", "icon")
@@ -121,7 +109,17 @@ class CustomTitleBar(QWidget):
         self._hide_btn.clicked.connect(self.hide_requested.emit)
         self._update_hide_style()
 
-        layout.addSpacing(8)
+        # Clear results button (new, on left side of pin button)
+        self._clear_btn = QPushButton()
+        self._clear_btn.setProperty("class", "icon")
+        self._clear_btn.setFixedSize(32, 32)
+        self._clear_btn.setToolTip("Clear all search results")
+        self._clear_btn.clicked.connect(self.clear_results_requested.emit)
+        self._update_clear_style()
+
+        # Layout order: Clear, Pin, Hide
+        layout.addWidget(self._clear_btn)
+        layout.addSpacing(4)
         layout.addWidget(self._pin_btn)
         layout.addSpacing(4)
         layout.addWidget(self._hide_btn)

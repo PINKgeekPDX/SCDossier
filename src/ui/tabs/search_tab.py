@@ -93,8 +93,8 @@ class StyledToggleButton(QPushButton):
 class AnimatedSearchInput(SearchInput):
     """Search input with border paint animation on focus/hover."""
 
-    def __init__(self, placeholder: str, parent=None):
-        super().__init__(placeholder, parent)
+    def __init__(self, placeholder: str, parent=None, history_type: str = "all"):
+        super().__init__(placeholder, parent, history_type)
         self._focused = False
         self._hovered = False
         self._anim_progress = 0.0
@@ -267,6 +267,36 @@ class StyledActionButton(QPushButton):
         super().paintEvent(event)
 
 
+class RecentSearchChip(QPushButton):
+    """A clean, premium Aegis-style chip for a recent search query."""
+    
+    def __init__(self, text: str, parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(26)
+        self.setFlat(True)
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(0, 170, 255, 0.06);
+                color: {P.PRIMARY};
+                border: 1px solid rgba(0, 170, 255, 0.25);
+                border-radius: 13px;
+                padding: 2px 12px;
+                font-family: "Inter", sans-serif;
+                font-size: 11px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(0, 170, 255, 0.15);
+                border-color: {P.PRIMARY};
+                color: #FFFFFF;
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(0, 170, 255, 0.25);
+            }}
+        """)
+
+
 class SearchTab(QWidget):
     """
     Initial landing view with player/org mode toggle.
@@ -275,11 +305,33 @@ class SearchTab(QWidget):
         super().__init__(parent)
         self._mode = "player"
         self._build_ui()
+        self._update_recents()
+        EventBus.instance().settings_changed.connect(self._on_settings_changed)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(32)
+
+        # --- App Logo ---
+        logo_lbl = QLabel()
+        logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        _app_icon_path = get_asset_path("assets/appicon.png")
+        if os.path.exists(_app_icon_path):
+            logo_pix = QPixmap(_app_icon_path)
+            # Target width matching combined buttons (~300-350), maintain aspect ratio
+            target_width = 300
+            scaled_pix = logo_pix.scaled(
+                target_width, target_width,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            logo_lbl.setPixmap(scaled_pix)
+            logo_lbl.setFixedSize(scaled_pix.size())
+        else:
+            logo_lbl.setText("SC DOSSIER")
+            logo_lbl.setFont(font_inter(32))
+            logo_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent;")
 
         # --- Mode Toggle ---
         mode_widget = QWidget()
@@ -332,10 +384,19 @@ class SearchTab(QWidget):
 
 
 
+        # --- Recent Searches Row ---
+        self.recent_widget = QWidget()
+        self.recent_layout = QHBoxLayout(self.recent_widget)
+        self.recent_layout.setContentsMargins(0, 0, 0, 0)
+        self.recent_layout.setSpacing(8)
+        self.recent_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         # Assembly
         layout.addStretch(1)
+        layout.addWidget(logo_lbl, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(mode_widget, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(search_container, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.recent_widget, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addStretch(2)
 
     def _set_mode(self, mode: str) -> None:
@@ -369,19 +430,80 @@ class SearchTab(QWidget):
     def _add_to_search_history(self, query: str) -> None:
         """Add a search query to the history."""
         settings = SettingsManager.instance()
-        history = settings.search_history
-        
-        # Remove if already exists to avoid duplicates
-        if query in history:
-            history.remove(query)
-        
-        # Add to the end (most recent)
-        history.append(query)
-        
-        # Apply limit
         limit = settings.search_history_limit
-        if limit >= 0 and len(history) > limit:
-            history = history[-limit:]
         
-        # Save back to settings
-        settings.search_history = history
+        # 1. Update the master combined history
+        master = settings.search_history
+        if query in master:
+            master.remove(query)
+        master.append(query)
+        if limit >= 0 and len(master) > limit:
+            master = master[-limit:]
+        settings.search_history = master
+
+        # 2. Update the specific history based on active mode
+        if self._mode == "player":
+            player_hist = settings.search_history_player
+            if query in player_hist:
+                player_hist.remove(query)
+            player_hist.append(query)
+            if limit >= 0 and len(player_hist) > limit:
+                player_hist = player_hist[-limit:]
+            settings.search_history_player = player_hist
+        else:
+            org_hist = settings.search_history_org
+            if query in org_hist:
+                org_hist.remove(query)
+            org_hist.append(query)
+            if limit >= 0 and len(org_hist) > limit:
+                org_hist = org_hist[-limit:]
+            settings.search_history_org = org_hist
+
+    def _on_settings_changed(self, key: str, value: object) -> None:
+        if key == "search_history":
+            self._update_recents()
+
+    def _on_recent_clicked(self, query: str) -> None:
+        self.search_input.setText(query)
+        self._on_search()
+
+    def _update_recents(self) -> None:
+        """Re-populate the horizontal recents row."""
+        # Clear existing chips in layout
+        while self.recent_layout.count():
+            item = self.recent_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        settings = SettingsManager.instance()
+        history = settings.search_history
+        if not history:
+            self.recent_widget.setVisible(False)
+            return
+            
+        # Get unique recent searches up to 5 items
+        seen = set()
+        unique_history = []
+        for x in reversed(history):
+            if x not in seen:
+                seen.add(x)
+                unique_history.append(x)
+        unique_history = unique_history[:5]
+        
+        if not unique_history:
+            self.recent_widget.setVisible(False)
+            return
+            
+        self.recent_widget.setVisible(True)
+        
+        # Add label
+        lbl = QLabel("RECENTS:")
+        lbl.setFont(font_inter(10))
+        lbl.setStyleSheet(f"color: {P.TEXT_DIM}; letter-spacing: 0.1em; background: transparent; border: none; margin-right: 4px;")
+        self.recent_layout.addWidget(lbl)
+        
+        # Add chips
+        for query in unique_history:
+            chip = RecentSearchChip(query, self)
+            chip.clicked.connect(lambda checked, q=query: self._on_recent_clicked(q))
+            self.recent_layout.addWidget(chip)

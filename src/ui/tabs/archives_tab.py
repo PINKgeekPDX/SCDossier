@@ -628,6 +628,16 @@ class ArchivesTab(QWidget):
         if show_confirm("DELETE ARCHIVE", msg, parent=self.window(), danger=True):
             EventBus.instance().request_delete_archive.emit(self._selected_handle)
 
+    def _clear_results(self) -> None:
+        """Clear all displayed archive results."""
+        # Clear list selection
+        self.list_widget.clearSelection()
+        # Hide detail content, show empty state
+        self.detail_content.setVisible(False)
+        self.empty_state.setVisible(True)
+        # Clear search/filter inputs
+        self.filter_input.clear()
+
     @pyqtSlot(dict)
     def _on_profile_loaded(self, data: dict) -> None:
         """Refresh list when a profile is loaded/scraped."""

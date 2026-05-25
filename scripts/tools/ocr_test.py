@@ -30,27 +30,30 @@ def main():
         print(f"RapidOCR engine initialized.")
         print(f"Processing: {image_path}")
 
-        result = reader(image_path)
+        output = reader(image_path)
 
-        if result is None:
+        if output is None or not output[0]:
             print("No text detected.")
             sys.exit(0)
 
-        boxes, txts, scores = result
+        result, elapse = output
 
-        if not txts or not scores:
-            print("No text detected.")
-            sys.exit(0)
-
-        print(f"\nDetected {len(txts)} text regions:")
+        print(f"\nDetected {len(result)} text regions:")
         print("-" * 60)
-        for i, (text, conf) in enumerate(zip(txts, scores)):
-            print(f"  [{i}] Text: '{text}'  |  Confidence: {conf:.3f}")
+        best_text = ""
+        best_conf = -1.0
+        for i, entry in enumerate(result):
+            if len(entry) >= 3:
+                box, text, conf = entry[0], entry[1], entry[2]
+                print(f"  [{i}] Text: '{text}'  |  Confidence: {conf:.3f}")
+                if conf > best_conf:
+                    best_conf = conf
+                    best_text = text
         print("-" * 60)
 
         # Best match
-        best_idx = scores.index(max(scores))
-        print(f"\nBest match: '{txts[best_idx]}' (conf: {scores[best_idx]:.3f})")
+        if best_conf >= 0.0:
+            print(f"\nBest match: '{best_text}' (conf: {best_conf:.3f})")
 
     except ImportError as e:
         print(f"Error: rapidocr_onnxruntime not installed. Run: pip install rapidocr-onnxruntime")

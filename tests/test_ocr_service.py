@@ -113,9 +113,10 @@ class TestOCRWorkerRunLogic:
         """Test successful OCR result processing."""
         from pathlib import Path
 
-        # Mock RapidOCR returning (boxes, txts, scores)
+        # Mock RapidOCR returning (result, elapse_list)
+        # result is [[box, text, score]]
         mock_ocr = Mock()
-        mock_ocr.return_value = (None, ["PINKgeekPDX"], [0.95])
+        mock_ocr.return_value = ([[None, "PINKgeekPDX", 0.95]], [0.1, 0.1, 0.1])
         mock_get_rapid_ocr.return_value = mock_ocr
 
         worker = OCRWorker(Path("/fake/path.png"), confidence_threshold=0.5)
@@ -151,7 +152,7 @@ class TestOCRWorkerRunLogic:
         from pathlib import Path
 
         mock_ocr = Mock()
-        mock_ocr.return_value = ([], [], [])
+        mock_ocr.return_value = ([], [0.1, 0.1, 0.1])
         mock_get_rapid_ocr.return_value = mock_ocr
 
         worker = OCRWorker(Path("/fake/path.png"), confidence_threshold=0.5)
@@ -168,7 +169,7 @@ class TestOCRWorkerRunLogic:
         from pathlib import Path
 
         mock_ocr = Mock()
-        mock_ocr.return_value = (None, ["TEST"], [0.3])
+        mock_ocr.return_value = ([[None, "TEST", 0.3]], [0.1, 0.1, 0.1])
         mock_get_rapid_ocr.return_value = mock_ocr
 
         worker = OCRWorker(Path("/fake/path.png"), confidence_threshold=0.5)

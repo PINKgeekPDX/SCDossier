@@ -83,6 +83,8 @@ def main():
         main_window.raise_()
         main_window.activateWindow()
         toolbar.hide()
+        # Always navigate to search tab when showing window
+        EventBus.instance().navigate_to_tab.emit("search")
 
     def _hide_main_window():
         main_window.hide()
@@ -98,7 +100,10 @@ def main():
 
         def _on_captured(path):
             EventBus.instance().capture_completed.emit(str(path))
-            _show_main_window()
+            main_window.show()
+            main_window.raise_()
+            main_window.activateWindow()
+            toolbar.hide()
 
         def _on_cancelled():
             toolbar.show()

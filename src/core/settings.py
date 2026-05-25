@@ -78,6 +78,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "include_debug_in_diagnostics": False,
     "search_history_limit": 5,
     "search_history": [],
+    "search_history_player": [],
+    "search_history_org": [],
     "_version": APP_VERSION,
 }
 
@@ -187,6 +189,11 @@ class SettingsManager(QObject):
         """Set a top-level settings value and schedule auto-save."""
         self._data[key] = value
         self._mark_dirty()
+        try:
+            from src.core.events import EventBus
+            EventBus.instance().settings_changed.emit(key, value)
+        except Exception:
+            pass
 
     def get_nested(self, *keys: str, default: Any = None) -> Any:
         """Get a nested settings value. E.g. get_nested('toolbar', 'x')"""
@@ -206,6 +213,11 @@ class SettingsManager(QObject):
             node = node[k]
         node[keys[-1]] = value
         self._mark_dirty()
+        try:
+            from src.core.events import EventBus
+            EventBus.instance().settings_changed.emit(keys[0], self._data[keys[0]])
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Typed Accessors
@@ -506,6 +518,22 @@ class SettingsManager(QObject):
     @search_history.setter
     def search_history(self, value: list) -> None:
         self.set("search_history", value)
+
+    @property
+    def search_history_player(self) -> list:
+        return self.get("search_history_player", [])
+
+    @search_history_player.setter
+    def search_history_player(self, value: list) -> None:
+        self.set("search_history_player", value)
+
+    @property
+    def search_history_org(self) -> list:
+        return self.get("search_history_org", [])
+
+    @search_history_org.setter
+    def search_history_org(self, value: list) -> None:
+        self.set("search_history_org", value)
 
     def force_save(self) -> None:
         """Force an immediate save regardless of dirty state."""

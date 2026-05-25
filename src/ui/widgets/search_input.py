@@ -4,11 +4,12 @@ SearchInput — styled QLineEdit with animated blue glow on focus and search his
 """
 
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint, QTimer
-from PyQt6.QtGui import QColor, QAction
-from PyQt6.QtWidgets import QLineEdit, QGraphicsDropShadowEffect, QWidget, QMenu
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QLineEdit, QGraphicsDropShadowEffect, QWidget, QCompleter
 
 from src.ui.theme import palette as P
 from src.core.settings import SettingsManager
+from src.core.events import EventBus
 
 
 class SearchInput(QLineEdit):
@@ -24,15 +25,20 @@ class SearchInput(QLineEdit):
         parent:      Parent widget.
     """
 
-    def __init__(self, placeholder: str = "", parent: QWidget | None = None) -> None:
+    def __init__(self, placeholder: str = "", parent: QWidget | None = None, history_type: str = "all") -> None:
         super().__init__(parent)
         self.setPlaceholderText(placeholder)
         self._focused = False
         self._settings = SettingsManager.instance()
-        self._history_menu = None
+        self.history_type = history_type
         self._setup_glow()
         self._apply_style(False)
         self.setMinimumHeight(44)
+        
+        # Configure case-insensitive auto-completion list for history
+        self.update_history_completer()
+        # Dynamically refresh autocomplete suggestions when history changes
+        EventBus.instance().settings_changed.connect(self._on_settings_changed)
 
     def _apply_style(self, focused: bool) -> None:
         """Apply QSS based on focus state."""
@@ -108,68 +114,97 @@ class SearchInput(QLineEdit):
     def mousePressEvent(self, event) -> None:
         super().mousePressEvent(event)
         self.setFocus()
-        # Show history on mouse click (more intuitive than on focus)
         if event.button() == Qt.MouseButton.LeftButton:
-            # Use single shot to avoid interfering with the click event
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(1, self._show_history_menu)
+            completer = self.completer()
+            if completer:
+                # Force showing the completer dropdown listing history items
+                completer.setCompletionPrefix(self.text())
+                completer.complete()
 
-    def _show_history_menu(self) -> None:
-        """Show a dropdown menu with recent search history."""
-        # Get search history from settings
-        history = self._settings.search_history
-        limit = self._settings.search_history_limit
-        
-        # Limit history to the specified number
-        if limit > 0:
-            history = history[-limit:] if history else []
-            history = list(reversed(history))  # Show most recent first
-        
-        # Don't show menu if no history or limit is 0
-        if not history or limit == 0:
-            return
+    def _on_settings_changed(self, key: str, value: object) -> None:
+        if key == "search_history_limit":
+            self.update_history_completer()
+        elif self.history_type == "player" and key == "search_history_player":
+            self.update_history_completer()
+        elif self.history_type == "org" and key == "search_history_org":
+            self.update_history_completer()
+        elif self.history_type == "all" and key in ("search_history", "search_history_player", "search_history_org"):
+            self.update_history_completer()
+
+    def update_history_completer(self) -> None:
+        """Update the QCompleter with the latest search history."""
+        if self.history_type == "player":
+            history = self._settings.search_history_player
+        elif self.history_type == "org":
+            history = self._settings.search_history_org
+        else:
+            history = self._settings.search_history
             
-        # Create and show the menu
-        self._history_menu = QMenu(self)
-        self._history_menu.setStyleSheet(f"""
-            QMenu {{{{
+        if not history:
+            self.setCompleter(None)
+            return
+
+        # Unique list, reversed to show most recent first
+        seen = set()
+        unique_history = []
+        for x in reversed(history):
+            if x not in seen:
+                seen.add(x)
+                unique_history.append(x)
+                
+        limit = self._settings.search_history_limit
+        if limit > 0:
+            unique_history = unique_history[:limit]
+        else:
+            self.setCompleter(None)
+            return
+
+        if not unique_history:
+            self.setCompleter(None)
+            return
+
+        completer = QCompleter(unique_history, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        
+        # Style the completer popup view (QListView)
+        popup = completer.popup()
+        popup.setStyleSheet(f"""
+            QListView {{
                 background-color: rgba(10, 20, 30, 0.95);
-                border: 1px solid {P.PRIMARY_CONTAINER};
-                border-radius: 4px;
-                padding: 4px;
-            }}}}
-            QMenu::item {{{{
                 color: {P.ON_SURFACE};
-                padding: 6px 12px;
-                border-radius: 2px;
+                border: 1px solid {P.PRIMARY_CONTAINER};
+                border-radius: 6px;
+                padding: 4px;
                 font-family: "Inter", "Segoe UI", Arial, sans-serif;
                 font-size: 13px;
-            }}}}
-            QMenu::item:selected {{{{
-                background-color: rgba(0, 170, 255, 0.2);
+                outline: 0;
+            }}
+            QListView::item {{
+                padding: 6px 12px;
+                border-radius: 4px;
+            }}
+            QListView::item:hover, QListView::item:selected {{
+                background-color: rgba(0, 170, 255, 0.25);
                 color: #FFFFFF;
-            }}}}
+            }}
         """)
         
-        # Add history items
-        for item_text in history:
-            action = QAction(item_text, self)
-            action.triggered.connect(lambda checked, text=item_text: self._on_history_item_clicked(text))
-            self._history_menu.addAction(action)
-            
-        # Position menu below the search input
-        pos = self.mapToGlobal(QPoint(0, self.height()))
-        # Don't steal focus when showing the popup - use proper Qt flags
-        self._history_menu.setWindowFlag(Qt.WindowType.Popup, True)
-        self._history_menu.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, False)  # Keep shadow
-        self._history_menu.setAttribute(Qt.WA_ShowWithoutActivating, True)
-        self._history_menu.popup(pos)
-
-    def _on_history_item_clicked(self, text: str) -> None:
-        """Handle clicking on a history item."""
-        self.setText(text)
-        self._focused = True
-        self.setFocus()
-        # Hide the menu
-        if self._history_menu:
-            self._history_menu.hide()
+        # Style the popup's vertical scrollbar
+        popup.verticalScrollBar().setStyleSheet(f"""
+            QScrollBar:vertical {{
+                background: transparent;
+                width: 6px;
+                margin: 0;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {P.PRIMARY};
+                min-height: 20px;
+                border-radius: 3px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+        """)
+        
+        self.setCompleter(completer)

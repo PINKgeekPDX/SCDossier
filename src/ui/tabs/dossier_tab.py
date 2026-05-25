@@ -96,7 +96,7 @@ class DossierTab(QWidget):
         ab_layout.setContentsMargins(24, 10, 24, 10)
         ab_layout.setSpacing(12)
 
-        self.search_input = SearchInput("ENTER RSI HANDLE...")
+        self.search_input = SearchInput("ENTER RSI HANDLE...", history_type="player")
         self.search_input.returnPressed.connect(self._on_search)
         self.search_input.setFixedHeight(44)
         self.search_input.setToolTip("Enter an RSI handle (e.g., PINKgeekPDX) to search for a citizen profile")
@@ -257,6 +257,24 @@ class DossierTab(QWidget):
         bus.status_message.connect(self._on_status_msg)
         bus.archive_updated.connect(self._on_archive_updated)
 
+    def _clear_results(self) -> None:
+        """Clear all displayed dossier results."""
+        # Reset state
+        self.current_handle = ""
+        self._current_data = None
+        
+        # Clear search input
+        self.search_input.clear()
+        
+        # Hide detail view, show empty state
+        self.detail_container.setVisible(False)
+        self.empty_lbl.setVisible(True)
+        
+        # Reset archive button state
+        self.archive_btn.setEnabled(False)
+        if hasattr(self, '_archive_pulse_anim'):
+            self._archive_pulse_anim.stop()
+
     def _on_search(self) -> None:
         handle = self.search_input.text().strip()
         if handle:
@@ -267,22 +285,25 @@ class DossierTab(QWidget):
     def _add_to_search_history(self, query: str) -> None:
         """Add a search query to the history."""
         settings = SettingsManager.instance()
-        history = settings.search_history
-        
-        # Remove if already exists to avoid duplicates
-        if query in history:
-            history.remove(query)
-        
-        # Add to the end (most recent)
-        history.append(query)
-        
-        # Apply limit
         limit = settings.search_history_limit
-        if limit >= 0 and len(history) > limit:
-            history = history[-limit:]
-        
-        # Save back to settings
-        settings.search_history = history
+
+        # 1. Master history
+        master = settings.search_history
+        if query in master:
+            master.remove(query)
+        master.append(query)
+        if limit >= 0 and len(master) > limit:
+            master = master[-limit:]
+        settings.search_history = master
+
+        # 2. Player history
+        player_hist = settings.search_history_player
+        if query in player_hist:
+            player_hist.remove(query)
+        player_hist.append(query)
+        if limit >= 0 and len(player_hist) > limit:
+            player_hist = player_hist[-limit:]
+        settings.search_history_player = player_hist
 
     def _on_archive_clicked(self) -> None:
         if self.current_handle:

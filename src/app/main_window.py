@@ -53,13 +53,17 @@ class MainWindow(BaseWindow):
         self._build_ui()
         self._connect_signals()
 
-        # Restore last-active tab from settings
+        # Restore last-active tab from settings, default to search tab
         from src.core.settings import SettingsManager
         sm = SettingsManager.instance()
         last_tab = sm.last_tab
         if last_tab and last_tab != "search":
             self.sidebar.set_active_tab(last_tab)
             self._on_tab_selected(last_tab)
+        else:
+            # Default to search tab on startup
+            self.sidebar.set_active_tab("search")
+            self._on_tab_selected("search")
 
     def _build_ui(self) -> None:
         # We override the base window's layout to include the title bar, 
@@ -145,6 +149,18 @@ class MainWindow(BaseWindow):
         """Programmatically switch tabs and update sidebar state."""
         self.sidebar.set_active_tab(tab_id)
         self._on_tab_selected(tab_id)
+
+    def _on_clear_results(self) -> None:
+        """Clear all search results from all tabs."""
+        # Clear dossier tab
+        if hasattr(self.tab_dossier, '_clear_results'):
+            self.tab_dossier._clear_results()
+        # Clear org tab
+        if hasattr(self.tab_org, '_clear_results'):
+            self.tab_org._clear_results()
+        # Clear archive tab
+        if hasattr(self.tab_archives, '_clear_results'):
+            self.tab_archives._clear_results()
 
     def _toggle_maximize(self) -> None:
         if self.isMaximized():

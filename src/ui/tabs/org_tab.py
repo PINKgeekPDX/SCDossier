@@ -84,7 +84,7 @@ class OrgTab(QWidget):
         ab_layout.setContentsMargins(24, 10, 24, 10)
         ab_layout.setSpacing(12)
 
-        self.search_input = SearchInput("ENTER ORG NAME OR SID...")
+        self.search_input = SearchInput("ENTER ORG NAME OR SID...", history_type="org")
         self.search_input.returnPressed.connect(self._on_search)
         self.search_input.setFixedHeight(44)
         self.search_input.setToolTip("Enter an organization name or SID (e.g., REBELS) to search for org details")
@@ -226,6 +226,19 @@ class OrgTab(QWidget):
         bus.org_candidates_found.connect(self._on_org_candidates)
         bus.status_message.connect(self._on_status_msg)
 
+    def _clear_results(self) -> None:
+        """Clear all displayed organization results."""
+        # Reset state
+        self.current_sid = ""
+        self._current_data = None
+        
+        # Clear search input
+        self.search_input.clear()
+        
+        # Hide detail view, show empty state
+        self.detail_container.setVisible(False)
+        self.empty_lbl.setVisible(True)
+
     def _on_search(self) -> None:
         query = self.search_input.text().strip()
         if query:
@@ -236,22 +249,25 @@ class OrgTab(QWidget):
     def _add_to_search_history(self, query: str) -> None:
         """Add a search query to the history."""
         settings = SettingsManager.instance()
-        history = settings.search_history
-        
-        # Remove if already exists to avoid duplicates
-        if query in history:
-            history.remove(query)
-        
-        # Add to the end (most recent)
-        history.append(query)
-        
-        # Apply limit
         limit = settings.search_history_limit
-        if limit >= 0 and len(history) > limit:
-            history = history[-limit:]
-        
-        # Save back to settings
-        settings.search_history = history
+
+        # 1. Master history
+        master = settings.search_history
+        if query in master:
+            master.remove(query)
+        master.append(query)
+        if limit >= 0 and len(master) > limit:
+            master = master[-limit:]
+        settings.search_history = master
+
+        # 2. Org history
+        org_hist = settings.search_history_org
+        if query in org_hist:
+            org_hist.remove(query)
+        org_hist.append(query)
+        if limit >= 0 and len(org_hist) > limit:
+            org_hist = org_hist[-limit:]
+        settings.search_history_org = org_hist
 
     @pyqtSlot(list)
     def _on_org_candidates(self, candidates: list) -> None:
