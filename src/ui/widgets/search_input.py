@@ -33,7 +33,7 @@ class SearchInput(QLineEdit):
         self.history_type = history_type
         self._setup_glow()
         self._apply_style(False)
-        self.setMinimumHeight(44)
+        self.setMinimumHeight(36)   # was 44
         
         # Configure case-insensitive auto-completion list for history
         self.update_history_completer()
@@ -48,10 +48,10 @@ class SearchInput(QLineEdit):
                     background-color: rgba(0, 10, 20, 0.95);
                     color: {P.ON_SURFACE};
                     border: 1px solid {P.PRIMARY_CONTAINER};
-                    border-radius: 6px;
-                    padding: 10px 14px;
+                    border-radius: 4px;
+                    padding: 7px 12px;
                     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-                    font-size: 14px;
+                    font-size: 12px;
                     selection-background-color: {P.PRIMARY_CONTAINER};
                     selection-color: #FFFFFF;
                 }}
@@ -62,10 +62,10 @@ class SearchInput(QLineEdit):
                     background-color: rgba(5, 11, 15, 0.90);
                     color: {P.ON_SURFACE};
                     border: 1px solid {P.OUTLINE_VARIANT};
-                    border-radius: 6px;
-                    padding: 10px 14px;
+                    border-radius: 4px;
+                    padding: 7px 12px;
                     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-                    font-size: 14px;
+                    font-size: 12px;
                     selection-background-color: {P.PRIMARY_CONTAINER};
                     selection-color: #FFFFFF;
                 }}

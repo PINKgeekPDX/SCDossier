@@ -59,8 +59,8 @@ class ConfirmDialog(QDialog):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setModal(True)
-        self.setMinimumWidth(420)
-        self.setMaximumWidth(520)
+        self.setMinimumWidth(380)   # was 420
+        self.setMaximumWidth(480)   # was 520
 
         self._build_ui(title, message, confirm_text, cancel_text, danger)
 
@@ -96,8 +96,8 @@ class ConfirmDialog(QDialog):
         outer.addWidget(container)
 
         inner = QVBoxLayout(container)
-        inner.setContentsMargins(28, 24, 28, 24)
-        inner.setSpacing(16)
+        inner.setContentsMargins(20, 16, 20, 16)   # was 28,24,28,24
+        inner.setSpacing(10)                         # was 16
 
         # Title
         title_lbl = QLabel(title.upper())
@@ -113,34 +113,34 @@ class ConfirmDialog(QDialog):
 
         # Message
         msg_lbl = QLabel(message)
-        msg_lbl.setFont(font_inter(14))
+        msg_lbl.setFont(font_inter(12))   # was 14
         msg_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent;")
         msg_lbl.setWordWrap(True)
         msg_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
         # Buttons
         btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(12)
+        btn_layout.setSpacing(8)   # was 12
         btn_layout.addStretch(1)
 
         # Only create cancel button if cancel_text is provided
         if cancel_text:
             cancel_btn = QPushButton(cancel_text)
             cancel_btn.setProperty("class", "ghost")
-            cancel_btn.setMinimumWidth(100)
+            cancel_btn.setMinimumWidth(88)   # was 100
             cancel_btn.clicked.connect(self.reject)
             btn_layout.addWidget(cancel_btn)
 
         confirm_btn = QPushButton(confirm_text)
         confirm_btn.setProperty("class", "danger" if danger else "primary")
-        confirm_btn.setMinimumWidth(100)
+        confirm_btn.setMinimumWidth(88)   # was 100
         confirm_btn.clicked.connect(self.accept)
         btn_layout.addWidget(confirm_btn)
 
         inner.addWidget(title_lbl)
         inner.addWidget(divider)
         inner.addWidget(msg_lbl)
-        inner.addSpacing(8)
+        inner.addSpacing(4)   # was 8
         inner.addLayout(btn_layout)
 
     def paintEvent(self, event) -> None:
@@ -148,8 +148,8 @@ class ConfirmDialog(QDialog):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect()
-        s = 10
-        pen = QPen(QColor(P.BRACKET_COLOR), 2)
+        s = 8   # was 10 — slightly smaller bracket
+        pen = QPen(QColor(P.BRACKET_COLOR), 1.5)   # was 2
         painter.setPen(pen)
         x0, y0 = rect.left(), rect.top()
         x1, y1 = rect.right(), rect.bottom()

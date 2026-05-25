@@ -65,7 +65,7 @@ class ClickableOrgCard(GlassCard):
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             rect = self.rect()
-            painter.fillRect(rect, QColor(0, 170, 255, 15)) # rgba(0, 170, 255, 0.06) hover highlight overlay
+            painter.fillRect(rect, QColor(0, 170, 255, 12))
             painter.end()
 
 
@@ -88,19 +88,22 @@ class DossierTab(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- Top Action Bar ---
+        # --- Top Action Bar — compact ---
         action_bar = QWidget()
-        action_bar.setFixedHeight(64)
-        action_bar.setStyleSheet(f"background: {P.SURFACE_CONTAINER_LOW}; border-bottom: 1px solid {P.OUTLINE_VARIANT};")
+        action_bar.setFixedHeight(50)   # was 64
+        action_bar.setStyleSheet(
+            f"background: {P.SURFACE_CONTAINER_LOW}; border-bottom: 1px solid {P.OUTLINE_VARIANT};"
+        )
         ab_layout = QHBoxLayout(action_bar)
-        ab_layout.setContentsMargins(24, 10, 24, 10)
-        ab_layout.setSpacing(12)
+        ab_layout.setContentsMargins(16, 7, 16, 7)   # was 24,10,24,10
+        ab_layout.setSpacing(8)                        # was 12
 
         self.search_input = SearchInput("ENTER RSI HANDLE...", history_type="player")
         self.search_input.returnPressed.connect(self._on_search)
-        self.search_input.setFixedHeight(44)
-        self.search_input.setToolTip("Enter an RSI handle (e.g., PINKgeekPDX) to search for a citizen profile")
-        # Base styling is handled by SearchInput class - remove redundant inline style
+        self.search_input.setFixedHeight(36)   # was 44
+        self.search_input.setToolTip(
+            "Enter an RSI handle (e.g., PINKgeekPDX) to search for a citizen profile"
+        )
 
         from src.core.paths import get_asset_path
         search_icon = get_asset_path("assets/icons/misc/icon_search.svg")
@@ -108,15 +111,15 @@ class DossierTab(QWidget):
 
         search_btn = QPushButton()
         search_btn.setProperty("class", "primary")
-        search_btn.setFixedSize(56, 44)
-        set_button_icon(search_btn, search_icon, (20, 20))
+        search_btn.setFixedSize(44, 36)   # was 56,44
+        set_button_icon(search_btn, search_icon, (16, 16))
         search_btn.clicked.connect(self._on_search)
         search_btn.setToolTip("Search for the entered RSI handle")
 
         self.archive_btn = QPushButton()
         self.archive_btn.setProperty("class", "ghost")
-        self.archive_btn.setFixedSize(56, 44)
-        set_button_icon(self.archive_btn, archive_icon, (20, 20))
+        self.archive_btn.setFixedSize(44, 36)
+        set_button_icon(self.archive_btn, archive_icon, (16, 16))
         self.archive_btn.setEnabled(False)
         self.archive_btn.clicked.connect(self._on_archive_clicked)
         self.archive_btn.setToolTip("Save the current profile to the archive")
@@ -133,8 +136,8 @@ class DossierTab(QWidget):
 
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
-        self.content_layout.setContentsMargins(24, 24, 24, 24)
-        self.content_layout.setSpacing(20)
+        self.content_layout.setContentsMargins(16, 16, 16, 16)   # was 24,24,24,24
+        self.content_layout.setSpacing(12)                         # was 20
         self.content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Empty state
@@ -151,7 +154,6 @@ class DossierTab(QWidget):
         self.detail_container.setVisible(False)
         self._build_detail()
 
-        # CRITICAL FIX: add detail_container to content_layout so scraped data appears
         self.content_layout.addWidget(self.detail_container)
 
         scroll.setWidget(self.content_widget)
@@ -164,24 +166,28 @@ class DossierTab(QWidget):
     def _build_detail(self) -> None:
         dl = QVBoxLayout(self.detail_container)
         dl.setContentsMargins(0, 0, 0, 0)
-        dl.setSpacing(20)
+        dl.setSpacing(12)   # was 20
 
         # Identity card
         self.identity_card = GlassCard(title="IDENTITY CORE")
         header_layout = QHBoxLayout()
-        header_layout.setSpacing(20)
-        self.avatar = AvatarWidget(size=120)
+        header_layout.setSpacing(14)   # was 20
+        self.avatar = AvatarWidget(size=90)   # was 120
 
         name_vbox = QVBoxLayout()
         name_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        name_vbox.setSpacing(4)
+        name_vbox.setSpacing(2)   # was 4
         self.moniker_lbl = QLabel("—")
         self.moniker_lbl.setFont(headline_lg())
-        self.moniker_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+        self.moniker_lbl.setStyleSheet(
+            f"color: {P.ON_SURFACE}; background: transparent; border: none;"
+        )
         self.moniker_lbl.setWordWrap(True)
         self.handle_lbl = QLabel("—")
         self.handle_lbl.setFont(headline_md())
-        self.handle_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; border: none;")
+        self.handle_lbl.setStyleSheet(
+            f"color: {P.PRIMARY}; background: transparent; border: none;"
+        )
         name_vbox.addWidget(self.moniker_lbl)
         name_vbox.addWidget(self.handle_lbl)
 
@@ -189,14 +195,13 @@ class DossierTab(QWidget):
         header_layout.addLayout(name_vbox)
         header_layout.addStretch()
 
-        # Add RSI brand icon decoration
+        # RSI brand icon decoration
         from src.core.paths import get_asset_path
         rsi_logo_path = get_asset_path("assets/icons/brand-icons/sc-icon-brand-rsi.svg")
         if os.path.exists(rsi_logo_path):
             from src.ui.theme.icon_utils import load_tinted_icon
-            # Tint with Aegis Cyan/Blue with 60% opacity for a premium watermark look
-            tint_color = (0, 170, 255, 153)
-            icon_size = 48
+            tint_color = (0, 170, 255, 140)
+            icon_size = 36   # was 48
             tinted_icon = load_tinted_icon(rsi_logo_path, tint_color, icon_size)
             if tinted_icon and not tinted_icon.isNull():
                 from PyQt6.QtWidgets import QLabel as QLbl
@@ -205,7 +210,10 @@ class DossierTab(QWidget):
                 rsi_logo_lbl.setFixedSize(icon_size, icon_size)
                 rsi_logo_lbl.setStyleSheet("background: transparent; border: none;")
                 rsi_logo_lbl.setToolTip("RSI")
-                header_layout.addWidget(rsi_logo_lbl, alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+                header_layout.addWidget(
+                    rsi_logo_lbl,
+                    alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+                )
         self.identity_card.content_layout.addLayout(header_layout)
         dl.addWidget(self.identity_card)
 
@@ -213,7 +221,7 @@ class DossierTab(QWidget):
         self.grid_card = GlassCard(title="PROFILE DATA")
         grid_layout = QVBoxLayout()
         grid_row1 = QHBoxLayout()
-        grid_row1.setSpacing(12)
+        grid_row1.setSpacing(8)   # was 12
         self.f_enlisted = DataField("ENLISTED")
         self.f_location = DataField("LOCATION")
         self.f_fluency = DataField("FLUENCY")
@@ -227,8 +235,10 @@ class DossierTab(QWidget):
         # Bio card
         self.bio_card = GlassCard(title="BIOGRAPHY")
         self.bio_lbl = QLabel("—")
-        self.bio_lbl.setFont(font_inter(14))
-        self.bio_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; border: none;")
+        self.bio_lbl.setFont(font_inter(12))   # was 14
+        self.bio_lbl.setStyleSheet(
+            f"color: {P.TEXT_DIM}; background: transparent; border: none;"
+        )
         self.bio_lbl.setWordWrap(True)
         self.bio_card.content_layout.addWidget(self.bio_lbl)
         dl.addWidget(self.bio_card)
@@ -236,14 +246,14 @@ class DossierTab(QWidget):
         # Badges card
         self.badges_card = GlassCard(title="ACCREDITATIONS & CLEARANCES")
         self.badges_wrap = WrapLayout()
-        self.badges_wrap.setMinimumHeight(44)
+        self.badges_wrap.setMinimumHeight(36)   # was 44
         self.badges_card.content_layout.addWidget(self.badges_wrap)
         dl.addWidget(self.badges_card)
 
         # Orgs card
         self.orgs_card = GlassCard(title="AFFILIATED ORGANIZATIONS")
         self.orgs_layout = QVBoxLayout()
-        self.orgs_layout.setSpacing(12)
+        self.orgs_layout.setSpacing(8)   # was 12
         self.orgs_card.content_layout.addLayout(self.orgs_layout)
         dl.addWidget(self.orgs_card)
 
@@ -259,18 +269,11 @@ class DossierTab(QWidget):
 
     def _clear_results(self) -> None:
         """Clear all displayed dossier results."""
-        # Reset state
         self.current_handle = ""
         self._current_data = None
-        
-        # Clear search input
         self.search_input.clear()
-        
-        # Hide detail view, show empty state
         self.detail_container.setVisible(False)
         self.empty_lbl.setVisible(True)
-        
-        # Reset archive button state
         self.archive_btn.setEnabled(False)
         if hasattr(self, '_archive_pulse_anim'):
             self._archive_pulse_anim.stop()
@@ -278,7 +281,6 @@ class DossierTab(QWidget):
     def _on_search(self) -> None:
         handle = self.search_input.text().strip()
         if handle:
-            # Add to search history
             self._add_to_search_history(handle)
             EventBus.instance().search_player_requested.emit(handle)
 
@@ -287,7 +289,6 @@ class DossierTab(QWidget):
         settings = SettingsManager.instance()
         limit = settings.search_history_limit
 
-        # 1. Master history
         master = settings.search_history
         if query in master:
             master.remove(query)
@@ -296,7 +297,6 @@ class DossierTab(QWidget):
             master = master[-limit:]
         settings.search_history = master
 
-        # 2. Player history
         player_hist = settings.search_history_player
         if query in player_hist:
             player_hist.remove(query)
@@ -325,11 +325,9 @@ class DossierTab(QWidget):
         self.search_input.clear()
         self.archive_btn.setEnabled(bool(self.current_handle))
 
-        # Show detail, hide empty state
         self.empty_lbl.setVisible(False)
         self.detail_container.setVisible(True)
 
-        # Header
         self.moniker_lbl.setText(data.get("moniker", "—"))
         self.handle_lbl.setText(f"@{data.get('handle', '—')}")
 
@@ -338,7 +336,6 @@ class DossierTab(QWidget):
         else:
             self.avatar.clear()
 
-        # Details
         self.f_enlisted.set_value(data.get("enlisted"))
         self.f_location.set_value(data.get("location"))
         fluency = data.get("fluency", [])
@@ -347,10 +344,14 @@ class DossierTab(QWidget):
         bio = data.get("bio")
         if bio:
             self.bio_lbl.setText(bio)
-            self.bio_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+            self.bio_lbl.setStyleSheet(
+                f"color: {P.ON_SURFACE}; background: transparent; border: none;"
+            )
         else:
             self.bio_lbl.setText("NO BIOGRAPHY PROVIDED.")
-            self.bio_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;")
+            self.bio_lbl.setStyleSheet(
+                f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;"
+            )
 
         # Badges
         self.badges_wrap.clear()
@@ -366,8 +367,10 @@ class DossierTab(QWidget):
                 self._add_org_widget(o)
         else:
             lbl = QLabel("NO AFFILIATIONS FOUND.")
-            lbl.setFont(font_inter(13))
-            lbl.setStyleSheet(f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;")
+            lbl.setFont(font_inter(11))
+            lbl.setStyleSheet(
+                f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;"
+            )
             self.orgs_layout.addWidget(lbl)
 
         self._update_archive_glow()
@@ -383,27 +386,32 @@ class DossierTab(QWidget):
         card = ClickableOrgCard(sid, self)
         inner = QWidget()
         layout = QHBoxLayout(inner)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(16)
+        layout.setContentsMargins(8, 6, 8, 6)   # was 12,8,12,8
+        layout.setSpacing(10)                     # was 16
 
-        avatar = AvatarWidget(size=52)
+        avatar = AvatarWidget(size=42)   # was 52
         if org.get("logo_local"):
             avatar.set_image(org["logo_local"])
 
         info_vbox = QVBoxLayout()
-        info_vbox.setSpacing(2)
+        info_vbox.setSpacing(1)   # was 2
         info_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         name_lbl = QLabel(org.get("name", ""))
-        name_lbl.setFont(font_inter(14, QFont.Weight.Bold))
-        name_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+        name_lbl.setFont(font_inter(12, QFont.Weight.Bold))   # was 14
+        name_lbl.setStyleSheet(
+            f"color: {P.ON_SURFACE}; background: transparent; border: none;"
+        )
 
         sid_rank = f"{org.get('sid', '')} • {org.get('rank', '')}"
         if org.get("is_main"):
             sid_rank += " (MAIN)"
         sub_lbl = QLabel(sid_rank)
-        sub_lbl.setFont(font_inter(12))
-        sub_lbl.setStyleSheet(f"color: {P.PRIMARY if org.get('is_main') else P.TEXT_DIM}; background: transparent; border: none;")
+        sub_lbl.setFont(font_inter(10))   # was 12
+        sub_lbl.setStyleSheet(
+            f"color: {P.PRIMARY if org.get('is_main') else P.TEXT_DIM}; "
+            f"background: transparent; border: none;"
+        )
 
         info_vbox.addWidget(name_lbl)
         info_vbox.addWidget(sub_lbl)
@@ -422,22 +430,18 @@ class DossierTab(QWidget):
 
         data = self._current_data
 
-        # Check if this is the avatar
         if data.get("avatar_local") == local_path:
             self.avatar.set_image(local_path)
             return
 
-        # Check if this is a badge image
         for b in data.get("badges", []):
             if b.get("image_local") == local_path:
-                # Re-populate badges to show the new images
                 self.badges_wrap.clear()
                 for badge in data.get("badges", []):
                     chip = BadgeChip(name=badge.get("name", ""), image_path=badge.get("image_local"))
                     self.badges_wrap.addWidget(chip)
                 return
 
-        # Check if this is an org logo
         for o in data.get("orgs", []):
             if o.get("logo_local") == local_path:
                 self._clear_orgs()
@@ -452,14 +456,14 @@ class DossierTab(QWidget):
 
         self._archive_glow_shadow = QGraphicsDropShadowEffect(self.archive_btn)
         self._archive_glow_shadow.setBlurRadius(0)
-        self._archive_glow_shadow.setColor(QColor(0, 170, 255, 200))  # Aegis Cyan/Blue glow
+        self._archive_glow_shadow.setColor(QColor(0, 170, 255, 180))
         self._archive_glow_shadow.setOffset(0, 0)
         self.archive_btn.setGraphicsEffect(self._archive_glow_shadow)
 
         self._archive_pulse_anim = QPropertyAnimation(self._archive_glow_shadow, b"blurRadius")
         self._archive_pulse_anim.setDuration(1500)
         self._archive_pulse_anim.setStartValue(0)
-        self._archive_pulse_anim.setKeyValueAt(0.5, 12)
+        self._archive_pulse_anim.setKeyValueAt(0.5, 10)
         self._archive_pulse_anim.setEndValue(0)
         self._archive_pulse_anim.setLoopCount(-1)
         self._archive_pulse_anim.setEasingCurve(QEasingCurve.Type.InOutSine)

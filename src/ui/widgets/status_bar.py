@@ -18,7 +18,7 @@ from src.app.constants import STATUSBAR_HEIGHT
 
 
 class CustomStatusBar(QWidget):
-    """Thin status bar at the bottom of the main window."""
+    """Ultra-thin status bar at the bottom of the main window."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -28,15 +28,15 @@ class CustomStatusBar(QWidget):
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 12, 0)
-        layout.setSpacing(4)
+        layout.setContentsMargins(10, 0, 10, 0)   # was 12,0,12,0
+        layout.setSpacing(3)                        # was 4
 
         font = label_caps()
 
-        # Status dot - shows green when idle, changes color on activity
+        # Status dot
         self._dot = QLabel("●")
         self._dot.setFont(font)
-        self._dot.setStyleSheet("color: #00FF88; background: transparent; font-size: 9px;")
+        self._dot.setStyleSheet("color: #00FF88; background: transparent; font-size: 7px;")
         self._dot.setToolTip("System status indicator")
 
         # Status text
@@ -47,11 +47,9 @@ class CustomStatusBar(QWidget):
         self._status_lbl.setToolTip("Current system status message")
 
         layout.addWidget(self._dot)
-        layout.addSpacing(4)
+        layout.addSpacing(3)
         layout.addWidget(self._status_lbl)
         layout.addStretch(1)
-
-        # Note: Connection/ping indicators removed per user request
 
     def set_status(self, text: str, level: str = "info") -> None:
         """Update the status message. level: 'info'|'success'|'warning'|'error'"""
@@ -72,14 +70,14 @@ class CustomStatusBar(QWidget):
 
         self._status_lbl.setText(text.upper())
         self._status_lbl.setStyleSheet(f"color: {color}; background: transparent;")
-        self._dot.setStyleSheet(f"color: {dot_color}; background: transparent; font-size: 9px;")
+        self._dot.setStyleSheet(f"color: {dot_color}; background: transparent; font-size: 7px;")
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
-        # Dark status bar background
-        painter.fillRect(self.rect(), QColor(2, 13, 20, 230))
+        # Slightly more opaque for clear bottom anchor
+        painter.fillRect(self.rect(), QColor(2, 10, 18, 240))
         # Top border
         from PyQt6.QtGui import QPen
-        painter.setPen(QPen(QColor(0, 170, 255, 25), 1))
+        painter.setPen(QPen(QColor(0, 170, 255, 22), 1))
         painter.drawLine(0, 0, self.width(), 0)
         painter.end()

@@ -19,11 +19,11 @@ class AvatarWidget(QWidget):
     Displays a square image with tech-bracket corner ornaments.
 
     Args:
-        size:       Widget size in pixels (square). Default 120.
+        size:       Widget size in pixels (square). Default 90 (was 120).
         parent:     Parent widget.
     """
 
-    def __init__(self, size: int = 120, parent: QWidget | None = None) -> None:
+    def __init__(self, size: int = 90, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._size = size
         self._pixmap: QPixmap | None = None
@@ -98,7 +98,7 @@ class AvatarWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         rect = self.rect()
-        radius = 4
+        radius = 3   # was 4
 
         if self._pixmap:
             # Clip to rounded rect
@@ -129,7 +129,7 @@ class AvatarWidget(QWidget):
         self._draw_brackets(painter, rect)
 
         # Border
-        pen = QPen(QColor(0, 170, 255, 51), 1)
+        pen = QPen(QColor(0, 170, 255, 45), 1)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(rect.adjusted(0, 0, -1, -1), radius, radius)
@@ -137,7 +137,7 @@ class AvatarWidget(QWidget):
         painter.end()
 
     def _draw_brackets(self, painter: QPainter, rect: QRect) -> None:
-        size = min(P.BRACKET_SIZE, self._size // 8)
+        bracket_size = max(4, min(6, self._size // 10))   # slightly smaller brackets
         pen = QPen(QColor(P.BRACKET_COLOR), P.BRACKET_WIDTH)
         pen.setCapStyle(Qt.PenCapStyle.SquareCap)
         painter.setPen(pen)
@@ -146,14 +146,14 @@ class AvatarWidget(QWidget):
         x0, y0 = rect.left(), rect.top()
         x1, y1 = rect.right(), rect.bottom()
 
-        painter.drawLine(x0, y0, x0 + size, y0)
-        painter.drawLine(x0, y0, x0, y0 + size)
+        painter.drawLine(x0, y0, x0 + bracket_size, y0)
+        painter.drawLine(x0, y0, x0, y0 + bracket_size)
 
-        painter.drawLine(x1 - size, y0, x1, y0)
-        painter.drawLine(x1, y0, x1, y0 + size)
+        painter.drawLine(x1 - bracket_size, y0, x1, y0)
+        painter.drawLine(x1, y0, x1, y0 + bracket_size)
 
-        painter.drawLine(x0, y1, x0 + size, y1)
-        painter.drawLine(x0, y1 - size, x0, y1)
+        painter.drawLine(x0, y1, x0 + bracket_size, y1)
+        painter.drawLine(x0, y1 - bracket_size, x0, y1)
 
-        painter.drawLine(x1 - size, y1, x1, y1)
-        painter.drawLine(x1, y1 - size, x1, y1)
+        painter.drawLine(x1 - bracket_size, y1, x1, y1)
+        painter.drawLine(x1, y1 - bracket_size, x1, y1)

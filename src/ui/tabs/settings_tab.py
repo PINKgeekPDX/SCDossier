@@ -125,10 +125,10 @@ class SettingsTab(QWidget):
 
         # Header bar
         header_bar = QWidget()
-        header_bar.setFixedHeight(48)
+        header_bar.setFixedHeight(44)   # was 48
         header_bar.setStyleSheet(f"background: {P.SURFACE_CONTAINER_LOW}; border-bottom: 1px solid {P.OUTLINE_VARIANT};")
         header_layout = QHBoxLayout(header_bar)
-        header_layout.setContentsMargins(20, 6, 20, 6)
+        header_layout.setContentsMargins(16, 5, 16, 5)   # was 20,6,20,6
 
         header_lbl = QLabel("SYSTEM PREFERENCES")
         header_lbl.setFont(label_caps())
@@ -145,8 +145,8 @@ class SettingsTab(QWidget):
 
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(14, 10, 14, 10)   # was 16,12,16,12
+        layout.setSpacing(8)                          # was 10
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # === SECTION: GENERAL ===
@@ -386,7 +386,7 @@ class SettingsTab(QWidget):
         gh_lbl_key = TechLabel("GITHUB")
         gh_lbl_key.setFixedWidth(100)
         gh_lbl_val = QLabel('<a href="https://github.com/pinkgeekpdx" style="color: #00AAFF;">github.com/pinkgeekpdx</a>')
-        gh_lbl_val.setFont(font_inter(12))
+        gh_lbl_val.setFont(font_inter(11))   # was 12
         gh_lbl_val.setStyleSheet("background: transparent; border: none;")
         gh_lbl_val.setTextFormat(Qt.TextFormat.RichText)
         gh_lbl_val.setOpenExternalLinks(True)

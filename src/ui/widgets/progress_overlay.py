@@ -44,7 +44,7 @@ class ProgressOverlay(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(16)
+        layout.setSpacing(10)   # was 16
 
         self._status_label = QLabel("RETRIEVING DATA...")
         self._status_label.setFont(label_caps())
@@ -54,7 +54,7 @@ class ProgressOverlay(QWidget):
         )
 
         self._sub_label = QLabel("ACCESSING RSI NETWORK")
-        self._sub_label.setFont(font_inter(12))
+        self._sub_label.setFont(font_inter(10))   # was 12
         self._sub_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._sub_label.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
 
@@ -122,7 +122,7 @@ class ProgressOverlay(QWidget):
 
         # --- Scanline beam ---
         if self._scan_y > 0 and self._scan_y < h:
-            beam_h = 80
+            beam_h = 60   # was 80
             grad = QLinearGradient(0, self._scan_y - beam_h, 0, self._scan_y + beam_h)
             grad.setColorAt(0.0, QColor(0, 170, 255, 0))
             grad.setColorAt(0.4, QColor(0, 170, 255, 30))
@@ -140,8 +140,8 @@ class ProgressOverlay(QWidget):
             painter.drawLine(0, int(self._scan_y), w, int(self._scan_y))
 
         # --- Center glass panel ---
-        panel_w = min(380, w - 80)
-        panel_h = 120
+        panel_w = min(320, w - 60)   # was 380, w-80
+        panel_h = 90                  # was 120
         panel_x = (w - panel_w) // 2
         panel_y = (h - panel_h) // 2
         panel_rect = QRect(panel_x, panel_y, panel_w, panel_h)
@@ -163,8 +163,8 @@ class ProgressOverlay(QWidget):
         painter.drawRoundedRect(QRectF(panel_rect), 4, 4)
 
         # Bracket corners on panel
-        s = 8
-        pen = QPen(QColor(P.BRACKET_COLOR), 2)
+        s = 6   # was 8
+        pen = QPen(QColor(P.BRACKET_COLOR), 1.5)   # was 2
         pen.setCapStyle(Qt.PenCapStyle.SquareCap)
         painter.setPen(pen)
         x0, y0 = panel_rect.left(), panel_rect.top()

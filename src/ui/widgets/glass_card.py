@@ -5,7 +5,7 @@ GlassCard — primary panel container for the Aegis Liquid Interface.
 Features:
 - Semi-transparent dark glass background
 - 1px rgba blue border
-- Tech-bracket corner ornaments (8×8px #00AAFF L-shapes at all 4 corners)
+- Tech-bracket corner ornaments (6×6px #00AAFF L-shapes at all 4 corners)
 - Optional title header strip with adaptive height
 """
 
@@ -17,17 +17,17 @@ from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps
 
 
-# Constants
-_HEADER_HEIGHT = 32
-_BORDER_RADIUS = 4
-_MARGIN = 16
-_BRACKET_SIZE = P.BRACKET_SIZE
+# Constants — tightened for compact layout
+_HEADER_HEIGHT = 24        # was 32
+_BORDER_RADIUS = 3         # was 4
+_MARGIN = 10               # was 16
+_BRACKET_SIZE = 6          # was 8
 _BRACKET_WIDTH = P.BRACKET_WIDTH
 _BRACKET_COLOR = QColor(P.BRACKET_COLOR)
-_GLASS_BG = QColor(10, 29, 41, 102)       # rgba(10,29,41,0.40)
-_BORDER_COLOR = QColor(0, 170, 255, 38)   # rgba(0,170,255,0.15)
-_HEADER_BG = QColor(0, 170, 255, 18)      # rgba(0,170,255,0.07)
-_HEADER_LINE = QColor(0, 170, 255, 25)    # rgba(0,170,255,0.10)
+_GLASS_BG = QColor(10, 29, 41, 90)        # slightly more transparent
+_BORDER_COLOR = QColor(0, 170, 255, 32)   # rgba(0,170,255,0.125)
+_HEADER_BG = QColor(0, 170, 255, 14)      # rgba(0,170,255,0.055)
+_HEADER_LINE = QColor(0, 170, 255, 20)    # rgba(0,170,255,0.08)
 
 
 class GlassCard(QFrame):
@@ -66,7 +66,7 @@ class GlassCard(QFrame):
         top_extra = _HEADER_HEIGHT if self._title else 0
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(_MARGIN, _MARGIN + top_extra, _MARGIN, _MARGIN)
-        self._layout.setSpacing(12)
+        self._layout.setSpacing(8)   # was 12
 
     def paintEvent(self, event) -> None:
         """Paint glass background, border, header strip, and bracket ornaments."""

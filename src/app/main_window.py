@@ -46,9 +46,9 @@ class MainWindow(BaseWindow):
             self.setWindowIcon(QIcon(_png_path))
 
         self.setWindowTitle("SC Dossier")
-        self.resize(1024, 768)
-        self.setMinimumSize(800, 600)
-        self.setMaximumSize(1600, 1200)
+        self.resize(1024, 680)    # was 1024,768
+        self.setMinimumSize(860, 560)   # was 800,600
+        self.setMaximumSize(1920, 1200)  # was 1600,1200
 
         self._build_ui()
         self._connect_signals()

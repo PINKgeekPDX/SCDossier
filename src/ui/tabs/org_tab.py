@@ -76,27 +76,30 @@ class OrgTab(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- Top Action Bar ---
+        # --- Top Action Bar — compact ---
         action_bar = QWidget()
-        action_bar.setFixedHeight(64)
-        action_bar.setStyleSheet(f"background: {P.SURFACE_CONTAINER_LOW}; border-bottom: 1px solid {P.OUTLINE_VARIANT};")
+        action_bar.setFixedHeight(50)   # was 64
+        action_bar.setStyleSheet(
+            f"background: {P.SURFACE_CONTAINER_LOW}; border-bottom: 1px solid {P.OUTLINE_VARIANT};"
+        )
         ab_layout = QHBoxLayout(action_bar)
-        ab_layout.setContentsMargins(24, 10, 24, 10)
-        ab_layout.setSpacing(12)
+        ab_layout.setContentsMargins(16, 7, 16, 7)   # was 24,10,24,10
+        ab_layout.setSpacing(8)
 
         self.search_input = SearchInput("ENTER ORG NAME OR SID...", history_type="org")
         self.search_input.returnPressed.connect(self._on_search)
-        self.search_input.setFixedHeight(44)
-        self.search_input.setToolTip("Enter an organization name or SID (e.g., REBELS) to search for org details")
-        # Base styling is handled by SearchInput class
+        self.search_input.setFixedHeight(36)   # was 44
+        self.search_input.setToolTip(
+            "Enter an organization name or SID (e.g., REBELS) to search for org details"
+        )
 
         from src.core.paths import get_asset_path
         search_icon = get_asset_path("assets/icons/misc/icon_search.svg")
 
         search_btn = QPushButton()
         search_btn.setProperty("class", "primary")
-        search_btn.setFixedSize(56, 44)
-        set_button_icon(search_btn, search_icon, (20, 20))
+        search_btn.setFixedSize(44, 36)   # was 56,44
+        set_button_icon(search_btn, search_icon, (16, 16))
         search_btn.clicked.connect(self._on_search)
         search_btn.setToolTip("Search for the entered organization name or SID")
 
@@ -111,8 +114,8 @@ class OrgTab(QWidget):
 
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout(self.content_widget)
-        self.content_layout.setContentsMargins(24, 24, 24, 24)
-        self.content_layout.setSpacing(20)
+        self.content_layout.setContentsMargins(16, 16, 16, 16)   # was 24,24,24,24
+        self.content_layout.setSpacing(12)                         # was 20
         self.content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Empty state
@@ -129,7 +132,6 @@ class OrgTab(QWidget):
         self.detail_container.setVisible(False)
         self._build_detail()
 
-        # CRITICAL FIX: add detail_container to content_layout so scraped data appears
         self.content_layout.addWidget(self.detail_container)
 
         scroll.setWidget(self.content_widget)
@@ -142,24 +144,28 @@ class OrgTab(QWidget):
     def _build_detail(self) -> None:
         dl = QVBoxLayout(self.detail_container)
         dl.setContentsMargins(0, 0, 0, 0)
-        dl.setSpacing(20)
+        dl.setSpacing(12)   # was 20
 
         # Identity card
         self.identity_card = GlassCard(title="ORGANIZATION IDENTITY")
         self.header_layout = QHBoxLayout()
-        self.header_layout.setSpacing(20)
-        self.logo = AvatarWidget(size=120)
+        self.header_layout.setSpacing(14)   # was 20
+        self.logo = AvatarWidget(size=90)   # was 120
 
         name_vbox = QVBoxLayout()
         name_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        name_vbox.setSpacing(4)
+        name_vbox.setSpacing(2)   # was 4
         self.name_lbl = QLabel("—")
         self.name_lbl.setFont(headline_lg())
-        self.name_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+        self.name_lbl.setStyleSheet(
+            f"color: {P.ON_SURFACE}; background: transparent; border: none;"
+        )
         self.name_lbl.setWordWrap(True)
         self.sid_lbl = QLabel("—")
         self.sid_lbl.setFont(headline_md())
-        self.sid_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; border: none;")
+        self.sid_lbl.setStyleSheet(
+            f"color: {P.PRIMARY}; background: transparent; border: none;"
+        )
         name_vbox.addWidget(self.name_lbl)
         name_vbox.addWidget(self.sid_lbl)
 
@@ -172,7 +178,7 @@ class OrgTab(QWidget):
         # Details grid card
         self.grid_card = GlassCard(title="ORGANIZATION DATA")
         grid = QGridLayout()
-        grid.setSpacing(12)
+        grid.setSpacing(8)   # was 12
         self.f_archetype = DataField("ARCHETYPE")
         self.f_language = DataField("LANGUAGE")
         self.f_commitment = DataField("COMMITMENT")
@@ -191,7 +197,7 @@ class OrgTab(QWidget):
         # Focus card
         self.focus_card = GlassCard(title="PRIMARY & SECONDARY FOCUS")
         focus_layout = QHBoxLayout()
-        focus_layout.setSpacing(12)
+        focus_layout.setSpacing(8)
         self.f_primary = DataField("PRIMARY FOCUS")
         self.f_secondary = DataField("SECONDARY FOCUS")
         focus_layout.addWidget(self.f_primary)
@@ -202,8 +208,10 @@ class OrgTab(QWidget):
         # Description card
         self.desc_card = GlassCard(title="ORGANIZATION HISTORY / DESCRIPTION")
         self.desc_lbl = QLabel("—")
-        self.desc_lbl.setFont(font_inter(14))
-        self.desc_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; border: none;")
+        self.desc_lbl.setFont(font_inter(12))   # was 14
+        self.desc_lbl.setStyleSheet(
+            f"color: {P.TEXT_DIM}; background: transparent; border: none;"
+        )
         self.desc_lbl.setWordWrap(True)
         self.desc_card.content_layout.addWidget(self.desc_lbl)
         dl.addWidget(self.desc_card)
@@ -228,21 +236,15 @@ class OrgTab(QWidget):
 
     def _clear_results(self) -> None:
         """Clear all displayed organization results."""
-        # Reset state
         self.current_sid = ""
         self._current_data = None
-        
-        # Clear search input
         self.search_input.clear()
-        
-        # Hide detail view, show empty state
         self.detail_container.setVisible(False)
         self.empty_lbl.setVisible(True)
 
     def _on_search(self) -> None:
         query = self.search_input.text().strip()
         if query:
-            # Add to search history
             self._add_to_search_history(query)
             EventBus.instance().search_org_requested.emit(query)
 
@@ -251,7 +253,6 @@ class OrgTab(QWidget):
         settings = SettingsManager.instance()
         limit = settings.search_history_limit
 
-        # 1. Master history
         master = settings.search_history
         if query in master:
             master.remove(query)
@@ -260,7 +261,6 @@ class OrgTab(QWidget):
             master = master[-limit:]
         settings.search_history = master
 
-        # 2. Org history
         org_hist = settings.search_history_org
         if query in org_hist:
             org_hist.remove(query)
@@ -282,15 +282,14 @@ class OrgTab(QWidget):
             cancel_text="CANCEL",
             parent=self.window(),
         )
-        # Replace the message label with a list
         list_widget = QListWidget()
-        list_widget.setFixedHeight(200)
+        list_widget.setFixedHeight(180)   # was 200
         list_widget.setStyleSheet(f"""
             QListWidget {{
                 background: rgba(5, 11, 15, 0.85);
                 color: {P.ON_SURFACE};
                 border: 1px solid {P.OUTLINE_VARIANT};
-                border-radius: 4px;
+                border-radius: 3px;
             }}
             QListWidget::item:selected {{
                 background: rgba(0, 170, 255, 0.20);
@@ -302,7 +301,6 @@ class OrgTab(QWidget):
             list_widget.addItem(item)
         list_widget.setCurrentRow(0)
 
-        # Find the message label in the dialog and replace it
         for child in dlg.findChildren(QLabel):
             if child.wordWrap():
                 parent_layout = child.parent().layout()
@@ -330,11 +328,9 @@ class OrgTab(QWidget):
         self.current_sid = data.get("sid", "")
         self.search_input.clear()
 
-        # Show detail, hide empty state
         self.empty_lbl.setVisible(False)
         self.detail_container.setVisible(True)
 
-        # Header
         self.name_lbl.setText(data.get("name", "—"))
         self.sid_lbl.setText(f"@{data.get('sid', '—')}")
 
@@ -342,6 +338,7 @@ class OrgTab(QWidget):
             self.logo.set_image(data["logo_local"])
         else:
             self.logo.clear()
+
         # Remove any existing manufacturer logo decoration
         if self.mfr_logo_lbl:
             self.header_layout.removeWidget(self.mfr_logo_lbl)
@@ -353,9 +350,8 @@ class OrgTab(QWidget):
         mfr_logo_path = self._get_manufacturer_logo_path(org_name)
         if mfr_logo_path:
             from src.ui.theme.icon_utils import load_tinted_icon
-            # Tint with Aegis Cyan/Blue with 60% opacity for a premium watermark look
-            tint_color = (0, 170, 255, 153)
-            icon_size = 48
+            tint_color = (0, 170, 255, 140)
+            icon_size = 36   # was 48
             tinted_icon = load_tinted_icon(mfr_logo_path, tint_color, icon_size)
             if tinted_icon and not tinted_icon.isNull():
                 from PyQt6.QtWidgets import QLabel as QLbl
@@ -364,7 +360,10 @@ class OrgTab(QWidget):
                 self.mfr_logo_lbl.setFixedSize(icon_size, icon_size)
                 self.mfr_logo_lbl.setStyleSheet("background: transparent; border: none;")
                 self.mfr_logo_lbl.setToolTip(org_name)
-                self.header_layout.addWidget(self.mfr_logo_lbl, alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+                self.header_layout.addWidget(
+                    self.mfr_logo_lbl,
+                    alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+                )
 
         # Details
         self.f_archetype.set_value(data.get("archetype"))
@@ -379,7 +378,11 @@ class OrgTab(QWidget):
         desc = data.get("description")
         if desc:
             self.desc_lbl.setText(desc)
-            self.desc_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
+            self.desc_lbl.setStyleSheet(
+                f"color: {P.ON_SURFACE}; background: transparent; border: none;"
+            )
         else:
             self.desc_lbl.setText("NO DESCRIPTION PROVIDED.")
-            self.desc_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;")
+            self.desc_lbl.setStyleSheet(
+                f"color: {P.TEXT_DIM}; font-style: italic; background: transparent; border: none;"
+            )

@@ -88,18 +88,18 @@ AVATAR_FILENAME = "avatar.png"
 OCR_CAPTURES_SUBDIR = "_captures"
 
 # ---------------------------------------------------------------------------
-# UI Layout Constants
+# UI Layout Constants  — tightened for compact, dense layout
 # ---------------------------------------------------------------------------
-MAIN_WINDOW_MIN_WIDTH = 900
-MAIN_WINDOW_MIN_HEIGHT = 600
-MAIN_WINDOW_DEFAULT_WIDTH = 1100
-MAIN_WINDOW_DEFAULT_HEIGHT = 700
+MAIN_WINDOW_MIN_WIDTH = 860
+MAIN_WINDOW_MIN_HEIGHT = 560
+MAIN_WINDOW_DEFAULT_WIDTH = 1024
+MAIN_WINDOW_DEFAULT_HEIGHT = 680
 
-SIDEBAR_WIDTH_COLLAPSED = 64
-SIDEBAR_WIDTH_EXPANDED = 240
-TITLEBAR_HEIGHT = 48
-STATUSBAR_HEIGHT = 28
-TOOLBAR_BUTTON_SIZE = 44
+SIDEBAR_WIDTH_COLLAPSED = 52      # was 64 — narrower icon rail
+SIDEBAR_WIDTH_EXPANDED = 220      # was 240
+TITLEBAR_HEIGHT = 36              # was 48 — slimmer chrome
+STATUSBAR_HEIGHT = 20             # was 28 — ultra-thin strip
+TOOLBAR_BUTTON_SIZE = 36          # was 44
 
 # ---------------------------------------------------------------------------
 # Scraper Defaults

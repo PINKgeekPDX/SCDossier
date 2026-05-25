@@ -31,8 +31,8 @@ class StyledToggleButton(QPushButton):
         super().__init__(text, parent)
         self._active = False
         self._hovered = False
-        self.setFixedHeight(44)
-        self.setMinimumWidth(170)
+        self.setFixedHeight(36)   # was 44
+        self.setMinimumWidth(130)  # was 170
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setMouseTracking(True)
@@ -62,7 +62,7 @@ class StyledToggleButton(QPushButton):
             grad.setColorAt(1, QColor(0, 170, 255, 220))
             painter.setBrush(QBrush(grad))
             painter.setPen(QPen(QColor(0, 200, 255, 150), 1))
-            painter.drawRoundedRect(rect, 6, 6)
+            painter.drawRoundedRect(rect, 4, 4)
 
             # Draw text
             painter.setPen(QColor("#FFFFFF"))
@@ -72,7 +72,7 @@ class StyledToggleButton(QPushButton):
             # Hover state: subtle glow
             painter.setBrush(QColor(0, 170, 255, 30))
             painter.setPen(QPen(QColor(0, 170, 255, 120), 1))
-            painter.drawRoundedRect(rect, 6, 6)
+            painter.drawRoundedRect(rect, 4, 4)
 
             painter.setPen(QColor(P.ON_SURFACE))
             painter.setFont(self.font())
@@ -81,7 +81,7 @@ class StyledToggleButton(QPushButton):
             # Default: ghost style
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QPen(QColor(0, 170, 255, 60), 1))
-            painter.drawRoundedRect(rect, 6, 6)
+            painter.drawRoundedRect(rect, 4, 4)
 
             painter.setPen(QColor(P.TEXT_DIM))
             painter.setFont(self.font())
@@ -104,8 +104,8 @@ class AnimatedSearchInput(SearchInput):
         self._anim_timer.timeout.connect(self._animate_border)
         self._anim_timer.setInterval(30)
 
-        self.setFixedHeight(56)
-        self.setFont(font_inter(16))
+        self.setFixedHeight(46)   # was 56
+        self.setFont(font_inter(13))  # was 16
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setToolTip("Enter an RSI handle, name, or profile URL to search")
 
@@ -155,31 +155,31 @@ class AnimatedSearchInput(SearchInput):
 
         painter.setBrush(bg)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(rect, 8, 8)
+        painter.drawRoundedRect(rect, 5, 5)
 
         # Border with animation when focused
         if self._focused:
             alpha = int(100 + 155 * self._anim_progress)
             border_color = QColor(0, 170, 255, alpha)
             painter.setPen(QPen(border_color, 2))
-            painter.drawRoundedRect(rect, 8, 8)
+            painter.drawRoundedRect(rect, 5, 5)
 
             # Glow effect ring
             glow_color = QColor(0, 170, 255, int(30 * self._anim_progress))
             painter.setPen(QPen(glow_color, 4))
-            painter.drawRoundedRect(rect.adjusted(-2, -2, 2, 2), 10, 10)
+            painter.drawRoundedRect(rect.adjusted(-2, -2, 2, 2), 7, 7)
         elif self._hovered:
             painter.setPen(QPen(QColor(0, 170, 255, 180), 2))
-            painter.drawRoundedRect(rect, 8, 8)
+            painter.drawRoundedRect(rect, 5, 5)
         else:
             painter.setPen(QPen(QColor(P.OUTLINE), 2))
-            painter.drawRoundedRect(rect, 8, 8)
+            painter.drawRoundedRect(rect, 5, 5)
 
         # Draw placeholder text or content
         text_rect = rect.adjusted(16, 0, -16, 0)
         text_color = QColor(P.TEXT_DIM) if not self.text() else QColor(P.ON_SURFACE)
         painter.setPen(text_color)
-        font = font_inter(15)
+        font = font_inter(12)   # was 15
         painter.setFont(font)
 
         if not self.text():
@@ -191,7 +191,7 @@ class AnimatedSearchInput(SearchInput):
         if self._focused and self.text():
             cursor_x = text_rect.x() + painter.fontMetrics().horizontalAdvance(self.text()[:self.cursorPosition()])
             painter.setPen(QPen(QColor(P.PRIMARY), 2))
-            painter.drawLine(cursor_x, text_rect.center().y() - 10, cursor_x, text_rect.center().y() + 10)
+            painter.drawLine(cursor_x, text_rect.center().y() - 8, cursor_x, text_rect.center().y() + 8)
 
         painter.end()
 
@@ -218,7 +218,7 @@ class StyledActionButton(QPushButton):
         # Load icon
         if os.path.exists(icon_path):
             self.setIcon(QIcon(icon_path))
-            self.setIconSize(QSize(size - 16, size - 16))
+            self.setIconSize(QSize(size - 12, size - 12))   # was size-16
 
     def enterEvent(self, event) -> None:
         self._hovered = True
@@ -248,18 +248,18 @@ class StyledActionButton(QPushButton):
         if self._pressed:
             painter.setBrush(QColor(0, 170, 255, 80))
             painter.setPen(QPen(QColor(0, 200, 255, 150), 1))
-            painter.drawRoundedRect(rect, 8, 8)
+            painter.drawRoundedRect(rect, 5, 5)   # was 8
         elif self._hovered:
             grad = QLinearGradient(0, 0, rect.width(), 0)
             grad.setColorAt(0, QColor(0, 170, 255, 50))
             grad.setColorAt(1, QColor(0, 170, 255, 80))
             painter.setBrush(QBrush(grad))
             painter.setPen(QPen(QColor(0, 200, 255, 120), 1))
-            painter.drawRoundedRect(rect, 8, 8)
+            painter.drawRoundedRect(rect, 5, 5)   # was 8
         else:
             painter.setBrush(QColor(P.PRIMARY))
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(rect, 8, 8)
+            painter.drawRoundedRect(rect, 5, 5)   # was 8
 
         painter.end()
 
@@ -273,17 +273,17 @@ class RecentSearchChip(QPushButton):
     def __init__(self, text: str, parent=None):
         super().__init__(text, parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(26)
+        self.setFixedHeight(22)   # was 26
         self.setFlat(True)
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: rgba(0, 170, 255, 0.06);
                 color: {P.PRIMARY};
-                border: 1px solid rgba(0, 170, 255, 0.25);
-                border-radius: 13px;
-                padding: 2px 12px;
+                border: 1px solid rgba(0, 170, 255, 0.22);
+                border-radius: 11px;
+                padding: 1px 10px;
                 font-family: "Inter", sans-serif;
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 500;
             }}
             QPushButton:hover {{
@@ -311,7 +311,7 @@ class SearchTab(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(32)
+        layout.setSpacing(18)   # was 32
 
         # --- App Logo ---
         logo_lbl = QLabel()
@@ -319,8 +319,8 @@ class SearchTab(QWidget):
         _app_icon_path = get_asset_path("assets/appicon.png")
         if os.path.exists(_app_icon_path):
             logo_pix = QPixmap(_app_icon_path)
-            # Target width matching combined buttons (~300-350), maintain aspect ratio
-            target_width = 300
+            # Compact logo — smaller than before
+            target_width = 200  # was 300
             scaled_pix = logo_pix.scaled(
                 target_width, target_width,
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -337,7 +337,7 @@ class SearchTab(QWidget):
         mode_widget = QWidget()
         mode_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         mode_layout = QHBoxLayout(mode_widget)
-        mode_layout.setSpacing(16)
+        mode_layout.setSpacing(10)  # was 16
         mode_layout.setContentsMargins(0, 0, 0, 0)
 
         self.player_btn = StyledToggleButton("SEARCH PLAYER")
@@ -356,11 +356,11 @@ class SearchTab(QWidget):
 
         # --- Search Bar ---
         search_container = QFrame()
-        search_container.setFixedWidth(560)
+        search_container.setFixedWidth(480)  # was 560
         search_container.setStyleSheet("background: transparent;")
         search_layout = QHBoxLayout(search_container)
         search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(12)
+        search_layout.setSpacing(8)  # was 12
 
         self.search_input = AnimatedSearchInput("IDENTIFY SUBJECT (RSI HANDLE)...")
         self.search_input.returnPressed.connect(self._on_search)
@@ -375,7 +375,7 @@ class SearchTab(QWidget):
         self.search_btn = StyledActionButton(
             _RIGHT_ICON,
             "Execute search for the entered player or organization",
-            56
+            46   # was 56
         )
         self.search_btn.clicked.connect(self._on_search)
 
@@ -388,7 +388,7 @@ class SearchTab(QWidget):
         self.recent_widget = QWidget()
         self.recent_layout = QHBoxLayout(self.recent_widget)
         self.recent_layout.setContentsMargins(0, 0, 0, 0)
-        self.recent_layout.setSpacing(8)
+        self.recent_layout.setSpacing(6)  # was 8
         self.recent_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Assembly
@@ -498,8 +498,8 @@ class SearchTab(QWidget):
         
         # Add label
         lbl = QLabel("RECENTS:")
-        lbl.setFont(font_inter(10))
-        lbl.setStyleSheet(f"color: {P.TEXT_DIM}; letter-spacing: 0.1em; background: transparent; border: none; margin-right: 4px;")
+        lbl.setFont(font_inter(9))   # was 10
+        lbl.setStyleSheet(f"color: {P.TEXT_DIM}; letter-spacing: 0.08em; background: transparent; border: none; margin-right: 3px;")
         self.recent_layout.addWidget(lbl)
         
         # Add chips

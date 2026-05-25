@@ -32,12 +32,12 @@ class DataField(QWidget):
 
     def _build_ui(self, label: str, value: str) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(2)
+        layout.setContentsMargins(6, 4, 6, 4)   # was 8,6,8,6
+        layout.setSpacing(1)                      # was 2
 
         # Background container
         self.setStyleSheet(
-            f"background: {P.rgba(P.SURFACE_CONTAINER_LOWEST, 0.5)}; border-radius: 4px;"
+            f"background: {P.rgba(P.SURFACE_CONTAINER_LOWEST, 0.5)}; border-radius: 3px;"
         )
 
         # Label row

@@ -33,18 +33,18 @@ class BadgeChip(QWidget):
         self._name = name
         self._image_path = image_path
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-        self.setFixedHeight(36)
+        self.setFixedHeight(28)        # was 36
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._build_ui(name, image_path)
 
     def _build_ui(self, name: str, image_path: str | Path | None) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 12, 4)
-        layout.setSpacing(6)
+        layout.setContentsMargins(6, 2, 10, 2)   # was 8,4,12,4
+        layout.setSpacing(5)                       # was 6
 
         # Badge image
         self._img_label = QLabel()
-        self._img_label.setFixedSize(24, 24)
+        self._img_label.setFixedSize(18, 18)       # was 24,24
         self._img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._img_label.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self._set_image(image_path)
@@ -64,14 +64,14 @@ class BadgeChip(QWidget):
             pix = QPixmap(str(path))
             if not pix.isNull():
                 self._img_label.setPixmap(
-                    pix.scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio,
+                    pix.scaled(18, 18, Qt.AspectRatioMode.KeepAspectRatio,
                                Qt.TransformationMode.SmoothTransformation)
                 )
                 return
         # Placeholder glyph
         self._img_label.setText("◈")
         self._img_label.setStyleSheet(
-            f"color: {P.PRIMARY_CONTAINER}; background: transparent; font-size: 14px;"
+            f"color: {P.PRIMARY_CONTAINER}; background: transparent; font-size: 11px;"
         )
 
     def update_image(self, path: str | Path | None) -> None:
@@ -94,7 +94,7 @@ class BadgeChip(QWidget):
         rect = self.rect().adjusted(0, 0, -1, -1)
         pill_radius = rect.height() // 2
         # Pill background
-        painter.setBrush(QColor(0, 170, 255, 13))  # rgba(0,170,255,0.05)
-        painter.setPen(QPen(QColor(0, 170, 255, 51), 1))  # rgba(0,170,255,0.20)
+        painter.setBrush(QColor(0, 170, 255, 12))   # slightly more visible
+        painter.setPen(QPen(QColor(0, 170, 255, 45), 1))
         painter.drawRoundedRect(rect, pill_radius, pill_radius)
         painter.end()

@@ -3,7 +3,7 @@ src/ui/widgets/nav_sidebar.py
 NavSidebar — left-side icon rail navigation for the main window.
 
 Features:
-- 64px collapsed icon rail, expandable to 240px on hover/toggle
+- 52px collapsed icon rail, expandable to 220px on hover/toggle
 - Nav items with SVG icons + label
 - Active item: bg-primary/10 + left border glow (3px, higher alpha)
 - Hover: horizontal gradient highlight
@@ -47,7 +47,7 @@ class NavItem(QWidget):
         self._label = label
         self._active = False
         self._hovered = False
-        self.setFixedHeight(52)
+        self.setFixedHeight(44)   # was 52
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMouseTracking(True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
@@ -75,7 +75,7 @@ class NavItem(QWidget):
         self.update()
 
     def _load_icon_pixmap(self) -> QPixmap | None:
-        """Load and return a 22x22 pixmap from the icon path, handling SVGs properly."""
+        """Load and return a 18x18 pixmap from the icon path, handling SVGs properly."""
         if not os.path.exists(self._icon_path):
             return None
 
@@ -83,7 +83,7 @@ class NavItem(QWidget):
         if self._icon_path.lower().endswith('.svg'):
             renderer = QSvgRenderer(self._icon_path)
             if renderer.isValid():
-                pixmap = QPixmap(22, 22)
+                pixmap = QPixmap(18, 18)
                 pixmap.fill(Qt.GlobalColor.transparent)
                 p = QPainter(pixmap)
                 renderer.render(p)
@@ -92,7 +92,7 @@ class NavItem(QWidget):
 
         # Fallback to QIcon for PNGs
         icon = QIcon(self._icon_path)
-        pixmap = icon.pixmap(22, 22)
+        pixmap = icon.pixmap(18, 18)
         if not pixmap.isNull():
             return pixmap
         return None
@@ -105,29 +105,28 @@ class NavItem(QWidget):
         parent_width = self.parent().width() if self.parent() else SIDEBAR_WIDTH_COLLAPSED
         expanded = parent_width > SIDEBAR_WIDTH_COLLAPSED + 10
 
-        # --- Active background (higher alpha = stronger glow) ---
+        # --- Active background ---
         if self._active:
-            painter.fillRect(rect, QColor(0, 170, 255, 40))
-            # Left accent bar (3px)
-            accent_pen = QPen(QColor(P.PRIMARY_CONTAINER), 3)
+            painter.fillRect(rect, QColor(0, 170, 255, 36))
+            # Left accent bar (2px — slimmer)
+            accent_pen = QPen(QColor(P.PRIMARY_CONTAINER), 2)
             painter.setPen(accent_pen)
-            painter.drawLine(0, 4, 0, rect.height() - 4)
+            painter.drawLine(0, 3, 0, rect.height() - 3)
 
         # --- Hover gradient ---
         elif self._hovered:
             grad = QLinearGradient(0, 0, rect.width(), 0)
-            grad.setColorAt(0, QColor(79, 142, 255, 51))
+            grad.setColorAt(0, QColor(79, 142, 255, 45))
             grad.setColorAt(1, QColor(79, 142, 255, 0))
             painter.fillRect(rect, QBrush(grad))
 
-        # --- Icon (render using _load_icon_pixmap) ---
-        icon_x = (SIDEBAR_WIDTH_COLLAPSED - 22) // 2
-        icon_y = (rect.height() - 22) // 2
+        # --- Icon (18×18, centred in the collapsed rail) ---
+        icon_x = (SIDEBAR_WIDTH_COLLAPSED - 18) // 2
+        icon_y = (rect.height() - 18) // 2
         pixmap = self._load_icon_pixmap()
         if pixmap is not None:
             if self._active:
-                # Tint for active state using a semi-transparent overlay
-                tinted = QPixmap(22, 22)
+                tinted = QPixmap(18, 18)
                 tinted.fill(Qt.GlobalColor.transparent)
                 tp = QPainter(tinted)
                 tp.drawPixmap(0, 0, pixmap)
@@ -147,7 +146,8 @@ class NavItem(QWidget):
                 label_color = QColor(P.ON_SURFACE)
             painter.setPen(label_color)
             painter.setFont(label_caps())
-            label_rect = QRect(SIDEBAR_WIDTH_COLLAPSED + 8, 0, rect.width() - SIDEBAR_WIDTH_COLLAPSED - 20, rect.height())
+            label_rect = QRect(SIDEBAR_WIDTH_COLLAPSED + 6, 0,
+                               rect.width() - SIDEBAR_WIDTH_COLLAPSED - 16, rect.height())
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._label)
 
         painter.end()
@@ -158,9 +158,8 @@ class NavItem(QWidget):
         if self._hovered and not self._active:
             icon_color = QColor(P.ON_SURFACE)
         painter.setPen(icon_color)
-        icon_font = QFont("Segoe UI Symbol", 18)
+        icon_font = QFont("Segoe UI Symbol", 14)   # was 18
         painter.setFont(icon_font)
-        # Use first char of label as fallback
         fallback_char = self._label[0] if self._label else "?"
         painter.drawText(icon_rect, Qt.AlignmentFlag.AlignCenter, fallback_char)
 
@@ -198,7 +197,7 @@ class NavSidebar(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 8, 0, 8)
+        layout.setContentsMargins(0, 6, 0, 6)   # was 0,8,0,8
         layout.setSpacing(0)
 
         tooltips = {
@@ -219,12 +218,13 @@ class NavSidebar(QWidget):
 
         layout.addStretch(1)
 
-        # Github profile button at bottom (replaced broken toggle)
+        # Github profile button at bottom
         self._toggle_btn = QPushButton()
         icon_path = get_asset_path("assets/icons/Icons/!.png")
         if os.path.exists(icon_path):
             self._toggle_btn.setIcon(QIcon(icon_path))
-        self._toggle_btn.setFixedHeight(40)
+            self._toggle_btn.setIconSize(QSize(16, 16))
+        self._toggle_btn.setFixedHeight(32)   # was 40
         self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._toggle_btn.setToolTip("Open PINKgeekPDX GitHub profile in your browser")
         self._toggle_btn.setStyleSheet(f"""
@@ -233,7 +233,7 @@ class NavSidebar(QWidget):
                 color: {P.TEXT_DIM};
                 border: none;
                 border-top: 1px solid {P.OUTLINE_VARIANT};
-                font-size: 14px;
+                font-size: 11px;
             }}
             QPushButton:hover {{
                 color: {P.PRIMARY};
@@ -248,7 +248,7 @@ class NavSidebar(QWidget):
 
     def _setup_animation(self) -> None:
         self._anim = QPropertyAnimation(self, b"maximumWidth")
-        self._anim.setDuration(200)
+        self._anim.setDuration(180)   # was 200 — slightly snappier
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
     # ------------------------------------------------------------------
@@ -282,10 +282,10 @@ class NavSidebar(QWidget):
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
-        # Dark sidebar background
-        painter.fillRect(self.rect(), QColor(10, 21, 29, 180))
-        # Right border
-        pen = QPen(QColor(0, 170, 255, 25), 1)
+        # Dark sidebar background — slightly more opaque for clear delineation
+        painter.fillRect(self.rect(), QColor(8, 18, 26, 200))
+        # Right border — subtle glow line
+        pen = QPen(QColor(0, 170, 255, 22), 1)
         painter.setPen(pen)
         painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
         painter.end()

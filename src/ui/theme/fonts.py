@@ -98,34 +98,34 @@ def font_mono(size: int, weight: QFont.Weight = QFont.Weight.Normal) -> QFont:
 
 
 # ---------------------------------------------------------------------------
-# Type Scale Presets
+# Type Scale Presets  — tightened for compact density
 # ---------------------------------------------------------------------------
 
 def headline_xl() -> QFont:
-    """headline-xl: Sora 32pt Bold"""
-    return font_sora(32, QFont.Weight.Bold)
+    """headline-xl: Sora 26pt Bold"""
+    return font_sora(26, QFont.Weight.Bold)
 
 
 def headline_lg() -> QFont:
-    """headline-lg: Sora 24pt SemiBold"""
-    return font_sora(24, QFont.Weight.DemiBold)
-
-
-def headline_md() -> QFont:
-    """headline-md: Sora 18pt SemiBold"""
+    """headline-lg: Sora 18pt SemiBold"""
     return font_sora(18, QFont.Weight.DemiBold)
 
 
+def headline_md() -> QFont:
+    """headline-md: Sora 13pt SemiBold"""
+    return font_sora(13, QFont.Weight.DemiBold)
+
+
 def body_md() -> QFont:
-    """body-md: Inter 14pt Regular"""
-    return font_inter(14)
+    """body-md: Inter 12pt Regular"""
+    return font_inter(12)
 
 
 def data_point() -> QFont:
-    """data-point: JetBrains Mono 13pt Medium"""
-    return font_mono(13, QFont.Weight.Medium)
+    """data-point: JetBrains Mono 11pt Medium"""
+    return font_mono(11, QFont.Weight.Medium)
 
 
 def label_caps() -> QFont:
-    """label-caps: JetBrains Mono 11pt Bold"""
-    return font_mono(11, QFont.Weight.Bold)
+    """label-caps: JetBrains Mono 9pt Bold"""
+    return font_mono(9, QFont.Weight.Bold)

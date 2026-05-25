@@ -5,7 +5,7 @@ CustomTitleBar — draggable window chrome for the main window.
 
 import logging
 import os
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QPainter, QColor, QPen, QLinearGradient, QIcon, QPixmap
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 
@@ -17,8 +17,8 @@ log = logging.getLogger(__name__)
 
 # Shared button base style
 _BTN_BASE = (
-    "QPushButton {{ color: {color}; font-size: 16px; border: none; "
-    "background: {bg}; border-radius: 6px; }}"
+    "QPushButton {{ color: {color}; font-size: 14px; border: none; "
+    "background: {bg}; border-radius: 4px; }}"
     "QPushButton:hover {{ background: {hover_bg}; color: {hover_color}; }}"
     "QPushButton:pressed {{ background: {pressed_bg}; }}"
     "QPushButton:disabled {{ opacity: 0.4; }}"
@@ -26,8 +26,8 @@ _BTN_BASE = (
 
 # Clear results button style (yellow hover)
 _CLEAR_BTN_BASE = (
-    "QPushButton {{ color: {color}; font-size: 16px; border: none; "
-    "background: {bg}; border-radius: 6px; }}"
+    "QPushButton {{ color: {color}; font-size: 14px; border: none; "
+    "background: {bg}; border-radius: 4px; }}"
     "QPushButton:hover {{ background: {hover_bg}; color: {hover_color}; }}"
     "QPushButton:pressed {{ background: {pressed_bg}; }}"
     "QPushButton:disabled {{ opacity: 0.4; }}"
@@ -61,41 +61,47 @@ class CustomTitleBar(QWidget):
         self._anim_step = 0
         self._anim_timer = QTimer(self)
         self._anim_timer.timeout.connect(self._update_animation)
-        self._anim_timer.start(100) # every 100ms
+        self._anim_timer.start(120)  # slightly slower pulse
 
         self._build_ui()
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 0, 12, 0)
+        layout.setContentsMargins(12, 0, 8, 0)   # was 16,0,12,0
         layout.setSpacing(0)
 
-        # App Icon - slightly increased size (from 24 to 28)
+        # App Icon — compact 22×22
         icon_lbl = QLabel()
         if os.path.exists(_APP_ICON):
-            pix = QPixmap(_APP_ICON).scaled(28, 28, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pix = QPixmap(_APP_ICON).scaled(22, 22, Qt.AspectRatioMode.KeepAspectRatio,
+                                             Qt.TransformationMode.SmoothTransformation)
             icon_lbl.setPixmap(pix)
         else:
             icon_lbl.setText("🚀")
         layout.addWidget(icon_lbl)
-        layout.addSpacing(12)
+        layout.addSpacing(8)   # was 12
 
-        # Animated Title Label (already has hover animation in _update_animation)
+        # Animated Title Label
         self._title_lbl = QLabel("SCD: Star Citizen Dossier")
         font = label_caps()
-        font.setPointSize(10)
+        font.setPointSize(9)
         font.setBold(True)
         self._title_lbl.setFont(font)
-        self._title_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.15em;")
+        self._title_lbl.setStyleSheet(
+            f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.14em;"
+        )
         self._title_lbl.setMouseTracking(True)
         layout.addWidget(self._title_lbl)
 
         layout.addStretch(1)
 
+        # --- Control buttons: compact 28×28 ---
+        btn_size = 28   # was 32
+
         # Pin button
         self._pin_btn = QPushButton()
         self._pin_btn.setProperty("class", "icon")
-        self._pin_btn.setFixedSize(32, 32)
+        self._pin_btn.setFixedSize(btn_size, btn_size)
         self._pin_btn.setToolTip("Pin window (stay on top)")
         self._pin_btn.setCheckable(True)
         self._pin_btn.clicked.connect(self._on_pin_clicked)
@@ -104,41 +110,41 @@ class CustomTitleBar(QWidget):
         # Hide button
         self._hide_btn = QPushButton()
         self._hide_btn.setProperty("class", "icon")
-        self._hide_btn.setFixedSize(32, 32)
+        self._hide_btn.setFixedSize(btn_size, btn_size)
         self._hide_btn.setToolTip("Minimize to toolbar — hides main window and shows the overlay toolbar")
         self._hide_btn.clicked.connect(self.hide_requested.emit)
         self._update_hide_style()
 
-        # Clear results button (new, on left side of pin button)
+        # Clear results button
         self._clear_btn = QPushButton()
         self._clear_btn.setProperty("class", "icon")
-        self._clear_btn.setFixedSize(32, 32)
+        self._clear_btn.setFixedSize(btn_size, btn_size)
         self._clear_btn.setToolTip("Clear all search results")
         self._clear_btn.clicked.connect(self.clear_results_requested.emit)
         self._update_clear_style()
 
-        # Layout order: Clear, Pin, Hide
+        # Layout order: Clear, Pin, Hide — with tighter spacing
         layout.addWidget(self._clear_btn)
-        layout.addSpacing(4)
+        layout.addSpacing(2)   # was 4
         layout.addWidget(self._pin_btn)
-        layout.addSpacing(4)
+        layout.addSpacing(2)
         layout.addWidget(self._hide_btn)
 
     def _update_animation(self):
-        self._anim_step = (self._anim_step + 5) % 360
-        # Slowly pulse brightness of primary color
+        self._anim_step = (self._anim_step + 4) % 360
         val = 0.5 + 0.5 * __import__("math").sin(self._anim_step * 3.14159 / 180.0)
-        c = QColor(0, int(170 + 85*val), 255)
-        self._title_lbl.setStyleSheet(f"color: {c.name()}; background: transparent; letter-spacing: 0.15em;")
+        c = QColor(0, int(160 + 95 * val), 255)
+        self._title_lbl.setStyleSheet(
+            f"color: {c.name()}; background: transparent; letter-spacing: 0.14em;"
+        )
 
     def _load_button_icon(self, btn: QPushButton, icon_path: str, fallback_text: str) -> None:
-        from PyQt6.QtCore import QSize
         icon = QIcon()
         if os.path.exists(icon_path):
             icon = QIcon(icon_path)
         if not icon.isNull():
             btn.setIcon(icon)
-            btn.setIconSize(QSize(20, 20))
+            btn.setIconSize(QSize(16, 16))   # was 20,20
             btn.setText("")
         else:
             btn.setText(fallback_text)
@@ -172,16 +178,8 @@ class CustomTitleBar(QWidget):
         self._load_button_icon(self._clear_btn, _CLEAR_ICON, "✕")
         self._clear_btn.setStyleSheet(_CLEAR_BTN_BASE.format(
             color=P.TEXT_DIM, bg="transparent",
-            hover_bg="rgba(255,255,0,0.2)", hover_color="#FFFF00",  # Yellowish hover
-            pressed_bg="rgba(255,255,0,0.3)",
-        ))
-
-    def _update_clear_style(self) -> None:
-        self._load_button_icon(self._clear_btn, _CLEAR_ICON, "✕")
-        self._clear_btn.setStyleSheet(_CLEAR_BTN_BASE.format(
-            color=P.TEXT_DIM, bg="transparent",
-            hover_bg="rgba(255,255,0,0.2)", hover_color="#FFFF00",  # Yellowish hover
-            pressed_bg="rgba(255,255,0,0.3)",
+            hover_bg="rgba(255,255,0,0.18)", hover_color="#FFFF00",
+            pressed_bg="rgba(255,255,0,0.28)",
         ))
 
     @property
@@ -213,22 +211,21 @@ class CustomTitleBar(QWidget):
                 self._hide_btn.setToolTip("Minimize to toolbar — hides main window and shows the overlay toolbar")
 
     def set_status(self, text: str, ok: bool = True) -> None:
-        pass # Removed per request
-
-
+        pass  # Removed per request
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Darker background with gradient between darker blue and grey
+        # Darker gradient — more pronounced depth
         grad = QLinearGradient(0, 0, self.width(), 0)
-        grad.setColorAt(0, QColor(4, 18, 30, 240)) # darker blue
-        grad.setColorAt(1, QColor(35, 40, 45, 240)) # grey
+        grad.setColorAt(0, QColor(3, 14, 24, 245))   # deep navy
+        grad.setColorAt(0.6, QColor(8, 20, 30, 240))
+        grad.setColorAt(1, QColor(28, 34, 40, 240))   # dark grey
         painter.fillRect(self.rect(), grad)
 
-        # Bottom border
-        pen = QPen(QColor(0, 170, 255, 38), 1)
+        # Bottom border glow line
+        pen = QPen(QColor(0, 170, 255, 42), 1)
         painter.setPen(pen)
         painter.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
 

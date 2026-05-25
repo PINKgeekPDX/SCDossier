@@ -37,8 +37,8 @@ class StyledFilterInput(QLineEdit):
     def __init__(self, placeholder: str, parent=None):
         super().__init__(parent)
         self.setPlaceholderText(placeholder)
-        self.setFont(font_mono(10))
-        self.setFixedHeight(32)
+        self.setFont(font_mono(9))   # was 10
+        self.setFixedHeight(28)   # was 32
         self._hovered = False
         self._focused = False
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
@@ -106,8 +106,8 @@ class StyledComboBox(QComboBox):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFont(font_mono(10))
-        self.setFixedHeight(28)
+        self.setFont(font_mono(9))   # was 10
+        self.setFixedHeight(24)   # was 28
         self.setToolTip("Select sorting order for archived profiles")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
 
@@ -163,7 +163,7 @@ class StyledArchiveButton(QPushButton):
         super().__init__(parent)
         self._hovered = False
         self._danger = "danger" in tooltip.lower()
-        self.setFixedHeight(36)
+        self.setFixedHeight(30)   # was 36
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setStyleSheet("background: transparent; border: none; padding: 0;")
@@ -212,8 +212,8 @@ class ArchiveItemWidget(QWidget):
 
     def _build_ui(self, data: dict) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(12)
+        layout.setContentsMargins(8, 5, 8, 5)   # was 12,8,12,8
+        layout.setSpacing(8)                      # was 12
 
         self.setStyleSheet(f"""
             ArchiveItemWidget {{
@@ -227,7 +227,7 @@ class ArchiveItemWidget(QWidget):
             }}
         """)
 
-        avatar = AvatarWidget(size=40)
+        avatar = AvatarWidget(size=34)   # was 40
         if data.get("avatar_local"):
             avatar.set_image(data["avatar_local"])
 
@@ -240,11 +240,11 @@ class ArchiveItemWidget(QWidget):
         date_str = data.get("synced_at", data.get("archived_at", "—"))[:10]
 
         name_lbl = QLabel(f"{moniker}")
-        name_lbl.setFont(font_inter(13, QFont.Weight.Bold))
+        name_lbl.setFont(font_inter(11, QFont.Weight.Bold))   # was 13
         name_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
 
         handle_lbl = QLabel(f"@{handle}  •  {date_str}")
-        handle_lbl.setFont(font_mono(10))
+        handle_lbl.setFont(font_mono(9))   # was 10
         handle_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; border: none;")
 
         info_vbox.addWidget(name_lbl)
@@ -279,10 +279,10 @@ class ArchivesTab(QWidget):
 
         # Header bar
         header_bar = QWidget()
-        header_bar.setFixedHeight(56)
+        header_bar.setFixedHeight(44)   # was 56
         header_bar.setStyleSheet(f"background: {P.SURFACE_CONTAINER_LOW}; border-bottom: 1px solid {P.OUTLINE_VARIANT};")
         header_layout = QHBoxLayout(header_bar)
-        header_layout.setContentsMargins(24, 8, 24, 8)
+        header_layout.setContentsMargins(16, 6, 16, 6)   # was 24,8,24,8
 
         header_lbl = QLabel("ARCHIVED PROFILES")
         header_lbl.setFont(label_caps())
@@ -299,12 +299,12 @@ class ArchivesTab(QWidget):
 
         # --- LEFT PANE: List ---
         left_widget = QWidget()
-        left_widget.setMinimumWidth(200)
-        left_widget.setMaximumWidth(320)
+        left_widget.setMinimumWidth(180)   # was 200
+        left_widget.setMaximumWidth(280)   # was 320
         left_widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(12, 12, 12, 12)
-        left_layout.setSpacing(8)
+        left_layout.setContentsMargins(8, 8, 8, 8)   # was 12,12,12,12
+        left_layout.setSpacing(6)                      # was 8
 
         # Filter input - enhanced
         self.filter_input = StyledFilterInput("FILTER ARCHIVES...")
@@ -332,7 +332,7 @@ class ArchivesTab(QWidget):
 
         # Action buttons - enhanced
         btn_layout = QHBoxLayout()
-        btn_layout.setSpacing(8)
+        btn_layout.setSpacing(6)   # was 8
 
         from src.core.paths import get_asset_path
         sync_icon = get_asset_path("assets/icons/Icons/Refresh.png")
@@ -364,8 +364,8 @@ class ArchivesTab(QWidget):
 
         self.detail_widget = QWidget()
         self.detail_layout = QVBoxLayout(self.detail_widget)
-        self.detail_layout.setContentsMargins(24, 24, 24, 24)
-        self.detail_layout.setSpacing(20)
+        self.detail_layout.setContentsMargins(16, 16, 16, 16)   # was 24,24,24,24
+        self.detail_layout.setSpacing(12)                         # was 20
         self.detail_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Empty state
@@ -388,7 +388,7 @@ class ArchivesTab(QWidget):
 
         self.splitter.addWidget(left_widget)
         self.splitter.addWidget(right_scroll)
-        self.splitter.setSizes([260, 800])
+        self.splitter.setSizes([240, 800])   # was 260
 
         main_layout.addWidget(self.splitter)
 
@@ -396,14 +396,14 @@ class ArchivesTab(QWidget):
         """Build the dossier-style detail view."""
         dl = QVBoxLayout(self.detail_content)
         dl.setContentsMargins(0, 0, 0, 0)
-        dl.setSpacing(20)
+        dl.setSpacing(12)   # was 20
 
         # Profile header card
         self.detail_header_card = GlassCard(title="IDENTITY CORE")
         header_layout = QHBoxLayout()
-        header_layout.setSpacing(20)
+        header_layout.setSpacing(14)   # was 20
 
-        self.detail_avatar = AvatarWidget(size=120)
+        self.detail_avatar = AvatarWidget(size=90)   # was 120
         self.detail_moniker = QLabel("—")
         self.detail_moniker.setFont(headline_lg())
         self.detail_moniker.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
@@ -427,7 +427,7 @@ class ArchivesTab(QWidget):
         # Details grid
         self.detail_grid_card = GlassCard(title="PROFILE DATA")
         grid = QGridLayout()
-        grid.setSpacing(12)
+        grid.setSpacing(8)   # was 12
         self.detail_enlisted = DataField("ENLISTED")
         self.detail_location = DataField("LOCATION")
         self.detail_fluency = DataField("FLUENCY")
@@ -444,7 +444,7 @@ class ArchivesTab(QWidget):
         # Bio card
         self.detail_bio_card = GlassCard(title="BIOGRAPHY")
         self.detail_bio = QLabel("—")
-        self.detail_bio.setFont(font_inter(14))
+        self.detail_bio.setFont(font_inter(12))   # was 14
         self.detail_bio.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
         self.detail_bio.setWordWrap(True)
         self.detail_bio_card.content_layout.addWidget(self.detail_bio)
@@ -453,14 +453,14 @@ class ArchivesTab(QWidget):
         # Badges card
         self.detail_badges_card = GlassCard(title="ACCREDITATIONS")
         self.detail_badges_wrap = WrapLayout()
-        self.detail_badges_wrap.setMinimumHeight(40)
+        self.detail_badges_wrap.setMinimumHeight(32)   # was 40
         self.detail_badges_card.content_layout.addWidget(self.detail_badges_wrap)
         dl.addWidget(self.detail_badges_card)
 
         # Orgs card
         self.detail_orgs_card = GlassCard(title="ORGANIZATIONS")
         self.detail_orgs_layout = QVBoxLayout()
-        self.detail_orgs_layout.setSpacing(12)
+        self.detail_orgs_layout.setSpacing(8)   # was 12
         self.detail_orgs_card.content_layout.addLayout(self.detail_orgs_layout)
         dl.addWidget(self.detail_orgs_card)
 
@@ -499,7 +499,7 @@ class ArchivesTab(QWidget):
         for p in profiles:
             item = QListWidgetItem(self.list_widget)
             widget = ArchiveItemWidget(p)
-            item.setSizeHint(QSize(0, 72))
+            item.setSizeHint(QSize(0, 58))   # was 72
             self.list_widget.addItem(item)
             self.list_widget.setItemWidget(item, widget)
 
@@ -569,10 +569,10 @@ class ArchivesTab(QWidget):
         card = GlassCard()
         inner = QWidget()
         layout = QHBoxLayout(inner)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(12)
+        layout.setContentsMargins(8, 5, 8, 5)   # was 12,8,12,8
+        layout.setSpacing(8)                      # was 12
 
-        avatar = AvatarWidget(size=48)
+        avatar = AvatarWidget(size=40)   # was 48
         if org.get("logo_local"):
             avatar.set_image(org["logo_local"])
 
@@ -581,14 +581,14 @@ class ArchivesTab(QWidget):
         info_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         name_lbl = QLabel(org.get("name", ""))
-        name_lbl.setFont(font_inter(14, QFont.Weight.Bold))
+        name_lbl.setFont(font_inter(12, QFont.Weight.Bold))   # was 14
         name_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent; border: none;")
 
         sid_rank = f"{org.get('sid', '')} • {org.get('rank', '')}"
         if org.get("is_main"):
             sid_rank += " (MAIN)"
         sub_lbl = QLabel(sid_rank)
-        sub_lbl.setFont(font_mono(11))
+        sub_lbl.setFont(font_mono(10))   # was 11
         sub_lbl.setStyleSheet(f"color: {P.PRIMARY if org.get('is_main') else P.TEXT_DIM}; background: transparent; border: none;")
 
         info_vbox.addWidget(name_lbl)
