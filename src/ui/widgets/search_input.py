@@ -122,14 +122,8 @@ class SearchInput(QLineEdit):
                 completer.complete()
 
     def _on_settings_changed(self, key: str, value: object) -> None:
-        if key == "search_history_limit":
-            self.update_history_completer()
-        elif self.history_type == "player" and key == "search_history_player":
-            self.update_history_completer()
-        elif self.history_type == "org" and key == "search_history_org":
-            self.update_history_completer()
-        elif self.history_type == "all" and key in ("search_history", "search_history_player", "search_history_org"):
-            self.update_history_completer()
+        if key in ("search_history_limit", "search_history", "search_history_player", "search_history_org"):
+            QTimer.singleShot(0, self.update_history_completer)
 
     def update_history_completer(self) -> None:
         """Update the QCompleter with the latest search history."""

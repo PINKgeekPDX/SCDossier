@@ -47,6 +47,8 @@ Highly specialized RSI website scraping service finds, extracts data thats used 
 *   **Visual:** Avatars, Org logo(s), and badge images.
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/layers.svg" width="22" align="top"> Organization Intel //
 Look up Orgs by name or SID. Instantly view their Archetype, Primary Focus, Commitment Level, and Member Roster.
+### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/alert-triangle.svg" width="22" align="top"> Community Reputation System //
+View and submit community-driven reputation reports. Aggregate reports across specific behaviors (Combat Logging, Stream Sniping, Pad Ramming, Exploiting) to compute an overall danger score powered by a live backend (Supabase).
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/archive.svg" width="22" align="top"> Local Archiving & Export //
 Save profiles locally to your personal offline database. Sync them later to check for updates, or export them into self-contained ZIPs (complete all data, images, a generated HTML player card) to share with your Org mates.
 <br><br>
@@ -65,6 +67,8 @@ The left sidebar contains all your tools.
    - **Organization** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/Icons/SHLD.png" width="18" align="top">): View detailed intelligence on a selected org.
    - **Archive** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/Icons/JOURNAL.png" width="18" align="top">): Browse, export, or delete your saved profiles.
    - **Settings** (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/icon_settings.svg" width="18" align="top">): Configure your auto-updater and app preferences.
+
+**Note:** SC Dossier includes a **Single-Instance Lock** to ensure only one instance of the application runs at any given time, preventing duplicate background OCR processes.
 <br><br>
 ---
 

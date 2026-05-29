@@ -126,6 +126,34 @@ class EventBus(QObject):
     image_download_failed = pyqtSignal(str, str)
 
     # ------------------------------------------------------------------
+    # Reputation System Signals
+    # ------------------------------------------------------------------
+
+    # Reputation data loaded for a player (handle, scores_dict)
+    # scores_dict shape: {category: {"score": int, "report_count": int}}
+    reputation_loaded = pyqtSignal(str, dict)
+
+    # Reputation data load failed (handle, error_message)
+    reputation_load_failed = pyqtSignal(str, str)
+
+    # An interaction report was successfully submitted (handle)
+    reputation_report_submitted = pyqtSignal(str)
+
+    # An interaction report submission failed (handle, error_message)
+    reputation_report_failed = pyqtSignal(str, str)
+
+    # Reputation system connection status changed
+    # Values: "online" | "offline" | "disabled"
+    reputation_system_status = pyqtSignal(str)
+
+    # User requested to submit a report (handle, list_of_tag_ids)
+    # Emitted by ReputationTab after ReportDialog is accepted
+    reputation_report_requested = pyqtSignal(str, list)
+    
+    # Request a standalone reputation fetch without a full player scrape
+    request_reputation_fetch = pyqtSignal(str)
+
+    # ------------------------------------------------------------------
     # Application Signals
     # ------------------------------------------------------------------
     app_exit = pyqtSignal()

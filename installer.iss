@@ -1,5 +1,5 @@
 #define MyAppName "SC Dossier"
-#define MyAppVersion "0.3.0" ; Will be dynamically replaced by build.py
+#define MyAppVersion "0.4.0" ; Will be dynamically replaced by build.py
 #define MyAppPublisher "PINKgeekPDX"
 #define MyAppURL "https://github.com/PINKgeekPDX/SCDossier"
 #define MyAppExeName "SCDossier.exe"

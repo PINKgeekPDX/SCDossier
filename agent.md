@@ -98,10 +98,10 @@ All cross-component communication uses signals defined in `src/core/events.py`. 
 
 ---
 
-## Scraping Rules
+## Data Sources & Scraping Rules
 
-- Use **pure HTML scraping** (`requests` + `BeautifulSoup` + `lxml`) only
-- No external API keys required — scrape RSI pages directly
+- **Scraping**: Use **pure HTML scraping** (`requests` + `BeautifulSoup` + `lxml`) for RSI pages.
+- **Backend API**: The Community Reputation System uses **Supabase** (Edge Functions and Database). Uses `supabase-py` client.
 - Target URLs (never hardcode these — use constants from `src/app/constants.py`):
   - `https://robertsspaceindustries.com/en/citizens/{handle}`
   - `https://robertsspaceindustries.com/en/citizens/{handle}/organizations`
@@ -153,6 +153,7 @@ Locked dependency set (do not add without reason):
 - `Pillow`
 - `easyocr`
 - `pyinstaller`
+- `supabase`
 
 Do not add `pystray` — tray is handled by `QSystemTrayIcon` natively.
 Do not add `pytesseract` unless specifically implementing Tesseract fallback path.

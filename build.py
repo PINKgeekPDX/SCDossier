@@ -25,7 +25,7 @@ def clean_build_dirs():
     for d in ["build", "dist"]:
         if os.path.exists(d):
             print(f"Cleaning {d}/ directory...")
-            shutil.rmtree(d)
+            shutil.rmtree(d, ignore_errors=True)
 
 
 def build_executable():
@@ -57,7 +57,7 @@ def build_executable():
     if assets_dir.exists():
         cmd.append(f"--add-data=src/assets{sep}src/assets")
         
-    # Hidden imports required by dynamic loaders (rapidocr, bs4, lxml)
+    # Hidden imports required by dynamic loaders (rapidocr, bs4, lxml, supabase)
     hidden_imports = [
         "rapidocr_onnxruntime",
         "bs4",
@@ -68,6 +68,15 @@ def build_executable():
         "PyQt6.QtGui",
         "PyQt6.QtCore",
         "PyQt6.QtWidgets",
+        "supabase",
+        "gotrue",
+        "postgrest",
+        "realtime",
+        "storage3",
+        "httpx",
+        "httpcore",
+        "h2",
+        "hpack",
     ]
     
     for imp in hidden_imports:
@@ -77,7 +86,8 @@ def build_executable():
     collect_all_modules = [
         "rapidocr_onnxruntime",
         "onnxruntime",
-        "numpy"
+        "numpy",
+        "supabase"
     ]
     for mod in collect_all_modules:
         cmd.append(f"--collect-all={mod}")

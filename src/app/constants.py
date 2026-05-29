@@ -11,7 +11,7 @@ from enum import Enum, auto
 # Application Metadata
 # ---------------------------------------------------------------------------
 APP_NAME = "SC Dossier"
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 APP_AUTHOR = "PINK"
 APP_VENDOR = "PINK"
 ORG_FOLDER = "PINK"
@@ -108,3 +108,120 @@ DEFAULT_SCRAPER_DELAY_MS = 500
 DEFAULT_SYNC_INTERVAL_HOURS = 24
 DEFAULT_TEMP_CACHE_MAX_AGE_DAYS = 7
 DEFAULT_OCR_CONFIDENCE_THRESHOLD = 0.5
+
+
+# ---------------------------------------------------------------------------
+# Supabase Configuration for Reputation System
+# ---------------------------------------------------------------------------
+# REP_SUPABASE_URL and REP_ANON_KEY must be populated after deploying the  
+# SCDossierRepServer project. These are safe to embed in the client. 
+# Alternatively, users can override them via settings file keys:
+# reputation_supabase_url and reputation_anon_key. REP_APP_TOKEN is sent as 
+# X-SCD-App-Token header on write requests; matches the APP_TOKEN Supabase 
+# Edge Function secret.
+# ---------------------------------------------------------------------------
+REP_SUPABASE_URL = "https://epqkqmnxixybtwkczxfs.supabase.co"
+REP_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwcWtxbW54aXh5YnR3a2N6eGZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MzM4OTMsImV4cCI6MjA5NTUwOTg5M30.PQFw8e3T6O-1ZXdZiJo64TcilYAngDzN_mRxdMHfjDg"
+REP_APP_TOKEN = "6UILwmiuzMeXtpXRnoX2Yg"
+
+
+# ---------------------------------------------------------------------------
+# Reputation System — Rate Limiting
+# ---------------------------------------------------------------------------
+REPUTATION_MAX_TAGS = 5
+REPUTATION_RATE_LIMIT_PER_MONTH = 3
+
+
+# ---------------------------------------------------------------------------
+# Reputation System — Tag Definitions
+# All 15 static tags. Users select up to REPUTATION_MAX_TAGS per report.
+# Shape: tag_id -> {"label": str, "category": str, "points": int}
+# ---------------------------------------------------------------------------
+REPUTATION_TAGS: dict = {
+    # --- Dangerous ---
+    "killed_me":        {"label": "They Killed Me",          "category": "dangerous",   "points": 3},
+    "killed_us":        {"label": "They Killed Us All",       "category": "dangerous",   "points": 5},
+    "ambushed":         {"label": "Set an Ambush / Trap",     "category": "dangerous",   "points": 4},
+    "griefer":          {"label": "Griefed / Harassed Me",    "category": "dangerous",   "points": 4},
+    # --- Shady ---
+    "scammed":          {"label": "Scammed Me",               "category": "shady",       "points": 5},
+    "lied":             {"label": "Lied / Deceived Me",       "category": "shady",       "points": 3},
+    "manipulated":      {"label": "Manipulated / Lured Me",   "category": "shady",       "points": 4},
+    # --- Pirate ---
+    "pirate_act":       {"label": "Acted Like a Pirate",      "category": "pirate",      "points": 4},
+    "pirate_confirmed": {"label": "Confirmed Pirate",          "category": "pirate",      "points": 6},
+    # --- Elusive ---
+    "elusive":          {"label": "Hard to Track / Elusive",  "category": "elusive",     "points": 3},
+    "escaped":          {"label": "Escaped Every Time",        "category": "elusive",     "points": 4},
+    # --- Trustworthy ---
+    "trustworthy":      {"label": "Trustworthy / Reliable",   "category": "trustworthy", "points": 5},
+    "helpful":          {"label": "Helped Me Out",             "category": "trustworthy", "points": 3},
+    "fair_fight":       {"label": "Honorable Fighter",         "category": "trustworthy", "points": 2},
+    "friendly":         {"label": "Friendly Encounter",        "category": "trustworthy", "points": 2},
+}
+
+
+# ---------------------------------------------------------------------------
+# Reputation System — Category Definitions
+# Each category has a display label, hex accent color, and score thresholds.
+# Thresholds: list of (min_pct_inclusive, verdict_label) in ascending order.
+# Score % is computed as: min(100, int(score / (report_count * 6) * 100))
+# Shape: category_id -> {"label": str, "color_hex": str, "thresholds": list}
+# ---------------------------------------------------------------------------
+REPUTATION_CATEGORIES: dict = {
+    "dangerous": {
+        "label": "⚔ DANGEROUS",
+        "color_hex": "#FF3B3B",
+        "thresholds": [
+            (0,  "No Threat Reports"),
+            (21, "Minor Threat"),
+            (41, "Moderately Dangerous"),
+            (61, "Highly Dangerous"),
+            (81, "⚠ EXTREMELY DANGEROUS"),
+        ],
+    },
+    "trustworthy": {
+        "label": "✓ TRUSTWORTHY",
+        "color_hex": "#00AA66",
+        "thresholds": [
+            (0,  "No Trust Data"),
+            (21, "Somewhat Reliable"),
+            (41, "Generally Trustworthy"),
+            (61, "Highly Trusted"),
+            (81, "✓ COMMUNITY TRUSTED"),
+        ],
+    },
+    "pirate": {
+        "label": "☠ PIRACY",
+        "color_hex": "#FF8800",
+        "thresholds": [
+            (0,  "No Piracy Reports"),
+            (21, "Possibly a Pirate?"),
+            (41, "Suspected Pirate — Be Careful"),
+            (61, "Known Pirate — High Risk"),
+            (81, "☠ NOTORIOUS PIRATE"),
+        ],
+    },
+    "shady": {
+        "label": "🎭 SHADY",
+        "color_hex": "#CC44FF",
+        "thresholds": [
+            (0,  "No Shady Reports"),
+            (21, "Slightly Suspicious"),
+            (41, "Shady as a Snake"),
+            (61, "Highly Untrustworthy"),
+            (81, "🚨 KNOWN SCAMMER / GRIEFER"),
+        ],
+    },
+    "elusive": {
+        "label": "👻 ELUSIVE",
+        "color_hex": "#4488FF",
+        "thresholds": [
+            (0,  "Easy to Find"),
+            (21, "Somewhat Elusive"),
+            (41, "Hard to Pin Down"),
+            (61, "Ghost — Very Elusive"),
+            (81, "👻 PHANTOM — IMPOSSIBLE TO CATCH"),
+        ],
+    },
+}

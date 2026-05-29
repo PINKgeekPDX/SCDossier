@@ -80,6 +80,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "search_history": [],
     "search_history_player": [],
     "search_history_org": [],
+    # Reputation System
+    "reputation_enabled": False,
+    "reputation_auto_check": True,
+    "reputation_prefetch_archived": False,
+    "reputation_supabase_url": "",  # power-user override; uses constants default when empty
+    "reputation_anon_key": "",      # power-user override; uses constants default when empty
     "_version": APP_VERSION,
 }
 
@@ -534,6 +540,34 @@ class SettingsManager(QObject):
     @search_history_org.setter
     def search_history_org(self, value: list) -> None:
         self.set("search_history_org", value)
+
+    # ------------------------------------------------------------------
+    # Reputation System
+    # ------------------------------------------------------------------
+
+    @property
+    def reputation_enabled(self) -> bool:
+        return bool(self.get("reputation_enabled", False))
+
+    @reputation_enabled.setter
+    def reputation_enabled(self, v: bool) -> None:
+        self.set("reputation_enabled", v)
+
+    @property
+    def reputation_auto_check(self) -> bool:
+        return bool(self.get("reputation_auto_check", True))
+
+    @reputation_auto_check.setter
+    def reputation_auto_check(self, v: bool) -> None:
+        self.set("reputation_auto_check", v)
+
+    @property
+    def reputation_prefetch_archived(self) -> bool:
+        return bool(self.get("reputation_prefetch_archived", False))
+
+    @reputation_prefetch_archived.setter
+    def reputation_prefetch_archived(self, v: bool) -> None:
+        self.set("reputation_prefetch_archived", v)
 
     def force_save(self) -> None:
         """Force an immediate save regardless of dirty state."""

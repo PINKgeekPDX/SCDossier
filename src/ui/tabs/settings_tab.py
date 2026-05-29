@@ -5,6 +5,7 @@ All changes auto-save via SettingsManager debouncer.
 """
 
 from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QSpinBox,
     QFormLayout, QCheckBox, QPushButton, QComboBox, QLineEdit, QScrollArea, QFrame,
@@ -13,6 +14,7 @@ from PyQt6.QtWidgets import (
 
 from src.core.settings import SettingsManager
 from src.core.paths import PathManager
+from src.core.events import EventBus
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
 from src.ui.widgets.tech_label import TechLabel
@@ -432,6 +434,9 @@ class SettingsTab(QWidget):
         # === SECTION: DIAGNOSTICS & LOGS ===
         layout.addWidget(self._build_diagnostics_card())
 
+        # === SECTION: COMMUNITY REPUTATION ===
+        layout.addWidget(self._build_reputation_card())
+
         layout.addStretch()
         scroll.setWidget(content)
         main_layout.addWidget(scroll)
@@ -694,6 +699,75 @@ class SettingsTab(QWidget):
         card.content_layout.addLayout(layout)
         return card
 
+    def _build_reputation_card(self) -> "GlassCard":
+        """Build the Community Reputation System GlassCard."""
+        card = GlassCard(title="COMMUNITY REPUTATION")
+        layout = QVBoxLayout()
+        layout.setSpacing(6)
+        layout.setContentsMargins(0, 4, 0, 4)
+
+        # Description
+        desc_lbl = QLabel(
+            "Community-sourced reputation scores for players. Anonymous, privacy-preserving. "
+            "No account required. Requires an active internet connection."
+        )
+        desc_lbl.setFont(font_inter(10))
+        desc_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; border: none;")
+        desc_lbl.setWordWrap(True)
+        layout.addWidget(desc_lbl)
+
+        # Enable toggle
+        self.rep_enabled_cb = QCheckBox("Enable Community Reputation System")
+        self.rep_enabled_cb.setStyleSheet(self._checkbox_style())
+        self.rep_enabled_cb.setToolTip(
+            "Enable to fetch and submit community reputation scores for players"
+        )
+        layout.addWidget(self.rep_enabled_cb)
+
+        # Auto-check toggle
+        self.rep_auto_check_cb = QCheckBox("Auto-check reputation when searching a player")
+        self.rep_auto_check_cb.setStyleSheet(self._checkbox_style())
+        self.rep_auto_check_cb.setToolTip(
+            "Automatically fetch reputation data after each player search completes"
+        )
+        layout.addWidget(self.rep_auto_check_cb)
+
+        # Pre-fetch archived toggle
+        self.rep_prefetch_cb = QCheckBox("Pre-fetch reputation for archived players at startup")
+        self.rep_prefetch_cb.setStyleSheet(self._checkbox_style())
+        self.rep_prefetch_cb.setToolTip(
+            "Fetch reputation scores for all archived players when the app starts"
+        )
+        layout.addWidget(self.rep_prefetch_cb)
+
+        # Connection status row
+        status_row = QHBoxLayout()
+        status_row.setSpacing(8)
+        status_lbl_key = TechLabel("CONNECTION STATUS")
+        status_lbl_key.setFixedWidth(140)
+        self.rep_status_lbl = QLabel("CHECKING..." if self.sm.reputation_enabled else "DISABLED")
+        self.rep_status_lbl.setFont(font_inter(11, QFont.Weight.Bold))
+        self.rep_status_lbl.setStyleSheet(
+            f"color: {P.TEXT_DIM}; background: transparent; border: none;"
+        )
+        status_row.addWidget(status_lbl_key)
+        status_row.addWidget(self.rep_status_lbl)
+        status_row.addStretch()
+        layout.addLayout(status_row)
+
+        # Privacy note
+        privacy_lbl = QLabel(
+            "Privacy: Your public IP is SHA-256 hashed locally before being sent. "
+            "Raw IPs are never transmitted or stored."
+        )
+        privacy_lbl.setFont(font_inter(9))
+        privacy_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; border: none;")
+        privacy_lbl.setWordWrap(True)
+        layout.addWidget(privacy_lbl)
+
+        card.content_layout.addLayout(layout)
+        return card
+
     def _init_updater(self) -> None:
         """Initialize the updater service and connect signals."""
         self._updater = UpdaterService()
@@ -872,6 +946,11 @@ class SettingsTab(QWidget):
         history_limit = getattr(self.sm, 'search_history_limit', 5)
         self.history_limit_spin.setValue(history_limit)
 
+        # Reputation System
+        self.rep_enabled_cb.setChecked(self.sm.reputation_enabled)
+        self.rep_auto_check_cb.setChecked(self.sm.reputation_auto_check)
+        self.rep_prefetch_cb.setChecked(self.sm.reputation_prefetch_archived)
+
     def _connect_signals(self) -> None:
         # General
         self.minimize_tray_cb.toggled.connect(lambda v: setattr(self.sm, 'minimize_to_tray_on_close', v))
@@ -925,6 +1004,14 @@ class SettingsTab(QWidget):
         # Search history limit
         self.history_limit_spin.valueChanged.connect(lambda v: setattr(self.sm, 'search_history_limit', v))
 
+        # Reputation System
+        self.rep_enabled_cb.toggled.connect(self._on_rep_enabled_toggled)
+        self.rep_auto_check_cb.toggled.connect(lambda v: setattr(self.sm, 'reputation_auto_check', v))
+        self.rep_prefetch_cb.toggled.connect(lambda v: setattr(self.sm, 'reputation_prefetch_archived', v))
+
+        # Reputation status signal
+        EventBus.instance().reputation_system_status.connect(self._on_reputation_status)
+
     def _on_ocr_changed(self, value: int) -> None:
         self.ocr_val_lbl.setText(f"{value}%")
         self.sm.ocr_confidence_threshold = value / 100.0
@@ -936,3 +1023,48 @@ class SettingsTab(QWidget):
     def _on_font_scaling_changed(self, value: int) -> None:
         self.font_scaling_lbl.setText(f"{value}%")
         self.sm.font_size_scaling = value
+
+    def _on_rep_enabled_toggled(self, enabled: bool) -> None:
+        """Handle the reputation enable toggle — update settings and status label."""
+        self.sm.reputation_enabled = enabled
+        if not enabled:
+            self._update_rep_status_lbl("DISABLED", P.TEXT_DIM)
+        else:
+            self._update_rep_status_lbl("CHECKING...", P.TEXT_DIM)
+            
+            # Dynamically initialize if it hasn't been booted yet
+            from src.services.reputation_service import ReputationService
+            if not ReputationService.is_initialized():
+                from src.app.constants import REP_SUPABASE_URL, REP_ANON_KEY
+                url = self.sm.get("reputation_supabase_url") or REP_SUPABASE_URL
+                key = self.sm.get("reputation_anon_key") or REP_ANON_KEY
+                if url and key:
+                    try:
+                        ReputationService.initialize(url, key)
+                    except Exception:
+                        pass
+            
+            # If initialized, run the ping to check connection
+            if ReputationService.is_initialized():
+                from src.services.reputation_worker import ReputationStartupWorker
+                self._rep_startup = ReputationStartupWorker()
+                self._rep_startup.start()
+            else:
+                self._update_rep_status_lbl("✕ OFFLINE", "#FF3B3B")
+                EventBus.instance().reputation_system_status.emit("offline")
+
+    @pyqtSlot(str)
+    def _on_reputation_status(self, status: str) -> None:
+        """Update the connection status label when the reputation system reports its state."""
+        if status == "online":
+            self._update_rep_status_lbl("● ONLINE", "#00AA66")
+        elif status == "offline":
+            self._update_rep_status_lbl("✕ OFFLINE", "#FF3B3B")
+        elif status == "disabled":
+            self._update_rep_status_lbl("DISABLED", P.TEXT_DIM)
+
+    def _update_rep_status_lbl(self, text: str, color: str) -> None:
+        self.rep_status_lbl.setText(text)
+        self.rep_status_lbl.setStyleSheet(
+            f"color: {color}; background: transparent; border: none;"
+        )

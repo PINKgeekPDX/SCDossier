@@ -1,0 +1,286 @@
+"""
+src/services/reputation_service.py
+ReputationService — plain Python singleton wrapping the supabase-py client.
+
+Follows the CacheManager singleton pattern (no QObject inheritance).
+All network I/O happens inside QThread workers that call these methods.
+This class is never called from the main thread directly.
+
+Usage:
+    # Initialization (main.py, once, after QApplication is created)
+    ReputationService.initialize(url, anon_key)
+
+    # Usage from workers
+    svc = ReputationService.instance()
+    data = svc.fetch_reputation("PINKgeekPDX")
+"""
+
+import hashlib
+import logging
+from typing import Any
+
+try:
+    from supabase import create_client, Client as SupabaseClient
+    _SUPABASE_AVAILABLE = True
+except ImportError:
+    create_client = None  # type: ignore[assignment]
+    SupabaseClient = None  # type: ignore[assignment]
+    _SUPABASE_AVAILABLE = False
+
+log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Typed error for reputation service failures
+# ---------------------------------------------------------------------------
+
+class ReputationServiceError(Exception):
+    """Raised when a ReputationService operation fails unrecoverably."""
+
+
+# ---------------------------------------------------------------------------
+# ReputationService — module-level singleton, plain Python class
+# ---------------------------------------------------------------------------
+
+class ReputationService:
+    """
+    Singleton that owns the supabase-py client and exposes synchronous
+    methods called from QThread workers.
+
+    Not a QObject — signals flow through the worker, not the service.
+    """
+
+    _instance: "ReputationService | None" = None
+    _initialized: bool = False
+
+    def __init__(self, url: str, anon_key: str) -> None:
+        if not _SUPABASE_AVAILABLE or create_client is None:
+            raise ReputationServiceError(
+                "supabase-py is not installed. Run: pip install supabase>=2.4.0"
+            )
+        self._client = create_client(url, anon_key)
+        self._known_handles: set[str] = set()
+        log.info("ReputationService initialized with Supabase URL: %s", url[:40])
+
+    # ------------------------------------------------------------------
+    # Singleton lifecycle
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def initialize(cls, url: str, anon_key: str) -> "ReputationService":
+        """
+        Create and return the singleton ReputationService.
+        Raises ReputationServiceError if url or anon_key are empty.
+        """
+        if not url or not anon_key:
+            raise ReputationServiceError(
+                "Cannot initialize ReputationService: url and anon_key must not be empty"
+            )
+        if cls._instance is None:
+            cls._instance = cls(url, anon_key)
+            cls._initialized = True
+        return cls._instance
+
+    @classmethod
+    def instance(cls) -> "ReputationService":
+        """Return the singleton. Raises RuntimeError if not initialized."""
+        if cls._instance is None:
+            raise RuntimeError(
+                "ReputationService not initialized. Call ReputationService.initialize() first."
+            )
+        return cls._instance
+
+    @classmethod
+    def is_initialized(cls) -> bool:
+        """Return True if the singleton has been created."""
+        return cls._initialized and cls._instance is not None
+
+    # ------------------------------------------------------------------
+    # Public API (called from QThread workers)
+    # ------------------------------------------------------------------
+
+    def fetch_reputation(self, handle: str) -> dict | None:
+        """
+        Fetch all reputation_scores rows for a player.
+
+        Returns a dict of the shape:
+            {
+                "dangerous":   {"score": int, "report_count": int},
+                "trustworthy": {"score": int, "report_count": int},
+                "pirate":      {"score": int, "report_count": int},
+                "shady":       {"score": int, "report_count": int},
+                "elusive":     {"score": int, "report_count": int},
+            }
+        Returns None if the player has no reputation data in the DB.
+        Returns None on any network/DB error (does not raise).
+        """
+        try:
+            handle_lower = handle.strip().lower()
+
+            # Look up the player row first
+            player_resp = (
+                self._client
+                .from_("players")
+                .select("id")
+                .eq("handle", handle_lower)
+                .maybe_single()
+                .execute()
+            )
+
+            if not player_resp.data:
+                log.debug("No reputation data for handle: %s", handle)
+                return None
+
+            player_id = player_resp.data["id"]
+
+            # Fetch all category scores
+            scores_resp = (
+                self._client
+                .from_("reputation_scores")
+                .select("category, score, report_count")
+                .eq("player_id", player_id)
+                .execute()
+            )
+
+            rows = scores_resp.data or []
+            if not rows:
+                return None
+
+            # Build the result dict
+            result: dict[str, Any] = {}
+            for row in rows:
+                cat = row.get("category")
+                if cat:
+                    result[cat] = {
+                        "score": int(row.get("score", 0)),
+                        "report_count": int(row.get("report_count", 0)),
+                    }
+
+            return result if result else None
+
+        except Exception as e:
+            log.warning("fetch_reputation(%s) failed: %s", handle, e)
+            return None
+
+    def submit_report(self, handle: str, tags: list[str], ip_hash: str) -> dict:
+        """
+        Submit an interaction report via the submit-report Edge Function.
+
+        Returns the updated 5-category score dict on success.
+        Raises ReputationServiceError on failure.
+        """
+        from src.app.constants import REP_APP_TOKEN
+        import json
+
+        try:
+            response = self._client.functions.invoke(
+                "submit-report",
+                invoke_options={
+                    "headers": {"X-SCD-App-Token": REP_APP_TOKEN},
+                    "body": {
+                        "handle": handle.strip().lower(),
+                        "tags": tags,
+                        "ip_hash": ip_hash,
+                    },
+                },
+            )
+            
+            if isinstance(response, bytes):
+                try:
+                    response = json.loads(response.decode("utf-8"))
+                except json.JSONDecodeError:
+                    raise ReputationServiceError("Failed to parse JSON from edge function")
+
+            if isinstance(response, dict) and "error" in response:
+                raise ReputationServiceError(str(response["error"]))
+            if not response:
+                raise ReputationServiceError("Empty response from submit-report function")
+            return response
+
+        except ReputationServiceError:
+            raise
+        except Exception as e:
+            log.error("submit_report(%s) failed: %s", handle, e)
+            raise ReputationServiceError(str(e)) from e
+
+    def fetch_known_handles(self) -> list[str]:
+        """
+        Fetch all player handles that have reputation data.
+        Used for startup pre-fetch / autocomplete.
+        Returns empty list on failure.
+        """
+        try:
+            resp = (
+                self._client
+                .from_("players")
+                .select("handle")
+                .execute()
+            )
+            handles = [row["handle"] for row in (resp.data or []) if row.get("handle")]
+            self._known_handles = set(handles)
+            log.debug("Fetched %d known reputation handles", len(handles))
+            return handles
+
+        except Exception as e:
+            log.warning("fetch_known_handles() failed: %s", e)
+            return []
+
+    def ping(self) -> bool:
+        """
+        Ping the keep-alive Edge Function. Returns True on success.
+        Used at startup to wake the Supabase free-tier project.
+        """
+        import json
+        try:
+            response = self._client.functions.invoke("keep-alive")
+            if isinstance(response, bytes):
+                try:
+                    response = json.loads(response.decode("utf-8"))
+                except json.JSONDecodeError:
+                    pass
+            # The keep-alive function returns {"status": "alive"} on success
+            return isinstance(response, dict) and response.get("status") == "alive"
+        except Exception as e:
+            log.warning("ReputationService.ping() failed: %s", e)
+            return False
+
+    @staticmethod
+    def _get_ip_hash() -> str | None:
+        """
+        Fetch the client's public IP from api.ipify.org and return its
+        SHA-256 hash as a hex string. The raw IP is never stored or logged.
+
+        Returns None on failure (no internet, service unavailable, etc.).
+        """
+        try:
+            import urllib.request
+            import json as _json
+
+            with urllib.request.urlopen(
+                "https://api.ipify.org?format=json", timeout=5
+            ) as resp:
+                data = _json.loads(resp.read().decode())
+                raw_ip = data.get("ip", "")
+
+            if not raw_ip:
+                log.warning("_get_ip_hash: api.ipify.org returned empty IP")
+                return None
+
+            # Immediately hash — raw IP is discarded
+            ip_hash = hashlib.sha256(raw_ip.encode()).hexdigest()
+            return ip_hash
+
+        except Exception as e:
+            log.warning("_get_ip_hash() failed: %s", e)
+            return None
+
+    @staticmethod
+    def _normalize_score(score: int, report_count: int) -> int:
+        """
+        Normalize score on a 0-100 scale using an absolute accumulation formula.
+        1 max-score report (6 points) = 1% reputation progression.
+        Requires 100 max-score reports (600 points) to reach 100%.
+        """
+        if score <= 0:
+            return 0
+        pct = int(score / 6)
+        return min(100, max(0, pct))

@@ -8,8 +8,8 @@ Application Entry Point.
 import os
 import sys
 import logging
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QRect
+from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtCore import QRect, QSharedMemory
 
 from src.core.logger import setup_logging
 from src.core.events import EventBus
@@ -46,12 +46,49 @@ def main():
     if os.path.exists(appicon_path):
         app.setWindowIcon(QIcon(appicon_path))
 
+    # 1.5 Single Instance Lock
+    app._single_instance_lock = QSharedMemory("SCDossierSingleInstanceLock")
+    if app._single_instance_lock.attach():
+        log.warning("SC Dossier is already running. Exiting this instance.")
+        QMessageBox.information(None, "SC Dossier", "SC Dossier is already running in the background.\n\nCheck your system tray or click the overlay to open it.")
+        sys.exit(0)
+        
+    if not app._single_instance_lock.create(1):
+        log.error(f"Failed to create single instance lock: {app._single_instance_lock.errorString()}")
+        sys.exit(1)
+
     # 2. Load Aegis Design System
     register_fonts()
     app.setStyleSheet(build_stylesheet())
 
     # Ensure Settings are loaded
     sm = SettingsManager.initialize(pm.settings_file)
+
+    # Initialize Reputation System (only if user has opted in)
+    _rep_startup = None
+    if sm.reputation_enabled:
+        try:
+            from src.app.constants import REP_SUPABASE_URL, REP_ANON_KEY
+            from src.services.reputation_service import ReputationService
+            from src.services.reputation_worker import ReputationStartupWorker
+
+            url = sm.get("reputation_supabase_url") or REP_SUPABASE_URL
+            key = sm.get("reputation_anon_key") or REP_ANON_KEY
+
+            if url and key:
+                ReputationService.initialize(url, key)
+                _rep_startup = ReputationStartupWorker()
+                _rep_startup.start()
+                log.info("ReputationService initialized; startup worker launched.")
+            else:
+                log.warning(
+                    "Reputation is enabled but REP_SUPABASE_URL/REP_ANON_KEY are not set. "
+                    "Reputation system will be unavailable."
+                )
+                EventBus.instance().reputation_system_status.emit("offline")
+        except Exception as e:
+            log.error("Failed to initialize ReputationService: %s", e)
+            EventBus.instance().reputation_system_status.emit("offline")
 
     # 3. Instantiate Architecture
     controller = AppController()

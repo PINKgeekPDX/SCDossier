@@ -62,6 +62,8 @@ class AppController(QObject):
         bus.request_export_archive.connect(self._on_request_export_archive)
         
         bus.request_org_scrape.connect(self._on_request_org_scrape)
+        bus.reputation_report_requested.connect(self._on_reputation_report_requested)
+        bus.request_reputation_fetch.connect(self._start_reputation_fetch)
         bus.app_exit.connect(self.cleanup)
 
     # -------------------------------------------------------------------------
@@ -144,6 +146,9 @@ class AppController(QObject):
         if self._active_scraper and self._active_scraper.isRunning():
             log.warning("Scraper already running, ignoring request for %s", handle)
             return
+
+        # Add to search history globally
+        self._add_to_global_history(handle, "player")
 
         from src.core.settings import SettingsManager
         sm = SettingsManager.instance()
@@ -271,6 +276,9 @@ class AppController(QObject):
             log.warning("Scraper already running, ignoring request for org %s", sid)
             return
 
+        # Add to search history globally
+        self._add_to_global_history(sid, "org")
+
         from src.core.settings import SettingsManager
         sm = SettingsManager.instance()
         
@@ -314,6 +322,51 @@ class AppController(QObject):
             data["banner_local"] = str(dest)
             self.img_dl.download(url, dest)
 
+    # -------------------------------------------------------------------------
+    # Reputation Flow
+    # -------------------------------------------------------------------------
+
+    @pyqtSlot(str)
+    def _start_reputation_fetch(self, handle: str) -> None:
+        """Fetch reputation scores from Supabase."""
+        if getattr(self, '_active_rep_fetcher', None) and self._active_rep_fetcher.isRunning():
+            log.warning("Rep fetch already running, ignoring.")
+            return
+
+        from src.services.reputation_worker import ReputationFetchWorker
+        self._active_rep_fetcher = ReputationFetchWorker(handle)
+        
+        def _on_success(data):
+            EventBus.instance().reputation_loaded.emit(handle, data)
+            
+        def _on_error(err):
+            EventBus.instance().reputation_load_failed.emit(handle, err)
+            
+        self._active_rep_fetcher.finished_success.connect(_on_success)
+        self._active_rep_fetcher.finished_error.connect(_on_error)
+        self._active_rep_fetcher.start()
+
+    @pyqtSlot(str, list)
+    def _on_reputation_report_requested(self, handle: str, tags: list[str]) -> None:
+        """Submit a reputation report to Supabase."""
+        if getattr(self, '_active_rep_submitter', None) and self._active_rep_submitter.isRunning():
+            log.warning("Rep submit already running, ignoring.")
+            return
+
+        from src.services.reputation_worker import ReputationSubmitWorker
+        self._active_rep_submitter = ReputationSubmitWorker(handle, tags)
+        
+        def _on_success(data):
+            EventBus.instance().reputation_report_submitted.emit(handle)
+            self._start_reputation_fetch(handle)
+            
+        def _on_error(err):
+            EventBus.instance().reputation_report_failed.emit(handle, err)
+            
+        self._active_rep_submitter.finished_success.connect(_on_success)
+        self._active_rep_submitter.finished_error.connect(_on_error)
+        self._active_rep_submitter.start()
+
     @pyqtSlot()
     def cleanup(self) -> None:
         """Stop and wait for all running background threads on application shutdown."""
@@ -343,3 +396,44 @@ class AppController(QObject):
             if self.ocr_svc._worker and self.ocr_svc._worker.isRunning():
                 self.ocr_svc._worker.quit()
                 self.ocr_svc._worker.wait(1000)
+
+        # 5. Stop reputation workers
+        if getattr(self, '_active_rep_fetcher', None) and self._active_rep_fetcher.isRunning():
+            self._active_rep_fetcher.quit()
+            self._active_rep_fetcher.wait(1000)
+        if getattr(self, '_active_rep_submitter', None) and self._active_rep_submitter.isRunning():
+            self._active_rep_submitter.quit()
+            self._active_rep_submitter.wait(1000)
+
+    def _add_to_global_history(self, query: str, mode: str) -> None:
+        """Add a search query to the global history."""
+        from src.core.settings import SettingsManager
+        settings = SettingsManager.instance()
+        limit = settings.search_history_limit
+        
+        # 1. Update the master combined history
+        master = settings.search_history
+        if query in master:
+            master.remove(query)
+        master.append(query)
+        if limit >= 0 and len(master) > limit:
+            master = master[-limit:]
+        settings.search_history = master
+
+        # 2. Update the specific history based on active mode
+        if mode == "player":
+            player_hist = settings.search_history_player
+            if query in player_hist:
+                player_hist.remove(query)
+            player_hist.append(query)
+            if limit >= 0 and len(player_hist) > limit:
+                player_hist = player_hist[-limit:]
+            settings.search_history_player = player_hist
+        else:
+            org_hist = settings.search_history_org
+            if query in org_hist:
+                org_hist.remove(query)
+            org_hist.append(query)
+            if limit >= 0 and len(org_hist) > limit:
+                org_hist = org_hist[-limit:]
+            settings.search_history_org = org_hist

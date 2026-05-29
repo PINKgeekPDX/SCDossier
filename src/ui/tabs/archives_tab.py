@@ -10,7 +10,8 @@ from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QIcon
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QFileDialog, QSplitter,
-    QScrollArea, QFrame, QGridLayout, QComboBox, QLineEdit, QGraphicsDropShadowEffect
+    QScrollArea, QFrame, QGridLayout, QComboBox, QLineEdit, QGraphicsDropShadowEffect,
+    QStackedWidget
 )
 
 from src.core.events import EventBus
@@ -25,6 +26,8 @@ from src.ui.widgets.wrap_layout import WrapLayout
 from src.ui.widgets.tech_label import TechLabel
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.confirm_dialog import show_confirm
+from src.ui.tabs.dossier_tab import DossierSubTabBar
+from src.ui.tabs.reputation_tab import ReputationTab
 
 import os
 
@@ -356,16 +359,33 @@ class ArchivesTab(QWidget):
         btn_layout.addWidget(self.delete_btn)
         left_layout.addLayout(btn_layout)
 
-        # --- RIGHT PANE: Detail ---
-        right_scroll = QScrollArea()
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        right_scroll.setStyleSheet("background: transparent;")
+        # --- RIGHT PANE: Detail Container ---
+        self.right_container = QWidget()
+        self.right_container.setStyleSheet("background: transparent;")
+        right_layout = QVBoxLayout(self.right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
+
+        # Sub-tab bar for the right pane
+        self.sub_tab_bar = DossierSubTabBar()
+        self.sub_tab_bar.tab_changed.connect(self._on_sub_tab_changed)
+        self.sub_tab_bar.setVisible(False)  # Hidden until a profile is selected
+        right_layout.addWidget(self.sub_tab_bar)
+
+        # Stacked widget for switching between Archive Dossier and Reputation
+        self.stack = QStackedWidget()
+        right_layout.addWidget(self.stack)
+
+        # Page 0: Dossier Detail (Scrollable)
+        self.detail_scroll = QScrollArea()
+        self.detail_scroll.setWidgetResizable(True)
+        self.detail_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.detail_scroll.setStyleSheet("background: transparent;")
 
         self.detail_widget = QWidget()
         self.detail_layout = QVBoxLayout(self.detail_widget)
-        self.detail_layout.setContentsMargins(16, 16, 16, 16)   # was 24,24,24,24
-        self.detail_layout.setSpacing(12)                         # was 20
+        self.detail_layout.setContentsMargins(16, 16, 16, 16)
+        self.detail_layout.setSpacing(12)
         self.detail_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Empty state
@@ -384,11 +404,16 @@ class ArchivesTab(QWidget):
 
         self.detail_layout.addWidget(self.detail_content)
 
-        right_scroll.setWidget(self.detail_widget)
+        self.detail_scroll.setWidget(self.detail_widget)
+        self.stack.addWidget(self.detail_scroll)  # index 0
+
+        # Page 1: ReputationTab
+        self.reputation_tab = ReputationTab()
+        self.stack.addWidget(self.reputation_tab)  # index 1
 
         self.splitter.addWidget(left_widget)
-        self.splitter.addWidget(right_scroll)
-        self.splitter.setSizes([240, 800])   # was 260
+        self.splitter.addWidget(self.right_container)
+        self.splitter.setSizes([240, 800])
 
         main_layout.addWidget(self.splitter)
 
@@ -522,6 +547,14 @@ class ArchivesTab(QWidget):
 
         self.empty_state.setVisible(False)
         self.detail_content.setVisible(True)
+        self.sub_tab_bar.setVisible(True)
+
+        # Reset to dossier sub-tab when loading a new profile
+        self.sub_tab_bar.set_active("dossier")
+        self.stack.setCurrentIndex(0)
+
+        self.reputation_tab.load_player(handle)
+        EventBus.instance().request_reputation_fetch.emit(handle)
 
         self.detail_moniker.setText(data.get("moniker", "—"))
         self.detail_handle.setText(f"@{data.get('handle', '—')}")
@@ -634,7 +667,12 @@ class ArchivesTab(QWidget):
         self.list_widget.clearSelection()
         # Hide detail content, show empty state
         self.detail_content.setVisible(False)
+        self.sub_tab_bar.setVisible(False)
         self.empty_state.setVisible(True)
+        # Reset stack to page 0
+        self.sub_tab_bar.set_active("dossier")
+        self.stack.setCurrentIndex(0)
+        self.reputation_tab.clear()
         # Clear search/filter inputs
         self.filter_input.clear()
 
@@ -644,3 +682,11 @@ class ArchivesTab(QWidget):
         self.refresh_list()
         if data.get("handle") == self._selected_handle:
             self._load_detail(self._selected_handle)
+
+    @pyqtSlot(str)
+    def _on_sub_tab_changed(self, tab_id: str) -> None:
+        """Switch the stacked widget page in response to sub-tab clicks."""
+        if tab_id == "dossier":
+            self.stack.setCurrentIndex(0)
+        elif tab_id == "reputation":
+            self.stack.setCurrentIndex(1)
