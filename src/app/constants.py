@@ -120,9 +120,9 @@ DEFAULT_OCR_CONFIDENCE_THRESHOLD = 0.5
 # X-SCD-App-Token header on write requests; matches the APP_TOKEN Supabase 
 # Edge Function secret.
 # ---------------------------------------------------------------------------
-REP_SUPABASE_URL = "https://epqkqmnxixybtwkczxfs.supabase.co"
-REP_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwcWtxbW54aXh5YnR3a2N6eGZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MzM4OTMsImV4cCI6MjA5NTUwOTg5M30.PQFw8e3T6O-1ZXdZiJo64TcilYAngDzN_mRxdMHfjDg"
-REP_APP_TOKEN = "6UILwmiuzMeXtpXRnoX2Yg"
+REP_SUPABASE_URL = ""
+REP_ANON_KEY = ""
+REP_APP_TOKEN = ""
 
 
 # ---------------------------------------------------------------------------
