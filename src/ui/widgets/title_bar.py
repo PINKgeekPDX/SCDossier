@@ -82,7 +82,7 @@ class CustomTitleBar(QWidget):
         layout.addSpacing(8)   # was 12
 
         # Animated Title Label
-        self._title_lbl = QLabel("SCD: Star Citizen Dossier")
+        self._title_lbl = QLabel("Star Citizen Dossier")
         font = label_caps()
         font.setPointSize(9)
         font.setBold(True)
@@ -95,8 +95,8 @@ class CustomTitleBar(QWidget):
 
         layout.addStretch(1)
 
-        # --- Control buttons: compact 28×28 ---
-        btn_size = 28   # was 32
+        # --- Control buttons: compact 32×32 ---
+        btn_size = 32   # was 28
 
         # Pin button
         self._pin_btn = QPushButton()
@@ -144,7 +144,7 @@ class CustomTitleBar(QWidget):
             icon = QIcon(icon_path)
         if not icon.isNull():
             btn.setIcon(icon)
-            btn.setIconSize(QSize(16, 16))   # was 20,20
+            btn.setIconSize(QSize(20, 20))   # was 16,16
             btn.setText("")
         else:
             btn.setText(fallback_text)

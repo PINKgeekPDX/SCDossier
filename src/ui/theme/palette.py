@@ -1,6 +1,6 @@
 """
 src/ui/theme/palette.py
-Aegis Liquid Interface — all color constants from DESIGN.md.
+SCPINK Design System — all color constants from DESIGN.md.
 
 Use only these constants in widget/stylesheet code. No hardcoded hex values elsewhere.
 """

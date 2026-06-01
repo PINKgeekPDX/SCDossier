@@ -115,7 +115,7 @@ All cross-component communication uses signals defined in `src/core/events.py`. 
 
 ## UI Design Rules
 
-The design system is **Aegis Liquid Interface** (see `ui-example-files/DESIGN.md`).
+The design system is **SCPINK Design System** (see `ui-example-files/DESIGN.md`).
 
 - Always use `GlassCard` as the primary container panel
 - Always use `DataField` for label+value pairs

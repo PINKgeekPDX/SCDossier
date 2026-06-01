@@ -1,35 +1,23 @@
-"""
-src/ui/theme/stylesheet.py
-Global QSS stylesheet for SC Dossier — Aegis Liquid Interface.
-
-Apply via: QApplication.instance().setStyleSheet(build_stylesheet())
-"""
-
 from src.ui.theme import palette as P
 
 
-def build_stylesheet(accent_override: str | None = None) -> str:
-    """
-    Build and return the global QSS string.
+def _scale(sizes: list[int], factor: int) -> list[int]:
+    f = factor / 100.0
+    return [max(1, int(s * f)) for s in sizes]
 
-    Args:
-        accent_override: Optional hex color to replace the primary blue accent.
-    """
-    accent = accent_override or P.PRIMARY_CONTAINER  # #00AAFF
+
+def build_stylesheet(accent_override: str | None = None, font_scale: int = 100) -> str:
+    accent = accent_override or P.PRIMARY_CONTAINER
+
+    fs = _scale([12, 10, 9, 11, 18, 8, 7], font_scale)
+    fs_body, fs_caps, fs_caps_sm, fs_data, fs_head, fs_tiny, fs_micro = fs
 
     return f"""
-/* =========================================================
-   SC Dossier — Aegis Liquid Interface QSS  (compact edition)
-   ========================================================= */
-
-/* ---------------------------------------------------------
-   Base Widget
-   --------------------------------------------------------- */
 QWidget {{
     background-color: {P.SPACE_VOID};
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-    font-size: 12px;
+    font-size: {fs_body}px;
     border: none;
     outline: none;
 }}
@@ -38,21 +26,15 @@ QWidget:focus {{
     outline: none;
 }}
 
-/* ---------------------------------------------------------
-   Main Window / Top-level
-   --------------------------------------------------------- */
 QMainWindow, QDialog {{
     background-color: {P.SPACE_VOID};
 }}
 
-/* ---------------------------------------------------------
-   QPushButton — Primary (solid blue)
-   --------------------------------------------------------- */
 QPushButton[class="primary"] {{
     background-color: {accent};
     color: #FFFFFF;
     font-family: "JetBrains Mono", "Consolas", monospace;
-    font-size: 10px;
+    font-size: {fs_caps}px;
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -77,14 +59,11 @@ QPushButton[class="primary"]:disabled {{
     color: {P.TEXT_DIM};
 }}
 
-/* ---------------------------------------------------------
-   QPushButton — Ghost (bracketed border)
-   --------------------------------------------------------- */
 QPushButton[class="ghost"] {{
     background-color: transparent;
     color: {accent};
     font-family: "JetBrains Mono", "Consolas", monospace;
-    font-size: 10px;
+    font-size: {fs_caps}px;
     font-weight: 700;
     letter-spacing: 0.12em;
     border: 1px solid {accent};
@@ -108,9 +87,6 @@ QPushButton[class="ghost"]:disabled {{
     color: {P.TEXT_DIM};
 }}
 
-/* ---------------------------------------------------------
-   QPushButton — Icon Only (toolbar / titlebar buttons)
-   --------------------------------------------------------- */
 QPushButton[class="icon"] {{
     background-color: transparent;
     border: none;
@@ -131,14 +107,11 @@ QPushButton[class="icon"][checked="true"] {{
     border: 1px solid rgba(0, 170, 255, 0.40);
 }}
 
-/* ---------------------------------------------------------
-   QPushButton — Danger (destructive)
-   --------------------------------------------------------- */
 QPushButton[class="danger"] {{
     background-color: {P.ERROR_CONTAINER};
     color: {P.ON_ERROR_CONTAINER};
     font-family: "JetBrains Mono", monospace;
-    font-size: 10px;
+    font-size: {fs_caps}px;
     font-weight: 700;
     letter-spacing: 0.08em;
     border: none;
@@ -152,14 +125,11 @@ QPushButton[class="danger"]:hover {{
     color: #FFFFFF;
 }}
 
-/* ---------------------------------------------------------
-   QLineEdit — Search / Input
-   --------------------------------------------------------- */
 QLineEdit {{
     background-color: rgba(5, 11, 15, 0.85);
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-    font-size: 12px;
+    font-size: {fs_body}px;
     border: 1px solid {P.OUTLINE_VARIANT};
     border-radius: 4px;
     padding: 5px 10px;
@@ -187,14 +157,11 @@ QLineEdit[readOnly="true"] {{
     border-color: {P.OUTLINE_VARIANT};
 }}
 
-/* ---------------------------------------------------------
-   QTextEdit / QPlainTextEdit
-   --------------------------------------------------------- */
 QTextEdit, QPlainTextEdit {{
     background-color: rgba(5, 11, 15, 0.85);
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-    font-size: 12px;
+    font-size: {fs_body}px;
     border: 1px solid {P.OUTLINE_VARIANT};
     border-radius: 4px;
     padding: 6px;
@@ -205,9 +172,6 @@ QTextEdit:focus, QPlainTextEdit:focus {{
     border-color: {accent};
 }}
 
-/* ---------------------------------------------------------
-   QScrollBar — Vertical (6px, minimal)
-   --------------------------------------------------------- */
 QScrollBar:vertical {{
     background: transparent;
     width: 6px;
@@ -234,9 +198,6 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
     background: none;
 }}
 
-/* ---------------------------------------------------------
-   QScrollBar — Horizontal
-   --------------------------------------------------------- */
 QScrollBar:horizontal {{
     background: transparent;
     height: 6px;
@@ -259,9 +220,6 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     background: none;
 }}
 
-/* ---------------------------------------------------------
-   QListWidget
-   --------------------------------------------------------- */
 QListWidget {{
     background-color: transparent;
     border: none;
@@ -273,7 +231,7 @@ QListWidget::item {{
     background-color: transparent;
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-    font-size: 12px;
+    font-size: {fs_body}px;
     padding: 7px 10px;
     border-radius: 3px;
     border: none;
@@ -294,14 +252,11 @@ QListWidget::item:selected {{
     padding-left: 8px;
 }}
 
-/* ---------------------------------------------------------
-   QComboBox
-   --------------------------------------------------------- */
 QComboBox {{
     background-color: rgba(5, 11, 15, 0.85);
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-    font-size: 11px;
+    font-size: {fs_caps_sm}px;
     border: 1px solid {P.OUTLINE_VARIANT};
     border-radius: 3px;
     padding: 4px 10px;
@@ -337,9 +292,6 @@ QComboBox QAbstractItemView {{
     outline: none;
 }}
 
-/* ---------------------------------------------------------
-   QSlider
-   --------------------------------------------------------- */
 QSlider::groove:horizontal {{
     background: {P.SURFACE_CONTAINER_HIGH};
     height: 3px;
@@ -363,13 +315,10 @@ QSlider::sub-page:horizontal {{
     border-radius: 1px;
 }}
 
-/* ---------------------------------------------------------
-   QCheckBox
-   --------------------------------------------------------- */
 QCheckBox {{
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
-    font-size: 12px;
+    font-size: {fs_body}px;
     spacing: 6px;
 }}
 
@@ -390,9 +339,6 @@ QCheckBox::indicator:hover {{
     border-color: {P.OUTLINE};
 }}
 
-/* ---------------------------------------------------------
-   QLabel Variants (by objectName)
-   --------------------------------------------------------- */
 QLabel {{
     color: {P.ON_SURFACE};
     background: transparent;
@@ -400,7 +346,7 @@ QLabel {{
 
 QLabel[class="label-caps"] {{
     font-family: "JetBrains Mono", "Consolas", monospace;
-    font-size: 9px;
+    font-size: {fs_caps_sm}px;
     font-weight: 700;
     color: {P.TEXT_DIM};
     letter-spacing: 0.12em;
@@ -408,14 +354,14 @@ QLabel[class="label-caps"] {{
 
 QLabel[class="data-point"] {{
     font-family: "JetBrains Mono", "Consolas", monospace;
-    font-size: 11px;
+    font-size: {fs_data}px;
     font-weight: 500;
     color: {P.ON_SURFACE};
 }}
 
 QLabel[class="headline"] {{
     font-family: "Sora", "Segoe UI", Arial, sans-serif;
-    font-size: 18px;
+    font-size: {fs_head}px;
     font-weight: 600;
     color: {P.ON_SURFACE};
 }}
@@ -423,20 +369,17 @@ QLabel[class="headline"] {{
 QLabel[class="status-ok"] {{
     color: #00FF88;
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: {fs_caps_sm}px;
     font-weight: 700;
 }}
 
 QLabel[class="status-error"] {{
     color: {P.HAZARD_RED};
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: {fs_caps_sm}px;
     font-weight: 700;
 }}
 
-/* ---------------------------------------------------------
-   QSplitter
-   --------------------------------------------------------- */
 QSplitter::handle {{
     background-color: {P.OUTLINE_VARIANT};
     width: 1px;
@@ -447,27 +390,21 @@ QSplitter::handle:hover {{
     background-color: {accent};
 }}
 
-/* ---------------------------------------------------------
-   QToolTip
-   --------------------------------------------------------- */
 QToolTip {{
     background-color: {P.SURFACE_CONTAINER_HIGH};
     color: {P.ON_SURFACE};
     border: 1px solid rgba(0, 170, 255, 0.25);
     border-radius: 3px;
     font-family: "JetBrains Mono", monospace;
-    font-size: 10px;
+    font-size: {fs_caps_sm}px;
     padding: 3px 7px;
 }}
 
-/* ---------------------------------------------------------
-   QTabWidget / QTabBar (for any native tabs if used)
-   --------------------------------------------------------- */
 QTabBar::tab {{
     background-color: transparent;
     color: {P.TEXT_DIM};
     font-family: "JetBrains Mono", monospace;
-    font-size: 9px;
+    font-size: {fs_caps_sm}px;
     font-weight: 700;
     letter-spacing: 0.10em;
     padding: 6px 12px;
@@ -485,9 +422,6 @@ QTabBar::tab:hover {{
     background-color: rgba(0, 170, 255, 0.08);
 }}
 
-/* ---------------------------------------------------------
-   QFrame separators
-   --------------------------------------------------------- */
 QFrame[frameShape="4"], QFrame[frameShape="5"] {{
     color: {P.OUTLINE_VARIANT};
     background-color: {P.OUTLINE_VARIANT};
@@ -495,9 +429,6 @@ QFrame[frameShape="4"], QFrame[frameShape="5"] {{
     border: none;
 }}
 
-/* ---------------------------------------------------------
-   QScrollArea
-   --------------------------------------------------------- */
 QScrollArea {{
     background: transparent;
     border: none;
@@ -507,9 +438,6 @@ QScrollArea > QWidget > QWidget {{
     background: transparent;
 }}
 
-/* ---------------------------------------------------------
-   QProgressBar
-   --------------------------------------------------------- */
 QProgressBar {{
     background-color: {P.SURFACE_CONTAINER_HIGH};
     border-radius: 2px;

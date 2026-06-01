@@ -24,8 +24,33 @@ from src.ui.toolbar.overlay_toolbar import OverlayToolbar
 from src.ui.capture.region_selector import RegionSelector
 from src.ui.tray.tray_icon import TrayIcon
 from src.ui.theme.palette import PRIMARY_CONTAINER
+from src.ui.splash.splash_screen import SplashScreen
 
 log = logging.getLogger(__name__)
+
+
+def _install_crash_handlers(log_path):
+    """Install global exception and Qt message handlers to log crashes."""
+    import traceback
+    from PyQt6.QtCore import qInstallMessageHandler, QtMsgType
+
+    def _excepthook(exc_type, exc_value, exc_tb):
+        msg = "UNHANDLED EXCEPTION:\n" + "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        log.critical(msg)
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(msg)
+        except Exception:
+            pass
+
+    def _qt_message_handler(mode, context, message):
+        if mode == QtMsgType.QtFatalMsg or mode == QtMsgType.QtCriticalMsg:
+            log.critical("Qt[%s] %s (file=%s line=%d)", mode.name, message, context.file, context.line)
+        elif mode == QtMsgType.QtWarningMsg:
+            log.warning("Qt[WARN] %s", message)
+
+    sys.excepthook = _excepthook
+    qInstallMessageHandler(_qt_message_handler)
 
 
 def main():
@@ -34,6 +59,7 @@ def main():
     pm = PathManager.instance()
     setup_logging(pm.logs_dir / "app.log")
     log.info("Starting SC Dossier...")
+    _install_crash_handlers(str(pm.logs_dir / "app.log"))
 
     # Initialize Qt Application
     app = QApplication(sys.argv)
@@ -57,43 +83,27 @@ def main():
         log.error(f"Failed to create single instance lock: {app._single_instance_lock.errorString()}")
         sys.exit(1)
 
-    # 2. Load Aegis Design System
+    # Launch Splash Screen
+    splash = SplashScreen()
+    splash.fade_in()
+    splash.update_progress("Initializing core systems...", 10)
+
+    # 2. Load SCPINK Design System
+    splash.update_progress("Loading SCPINK Design System...", 30)
     register_fonts()
     app.setStyleSheet(build_stylesheet())
 
     # Ensure Settings are loaded
+    splash.update_progress("Loading user settings...", 50)
     sm = SettingsManager.initialize(pm.settings_file)
 
-    # Initialize Reputation System (only if user has opted in)
-    _rep_startup = None
-    if sm.reputation_enabled:
-        try:
-            from src.app.constants import REP_SUPABASE_URL, REP_ANON_KEY
-            from src.services.reputation_service import ReputationService
-            from src.services.reputation_worker import ReputationStartupWorker
-
-            url = sm.get("reputation_supabase_url") or REP_SUPABASE_URL
-            key = sm.get("reputation_anon_key") or REP_ANON_KEY
-
-            if url and key:
-                ReputationService.initialize(url, key)
-                _rep_startup = ReputationStartupWorker()
-                _rep_startup.start()
-                log.info("ReputationService initialized; startup worker launched.")
-            else:
-                log.warning(
-                    "Reputation is enabled but REP_SUPABASE_URL/REP_ANON_KEY are not set. "
-                    "Reputation system will be unavailable."
-                )
-                EventBus.instance().reputation_system_status.emit("offline")
-        except Exception as e:
-            log.error("Failed to initialize ReputationService: %s", e)
-            EventBus.instance().reputation_system_status.emit("offline")
 
     # 3. Instantiate Architecture
+    splash.update_progress("Instantiating core architecture...", 65)
     controller = AppController()
     main_window = MainWindow(controller)
     toolbar = OverlayToolbar()
+    toolbar.set_main_window_ref(main_window)
 
     # Create tray icon with app icon
     app_icon = QIcon(appicon_path) if os.path.exists(appicon_path) else QIcon()
@@ -111,6 +121,7 @@ def main():
     active_selector = None
 
     # 4. Connect Toolbar Events
+    splash.update_progress("Wiring up event bus...", 80)
     def _show_main_window():
         main_window.show()
         main_window.raise_()
@@ -152,9 +163,31 @@ def main():
     main_window.title_bar.hide_requested.connect(_hide_main_window)
     main_window.window_hidden.connect(toolbar.show)
 
+    def _open_settings():
+        main_window.show()
+        main_window.raise_()
+        main_window.activateWindow()
+        toolbar.hide()
+        EventBus.instance().navigate_to_tab.emit("settings")
+
+    def _open_logs():
+        import os
+        os.startfile(pm.logs_dir)
+
+    def _open_archive():
+        import os
+        os.startfile(pm.archived_root)
+
     # 6. Connect Tray Events
     tray_icon.show_main_requested.connect(_show_main_window)
-    tray_icon.quit_requested.connect(app.quit)
+    tray_icon.quick_capture_requested.connect(_start_capture)
+    tray_icon.open_settings_requested.connect(_open_settings)
+    tray_icon.open_logs_requested.connect(_open_logs)
+    tray_icon.open_archive_requested.connect(_open_archive)
+    def _quit_app():
+        log.info("Quit requested — exiting.")
+        os._exit(0)
+    tray_icon.quit_requested.connect(_quit_app)
     tray_icon.show()
 
     # 7. Restore Positions
@@ -168,8 +201,104 @@ def main():
     if geom.isValid():
         main_window.setGeometry(geom)
 
-    # 8. Launch UI — toolbar only by default
-    toolbar.show()
+    # Setup Global Hotkey Manager
+    from src.core.hotkey_manager import GlobalHotkeyManager
+    _hotkey_manager = GlobalHotkeyManager()
+    EventBus.instance().capture_hotkey_pressed.connect(_start_capture)
+
+    # App exit handler to clean up hotkeys
+    app.aboutToQuit.connect(lambda: EventBus.instance().app_exit.emit())
+
+    # 9. Initialize Reputation System (only if user has opted in)
+    # Must be done after UI is created so EventBus signals are received
+    splash.update_progress("Initializing Reputation System...", 90)
+    _rep_startup = None
+    if sm.reputation_enabled:
+        try:
+            from src.app.constants import REP_SUPABASE_URL, REP_ANON_KEY
+            from src.services.reputation_service import ReputationService
+            from src.services.reputation_worker import ReputationStartupWorker
+
+            url = sm.get("reputation_supabase_url") or REP_SUPABASE_URL
+            key = sm.get("reputation_anon_key") or REP_ANON_KEY
+
+            if url and key:
+                ReputationService.initialize(url, key)
+                _rep_startup = ReputationStartupWorker()
+                _rep_startup.start()
+                log.info("ReputationService initialized; startup worker launched.")
+            else:
+                log.warning(
+                    "Reputation is enabled but REP_SUPABASE_URL/REP_ANON_KEY are not set. "
+                    "Reputation system will be unavailable."
+                )
+                EventBus.instance().reputation_system_status.emit("offline")
+        except Exception as e:
+            log.error("Failed to initialize ReputationService: %s", e)
+            EventBus.instance().reputation_system_status.emit("offline")
+
+    # 10. Global settings_changed listener (hot-reload outside SettingsTab)
+    def _on_settings_changed(key: str, value: object) -> None:
+        if key in ("font_size_scaling", "theme_accent_override"):
+            app.setStyleSheet(build_stylesheet(
+                accent_override=sm.theme_accent_override,
+                font_scale=sm.font_size_scaling
+            ))
+        elif key == "auto_hide_toolbar_without_game":
+            import subprocess
+            sc_running = False
+            try:
+                output = subprocess.check_output(
+                    'tasklist /FI "IMAGENAME eq StarCitizen.exe" /NH',
+                    shell=True,
+                    creationflags=0x08000000
+                ).decode()
+                if "StarCitizen.exe" in output:
+                    sc_running = True
+            except Exception:
+                pass
+            if not sc_running and value is True:
+                toolbar.hide()
+                main_window.show()
+            elif value is False:
+                toolbar.show()
+        elif key == "log_level":
+            level = logging.DEBUG if str(value) == "debug" else logging.INFO
+            logging.getLogger().setLevel(level)
+
+    EventBus.instance().settings_changed.connect(_on_settings_changed)
+
+    splash.update_progress("Startup complete", 100)
+    
+    # 11. Finish up and fade out
+    def _finalize_startup():
+        splash.close()
+        
+        import subprocess
+        sc_running = False
+        try:
+            output = subprocess.check_output('tasklist /FI "IMAGENAME eq StarCitizen.exe" /NH', shell=True).decode()
+            if "StarCitizen.exe" in output:
+                sc_running = True
+        except Exception:
+            pass
+            
+        if sc_running:
+            toolbar.show()
+            main_window.hide()
+        elif sm.auto_hide_toolbar_without_game:
+            toolbar.hide()
+            main_window.show()
+            main_window.raise_()
+            main_window.activateWindow()
+        else:
+            toolbar.show()
+            main_window.show()
+            main_window.raise_()
+            main_window.activateWindow()
+
+    splash.fade_out_finished.connect(_finalize_startup)
+    splash.fade_out()
 
     log.info("SC Dossier fully initialized. Entering event loop.")
     sys.exit(app.exec())

@@ -330,7 +330,7 @@ class ArchiveManager(QObject):
   </div>
 
   <div class="footer">
-    SC DOSSIER \u2022 AEGIS LIQUID INTERFACE \u2022 {datetime.now().strftime('%Y-%m-%d')}
+    SC DOSSIER \u2022 SCPINK DESIGN SYSTEM \u2022 {datetime.now().strftime('%Y-%m-%d')}
   </div>
 </div>
 </body>

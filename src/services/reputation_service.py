@@ -59,7 +59,68 @@ class ReputationService:
             )
         self._client = create_client(url, anon_key)
         self._known_handles: set[str] = set()
+        self._local_player_handle: str = ""
         log.info("ReputationService initialized with Supabase URL: %s", url[:40])
+
+    @property
+    def local_player_handle(self) -> str:
+        """Return the detected local player handle."""
+        return self._local_player_handle
+
+    @local_player_handle.setter
+    def local_player_handle(self, val: str) -> None:
+        """Set the local player handle."""
+        self._local_player_handle = val
+
+    def detect_local_player_handle(self) -> str:
+        """
+        Locate the Star Citizen installation and check the game.log.
+        Extract the local player handle using regex matching.
+        """
+        import os
+        import re
+
+        default_path = r"C:\Program Files\Roberts Space Industries\StarCitizen"
+        channels = ["LIVE", "PTU"]
+        
+        for channel in channels:
+            log_path = os.path.join(default_path, channel, "Game.log")
+            if os.path.exists(log_path):
+                log.info("detect_local_player_handle: Found game log at %s", log_path)
+                try:
+                    # Read the log file
+                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+
+                    # Pattern 1: AccountLoginCharacterStatus_Character Character: ... - name NAME - state STATE_CURRENT
+                    match = re.search(r"Character:.*?-\s*name\s+(\w+)\s+-\s*state\s+STATE_CURRENT", content)
+                    if match:
+                        handle = match.group(1)
+                        self._local_player_handle = handle
+                        log.info("detect_local_player_handle: Detected handle from Character Status: %s", handle)
+                        return handle
+
+                    # Pattern 2: Legacy login response user success: User Login Success - Handle[NAME]
+                    match = re.search(r"User Login Success\s+-\s+Handle\[(\w+)\]", content)
+                    if match:
+                        handle = match.group(1)
+                        self._local_player_handle = handle
+                        log.info("detect_local_player_handle: Detected handle from Legacy Login: %s", handle)
+                        return handle
+
+                    # Pattern 3: Expect Incoming Connection ... nickname="NAME"
+                    match = re.search(r"Expect Incoming Connection>.*?nickname=\"(\w+)\"", content)
+                    if match:
+                        handle = match.group(1)
+                        self._local_player_handle = handle
+                        log.info("detect_local_player_handle: Detected handle from Incoming Connection: %s", handle)
+                        return handle
+
+                except Exception as e:
+                    log.warning("detect_local_player_handle: Failed to read %s: %s", log_path, e)
+        
+        log.warning("detect_local_player_handle: Could not detect username from Star Citizen log.")
+        return ""
 
     # ------------------------------------------------------------------
     # Singleton lifecycle
@@ -276,11 +337,10 @@ class ReputationService:
     @staticmethod
     def _normalize_score(score: int, report_count: int) -> int:
         """
-        Normalize score on a 0-100 scale using an absolute accumulation formula.
-        1 max-score report (6 points) = 1% reputation progression.
-        Requires 100 max-score reports (600 points) to reach 100%.
+        Normalize score on a 0-100 scale.
+        Score % is computed as: min(100, int(score / (report_count * 6) * 100))
         """
-        if score <= 0:
+        if report_count <= 0 or score <= 0:
             return 0
-        pct = int(score / 6)
+        pct = int((score / (report_count * 6)) * 100)
         return min(100, max(0, pct))

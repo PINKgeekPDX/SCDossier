@@ -26,7 +26,7 @@ from src.ui.widgets.wrap_layout import WrapLayout
 from src.ui.widgets.tech_label import TechLabel
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.confirm_dialog import show_confirm
-from src.ui.tabs.dossier_tab import DossierSubTabBar
+from src.ui.tabs.dossier_tab import DossierSubTabBar, ClickableOrgCard
 from src.ui.tabs.reputation_tab import ReputationTab
 
 import os
@@ -599,7 +599,7 @@ class ArchivesTab(QWidget):
             self.detail_orgs_layout.addWidget(lbl)
 
     def _add_org_card(self, org: dict) -> None:
-        card = GlassCard()
+        card = ClickableOrgCard(org.get("sid", ""), self)
         inner = QWidget()
         layout = QHBoxLayout(inner)
         layout.setContentsMargins(8, 5, 8, 5)   # was 12,8,12,8

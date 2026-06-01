@@ -1,6 +1,6 @@
 """
 src/ui/widgets/glass_card.py
-GlassCard — primary panel container for the Aegis Liquid Interface.
+GlassCard — primary panel container for the SCPINK Design System.
 
 Features:
 - Semi-transparent dark glass background

@@ -1,7 +1,7 @@
 """
 src/ui/tabs/dossier_tab.py
 DossierTab — the primary view displaying scraped citizen and organization information.
-Uses GlassCard containers for the Aegis aesthetic.
+Uses GlassCard containers for the SCPINK aesthetic.
 
 T4: Structural refactor — added DossierSubTabBar and QStackedWidget.
 The action bar and all existing content widgets are UNCHANGED.
@@ -204,9 +204,14 @@ class ClickableOrgCard(GlassCard):
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
+            from PyQt6.QtCore import QTimer
             from src.core.events import EventBus
-            EventBus.instance().navigate_to_tab.emit("organization")
-            EventBus.instance().request_org_scrape.emit(self.sid)
+            
+            def _handle_click():
+                EventBus.instance().navigate_to_tab.emit("organization")
+                EventBus.instance().request_org_scrape.emit(self.sid)
+                
+            QTimer.singleShot(0, _handle_click)
             event.accept()
         else:
             super().mousePressEvent(event)
@@ -556,6 +561,7 @@ class DossierTab(QWidget):
         # Trigger reputation fetch if available (T5 sets self.reputation_tab)
         if hasattr(self, 'reputation_tab') and self.current_handle:
             self.reputation_tab.load_player(self.current_handle)
+            EventBus.instance().request_reputation_fetch.emit(self.current_handle)
 
     def _clear_orgs(self) -> None:
         while self.orgs_layout.count():

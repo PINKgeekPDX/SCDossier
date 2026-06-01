@@ -216,3 +216,44 @@ class TestReputationServiceInit:
         from src.services.reputation_service import ReputationService
         ReputationService.initialize("https://x.supabase.co", "fake-key")
         assert ReputationService.is_initialized() is True
+
+    @patch("os.path.exists")
+    @patch("builtins.open")
+    def test_detect_local_player_handle_patterns(self, mock_open, mock_exists, service):
+        """detect_local_player_handle successfully extracts from all 3 patterns."""
+        svc, _ = service
+        mock_exists.side_effect = lambda path: "Game.log" in path
+        
+        # Test Pattern A (Character status)
+        log_a = (
+            "Some log line\n"
+            "<2026-05-31T09:13:18.406Z> [Notice] <AccountLoginCharacterStatus_Character> "
+            "Character: createdAt 1778731949259 - updatedAt 1779669072087 - geid 204502564273 - "
+            "accountId 927959 - name TestPlayerA - state STATE_CURRENT [Team_GameServices][Login]"
+        )
+        mock_open.return_value.__enter__.return_value.read.return_value = log_a
+        assert svc.detect_local_player_handle() == "TestPlayerA"
+        
+        # Test Pattern B (Legacy Login)
+        log_b = (
+            "Some log line\n"
+            "<2026-05-31T09:13:19.016Z> [Notice] <Legacy login response> [CIG-net] User Login Success - Handle[TestPlayerB] - Time[288202229] [Team_GameServices][Login]"
+        )
+        mock_open.return_value.__enter__.return_value.read.return_value = log_b
+        assert svc.detect_local_player_handle() == "TestPlayerB"
+        
+        # Test Pattern C (Expect Incoming Connection)
+        log_c = (
+            "Some log line\n"
+            "<2026-05-31T09:13:23.359Z> [Notice] <Expect Incoming Connection> session=ca5702b nickname=\"TestPlayerC\" playerGEID=204502564273 [Team_Network][Network][Gateway]"
+        )
+        mock_open.return_value.__enter__.return_value.read.return_value = log_c
+        assert svc.detect_local_player_handle() == "TestPlayerC"
+
+    @patch("os.path.exists")
+    def test_detect_local_player_handle_no_log(self, mock_exists, service):
+        """detect_local_player_handle returns empty string when no game log is found."""
+        svc, _ = service
+        mock_exists.return_value = False
+        assert svc.detect_local_player_handle() == ""
+

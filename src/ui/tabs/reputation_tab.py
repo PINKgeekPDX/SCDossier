@@ -490,6 +490,11 @@ class ReputationTab(QWidget):
                     font-weight: bold;
                 }}
                 QPushButton:hover {{ background: rgba(0, 170, 255, 0.22); }}
+                QPushButton:disabled {{
+                    color: rgba(255, 255, 255, 0.3);
+                    border-color: rgba(255, 255, 255, 0.15);
+                    background: transparent;
+                }}
             """)
             card_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
             result["button"] = btn
@@ -623,6 +628,11 @@ class ReputationTab(QWidget):
                 font-weight: bold;
             }}
             QPushButton:hover {{ background: rgba(0, 170, 255, 0.22); }}
+            QPushButton:disabled {{
+                color: rgba(255, 255, 255, 0.3);
+                border-color: rgba(255, 255, 255, 0.15);
+                background: transparent;
+            }}
         """)
         self._report_btn.clicked.connect(self._on_report_clicked)
 
@@ -670,6 +680,7 @@ class ReputationTab(QWidget):
         bus.reputation_loaded.connect(self._on_reputation_loaded)
         bus.reputation_load_failed.connect(self._on_reputation_failed)
         bus.reputation_report_submitted.connect(self._on_report_submitted)
+        bus.reputation_report_failed.connect(self._on_report_failed)
         bus.reputation_system_status.connect(self._on_system_status)
         bus.settings_changed.connect(self._on_settings_changed)
 
@@ -715,6 +726,28 @@ class ReputationTab(QWidget):
         self._set_state("loading")
         # Update handle label in case we arrive at 'loaded' state
         self._loaded_handle_lbl.setText(f"@{handle.upper()}")
+
+        # Check self-report restriction
+        from src.services.reputation_service import ReputationService
+        is_self = False
+        try:
+            if ReputationService.is_initialized():
+                local_handle = ReputationService.instance().local_player_handle
+                if local_handle and handle.lower() == local_handle.lower():
+                    is_self = True
+        except Exception:
+            pass
+
+        if is_self:
+            self._report_btn.setEnabled(False)
+            self._report_btn.setToolTip("You cannot submit a reputation report for yourself.")
+            self._no_data_report_btn.setEnabled(False)
+            self._no_data_report_btn.setToolTip("You cannot submit a reputation report for yourself.")
+        else:
+            self._report_btn.setEnabled(True)
+            self._report_btn.setToolTip("")
+            self._no_data_report_btn.setEnabled(True)
+            self._no_data_report_btn.setToolTip("")
 
     def clear(self) -> None:
         """Reset to empty state (called when DossierTab clears results)."""
@@ -790,6 +823,18 @@ class ReputationTab(QWidget):
         # AppController will re-emit reputation_loaded after submit
         self._set_state("loading")
 
+    @pyqtSlot(str, str)
+    def _on_report_failed(self, handle: str, error_msg: str) -> None:
+        """Handle reputation report submission failure."""
+        if handle.lower() != self._current_handle.lower():
+            return
+        # Re-fetch reputation data to restore UI state from loading to loaded
+        self._set_state("loading")
+        EventBus.instance().search_player_requested.emit(self._current_handle)
+
+        from src.ui.widgets.confirm_dialog import show_error_dialog
+        show_error_dialog("REPORT SUBMISSION FAILED", error_msg, parent=self.window())
+
     @pyqtSlot(str)
     def _on_system_status(self, status: str) -> None:
         """React to reputation system going online or offline."""
@@ -819,6 +864,16 @@ class ReputationTab(QWidget):
         """Open the ReportDialog and emit reputation_report_requested on accept."""
         if not self._current_handle:
             return
+
+        # Safeguard: prevent submitting report if it's the local user
+        from src.services.reputation_service import ReputationService
+        if ReputationService.is_initialized():
+            local_handle = ReputationService.instance().local_player_handle
+            if local_handle and self._current_handle.lower() == local_handle.lower():
+                from src.ui.widgets.confirm_dialog import show_error_dialog
+                show_error_dialog("REPORT RESTRICTED", "You cannot submit a reputation report for yourself.", parent=self.window())
+                return
+
         dialog = ReportDialog(self._current_handle, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             tags = dialog.selected_tags

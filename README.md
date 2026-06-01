@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/appicon.png" width="180" alt="SC Dossier Logo">
 
-  # `SCD: Star Citizen Dossier`
+  # `Star Citizen Dossier`
  **`A Star Citizen Companion App`**
 
   [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-00AAFF?style=for-the-badge)](https://github.com/PINKgeekPDX/SCDossier/releases)
@@ -48,14 +48,14 @@ Highly specialized RSI website scraping service finds, extracts data thats used 
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/layers.svg" width="22" align="top"> Organization Intel //
 Look up Orgs by name or SID. Instantly view their Archetype, Primary Focus, Commitment Level, and Member Roster.
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/alert-triangle.svg" width="22" align="top"> Community Reputation System //
-View and submit community-driven reputation reports. Aggregate reports across specific behaviors (Combat Logging, Stream Sniping, Pad Ramming, Exploiting) to compute an overall danger score powered by a live backend (Supabase).
+View and submit community-driven reputation reports across five behavior categories — **Dangerous** (killed me, griefed), **Shady** (scammed, manipulated), **Pirate** (acted like a pirate), **Elusive** (hard to track), and **Trustworthy** (honorable, helpful). Each category has its own score threshold powered by a live Supabase backend.
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/archive.svg" width="22" align="top"> Local Archiving & Export //
 Save profiles locally to your personal offline database. Sync them later to check for updates, or export them into self-contained ZIPs (complete all data, images, a generated HTML player card) to share with your Org mates.
 <br><br>
 ---
 
 >## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/navigation.svg" width="26" align="top"> HOW TO USE
-**`SCD: Star Citizen Dossier`** is designed to be completely unobtrusive and lighting fast.
+**`Star Citizen Dossier`** is designed to be completely unobtrusive and lighting fast.
 - **1. Expand the Overlay:**
 Click the **Expand** button (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/ships/default/MobiGlas.png" width="18" align="top">) on the edge-snapped mini toolbar to open the main window.
 - **2. OCR Screen Capture:**
@@ -86,7 +86,7 @@ SC Dossier is designed to be plug-and-play. **No complex setups. No external dep
 ---
 
 >## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/shield.svg" width="26" align="top"> PRIVACY FIRST
-*   **Zero Credentials Required:** *`SCD: Star Citizen Dossier`* uses public RSI data. You never log in.
+*   **Zero Credentials Required:** *`Star Citizen Dossier`* uses public RSI data. You never log in.
 *   **100% Local Processing:** The OCR engine runs entirely on your own GPU/CPU. No screen images are ever sent over the internet.
 
 *   **Local Storage:** Your archived dossiers are saved locally on your own hard drive:
@@ -101,7 +101,7 @@ SC Dossier is designed to be plug-and-play. **No complex setups. No external dep
 >## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/terminal.svg" width="26" align="top"> FOR DEVELOPERS
 <details><summary><b>BUILD FROM SOURCE</b></summary>
 <br>
-Want to tinker with the code? SCD: Star Citizen Dossier is built in Python 3.11+ using PyQt6.
+Want to tinker with the code? Star Citizen Dossier is built in Python 3.11+ using PyQt6.
 <br>
 
 ```bash
@@ -134,7 +134,7 @@ python build.py
 ---
 >## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/file-text.svg" width="26" align="top"> LICENSE
 
-`**SCD: Star Citizen Dossier**` is open-source software licensed under the **MIT License**. See the `LICENSE` file for more details. 
+`**Star Citizen Dossier**` is open-source software licensed under the **MIT License**. See the `LICENSE` file for more details. 
 
 <div align="center">
   <sub>Developed by <b><u>PINKgeekPDX</u></b> <i>(2026)</i> with 💖 for the Star Citizen Community</sub>

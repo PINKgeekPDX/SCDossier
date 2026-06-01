@@ -2,7 +2,7 @@
 src/ui/widgets/avatar_widget.py
 AvatarWidget — image display with tech-bracket corner overlay.
 
-Displays a player avatar or org logo with the Aegis bracket ornaments
+Displays a player avatar or org logo with the SCPINK bracket ornaments
 painted over the image. Shows a placeholder icon when no image is set.
 """
 

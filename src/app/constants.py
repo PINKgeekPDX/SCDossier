@@ -11,7 +11,7 @@ from enum import Enum, auto
 # Application Metadata
 # ---------------------------------------------------------------------------
 APP_NAME = "SC Dossier"
-APP_VERSION = "0.4.0"
+APP_VERSION = "b0.4.1"
 APP_AUTHOR = "PINK"
 APP_VENDOR = "PINK"
 ORG_FOLDER = "PINK"
@@ -174,7 +174,7 @@ REPUTATION_CATEGORIES: dict = {
         "color_hex": "#FF3B3B",
         "thresholds": [
             (0,  "No Threat Reports"),
-            (21, "Minor Threat"),
+            (1,  "Minor Threat"),
             (41, "Moderately Dangerous"),
             (61, "Highly Dangerous"),
             (81, "⚠ EXTREMELY DANGEROUS"),
@@ -185,7 +185,7 @@ REPUTATION_CATEGORIES: dict = {
         "color_hex": "#00AA66",
         "thresholds": [
             (0,  "No Trust Data"),
-            (21, "Somewhat Reliable"),
+            (1,  "Somewhat Reliable"),
             (41, "Generally Trustworthy"),
             (61, "Highly Trusted"),
             (81, "✓ COMMUNITY TRUSTED"),
@@ -196,7 +196,7 @@ REPUTATION_CATEGORIES: dict = {
         "color_hex": "#FF8800",
         "thresholds": [
             (0,  "No Piracy Reports"),
-            (21, "Possibly a Pirate?"),
+            (1,  "Possibly a Pirate?"),
             (41, "Suspected Pirate — Be Careful"),
             (61, "Known Pirate — High Risk"),
             (81, "☠ NOTORIOUS PIRATE"),
@@ -207,7 +207,7 @@ REPUTATION_CATEGORIES: dict = {
         "color_hex": "#CC44FF",
         "thresholds": [
             (0,  "No Shady Reports"),
-            (21, "Slightly Suspicious"),
+            (1,  "Slightly Suspicious"),
             (41, "Shady as a Snake"),
             (61, "Highly Untrustworthy"),
             (81, "🚨 KNOWN SCAMMER / GRIEFER"),
@@ -218,7 +218,7 @@ REPUTATION_CATEGORIES: dict = {
         "color_hex": "#4488FF",
         "thresholds": [
             (0,  "Easy to Find"),
-            (21, "Somewhat Elusive"),
+            (1,  "Somewhat Elusive"),
             (41, "Hard to Pin Down"),
             (61, "Ghost — Very Elusive"),
             (81, "👻 PHANTOM — IMPOSSIBLE TO CATCH"),

@@ -52,9 +52,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "pin_on_startup": False,
     "minimize_to_tray_on_close": True,
     "show_tray_notifications": True,
+    "auto_hide_toolbar_without_game": True,
     "ocr_engine": OCREngine.RAPIDOCR.value,
     "ocr_confidence_threshold": DEFAULT_OCR_CONFIDENCE_THRESHOLD,
     "ocr_thread_count": 2,
+    "ocr_hotkey": "",
     "scraper_delay_ms": DEFAULT_SCRAPER_DELAY_MS,
     "scraper_timeout_sec": 30,
     "scraper_proxy": "",
@@ -321,6 +323,14 @@ class SettingsManager(QObject):
     def ocr_confidence_threshold(self, v: float) -> None:
         self.set("ocr_confidence_threshold", max(0.0, min(1.0, v)))
 
+    @property
+    def ocr_hotkey(self) -> str:
+        return str(self.get("ocr_hotkey", ""))
+
+    @ocr_hotkey.setter
+    def ocr_hotkey(self, v: str) -> None:
+        self.set("ocr_hotkey", v)
+
     # Scraper
     @property
     def scraper_delay_ms(self) -> int:
@@ -423,6 +433,14 @@ class SettingsManager(QObject):
     def show_tray_notifications(self, v: bool) -> None:
         self.set("show_tray_notifications", v)
 
+    @property
+    def auto_hide_toolbar_without_game(self) -> bool:
+        return bool(self.get("auto_hide_toolbar_without_game", True))
+
+    @auto_hide_toolbar_without_game.setter
+    def auto_hide_toolbar_without_game(self, v: bool) -> None:
+        self.set("auto_hide_toolbar_without_game", v)
+
     # Scraper extras
     @property
     def scraper_timeout_sec(self) -> int:
@@ -501,6 +519,14 @@ class SettingsManager(QObject):
         self.set("archive_default_sort", v)
 
     # Diagnostics & Logs
+    @property
+    def log_level(self) -> str:
+        return str(self.get("log_level", "normal"))
+
+    @log_level.setter
+    def log_level(self, v: str) -> None:
+        self.set("log_level", v)
+
     @property
     def include_debug_in_diagnostics(self) -> bool:
         return bool(self.get("include_debug_in_diagnostics", False))

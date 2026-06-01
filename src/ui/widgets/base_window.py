@@ -7,7 +7,7 @@ Features:
 - Click-drag repositioning via custom title bar drag region
 - 8-direction resize handles on all edges/corners
 - Min/max size constraints (no maximize)
-- Radial gradient background from Aegis Liquid Interface
+- Radial gradient background from SCPINK Design System
 - Conditional WindowStaysOnTopHint (for toolbar and when pinned)
 """
 
@@ -283,7 +283,7 @@ class BaseWindow(QWidget):
     # ------------------------------------------------------------------
 
     def paintEvent(self, event) -> None:
-        """Paint the Aegis deep-space radial gradient background."""
+        """Paint the SCPINK deep-space radial gradient background."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 

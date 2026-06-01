@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"x64dbg.path": "C:\\Users\\Administrator\\Downloads\\snapshot_2025-08-19_19-40\\release\\x64\\x64dbg.exe",
+		"x64dbg.attachAnyPython": false
+	}
+}

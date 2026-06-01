@@ -81,9 +81,11 @@ class UpdaterWorker(QThread):
             self.check_complete.emit(False)
 
     def _is_newer(self, current: str, latest: str) -> bool:
+        current_clean = current.lstrip("bv")
+        latest_clean = latest.lstrip("bv")
         try:
-            curr_parts = [int(x) for x in current.split(".")]
-            latest_parts = [int(x) for x in latest.split(".")]
+            curr_parts = [int(x) for x in current_clean.split(".")]
+            latest_parts = [int(x) for x in latest_clean.split(".")]
             for c, l in zip(curr_parts, latest_parts):
                 if l > c:
                     return True

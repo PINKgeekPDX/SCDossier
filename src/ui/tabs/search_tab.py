@@ -268,7 +268,7 @@ class StyledActionButton(QPushButton):
 
 
 class RecentSearchChip(QPushButton):
-    """A clean, premium Aegis-style chip for a recent search query."""
+    """A clean, premium SCPINK-style chip for a recent search query."""
     
     def __init__(self, text: str, parent=None):
         super().__init__(text, parent)

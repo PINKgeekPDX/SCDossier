@@ -98,6 +98,9 @@ class EventBus(QObject):
     # Request OCR capture mode to begin
     start_capture = pyqtSignal()
 
+    # Emitted when the global hotkey is pressed
+    capture_hotkey_pressed = pyqtSignal()
+
     # ------------------------------------------------------------------
     # Status / Feedback Signals
     # ------------------------------------------------------------------

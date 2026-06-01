@@ -16,5 +16,10 @@ ui-example-files/
 .venv/
 .pytest_cache/
 agent.md
+AGENTS.md
 run_quick.py
 Output/
+.playwright-mcp/
+.vscode/
+.gitignore
+tests/

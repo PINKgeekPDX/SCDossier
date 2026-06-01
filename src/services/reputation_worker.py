@@ -135,6 +135,12 @@ class ReputationStartupWorker(QThread):
         try:
             svc = ReputationService.instance()
 
+            # Detect local player handle from game.log
+            try:
+                svc.detect_local_player_handle()
+            except Exception as e:
+                log.warning("ReputationStartupWorker: Failed to detect local player handle: %s", e)
+
             # Ping keep-alive to wake free-tier project
             online = svc.ping()
 

@@ -83,7 +83,7 @@ Displays full player profile information retrieved from RSI:
 - **Accreditations & Clearances**: All badge images and names
 - **Primary Affiliation**: Main org logo, name, SID, player rank
 - **Affiliated Organizations**: All associated orgs (if more than one)
-- **Reputation (Rep) Tab**: View the player's community danger score and submit behavior reports (Combat Logging, Pad Ramming, etc.) to the live Supabase backend.
+- **Reputation (Rep) Tab**: View the player's community reputation scores and submit behavior reports across five categories (Dangerous, Shady, Pirate, Elusive, Trustworthy) to the live Supabase backend.
 
 **Action buttons:**
 - `ARCHIVE PROFILE` — saves this profile to your local archive
@@ -115,7 +115,7 @@ Browse all locally saved player profiles.
 
 **Detail pane (right):**
 - Shows all archived identity, organization, and badge data
-- Includes a fully functional **Reputation Tab** mirroring the main Dossier tab, allowing you to view and submit reports directly from the archive.
+- Includes a fully functional **Reputation Tab** mirroring the main Dossier tab, with the same five-category system (Dangerous, Shady, Pirate, Elusive, Trustworthy) allowing you to view and submit reports directly from the archive.
 
 **Per-profile actions:**
 - `SYNC CHECK` — checks if the live RSI profile has changed; offers to update

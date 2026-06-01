@@ -1,15 +1,11 @@
-"""
-src/app/main_window.py
-MainWindow — the primary application window, assembling the UI components.
-"""
-
 import os
 
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget, QApplication
 
 from src.core.events import EventBus
+from src.core.settings import SettingsManager
 from src.ui.widgets.base_window import BaseWindow
 from src.ui.widgets.title_bar import CustomTitleBar
 from src.ui.widgets.status_bar import CustomStatusBar
@@ -25,10 +21,6 @@ from src.app.controller import AppController
 
 
 class MainWindow(BaseWindow):
-    """
-    Main SC Dossier application window.
-    Assembles the Aegis UI and manages tab navigation.
-    """
 
     window_hidden = pyqtSignal()
 
@@ -36,7 +28,6 @@ class MainWindow(BaseWindow):
         super().__init__(parent)
         self.controller = controller
 
-        # Set window icon on the instance so the taskbar entry uses the correct icon
         from src.core.paths import get_asset_path
         _ico_path = get_asset_path("assets/appicon.ico")
         _png_path = get_asset_path("assets/appicon.png")
@@ -46,47 +37,44 @@ class MainWindow(BaseWindow):
             self.setWindowIcon(QIcon(_png_path))
 
         self.setWindowTitle("SC Dossier")
-        self.resize(1024, 680)    # was 1024,768
-        self.setMinimumSize(860, 560)   # was 800,600
-        self.setMaximumSize(1920, 1200)  # was 1600,1200
+        self.resize(1024, 680)
+        self.setMinimumSize(860, 560)
+        self.setMaximumSize(1920, 1200)
 
         self._build_ui()
         self._connect_signals()
 
-        # Restore last-active tab from settings, default to search tab
-        from src.core.settings import SettingsManager
         sm = SettingsManager.instance()
         last_tab = sm.last_tab
         if last_tab and last_tab != "search":
             self.sidebar.set_active_tab(last_tab)
             self._on_tab_selected(last_tab)
         else:
-            # Default to search tab on startup
             self.sidebar.set_active_tab("search")
             self._on_tab_selected("search")
 
+        # Pin on startup if setting enabled
+        if sm.pin_on_startup:
+            self._toggle_always_on_top(True)
+
     def _build_ui(self) -> None:
-        # We override the base window's layout to include the title bar, 
-        # a horizontal split for nav+content, and the status bar.
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # 1. Title Bar
         self.title_bar = CustomTitleBar(self)
         self.set_drag_widget(self.title_bar)
         main_layout.addWidget(self.title_bar)
 
-        # 2. Middle section (Sidebar + Stacked Widget)
         middle_widget = QWidget()
         middle_layout = QHBoxLayout(middle_widget)
         middle_layout.setContentsMargins(0, 0, 0, 0)
         middle_layout.setSpacing(0)
 
         self.sidebar = NavSidebar()
-        
+
         self.stack = QStackedWidget()
-        
+
         self.tab_search = SearchTab()
         self.tab_dossier = DossierTab()
         self.tab_org = OrgTab()
@@ -104,28 +92,21 @@ class MainWindow(BaseWindow):
 
         main_layout.addWidget(middle_widget, 1)
 
-        # 3. Status Bar
         self.status_bar = CustomStatusBar()
         main_layout.addWidget(self.status_bar)
 
     def _connect_signals(self) -> None:
-        # Title bar controls window state
         self.title_bar.hide_requested.connect(self._on_hide_requested)
         self.title_bar.pin_toggled.connect(self._toggle_always_on_top)
         self.title_bar.clear_results_requested.connect(self._on_clear_results)
 
-        # Nav sidebar changes tabs
         self.sidebar.tab_selected.connect(self._on_tab_selected)
 
-        # Event bus navigation request (e.g., from Controller loading an archive)
         EventBus.instance().navigate_to_tab.connect(self.sidebar.set_active_tab)
-
-        # Status messages
         EventBus.instance().status_message.connect(self.status_bar.set_status)
         EventBus.instance().navigate_to_tab.connect(self._on_navigate_requested)
 
     def _on_hide_requested(self) -> None:
-        """Hide main window and emit signal for toolbar to show."""
         self.window_hidden.emit()
         self.hide()
 
@@ -141,24 +122,17 @@ class MainWindow(BaseWindow):
         elif tab_id == "settings":
             self.stack.setCurrentWidget(self.tab_settings)
 
-        # Persist last tab
-        from src.core.settings import SettingsManager
         SettingsManager.instance().last_tab = tab_id
 
     def _on_navigate_requested(self, tab_id: str) -> None:
-        """Programmatically switch tabs and update sidebar state."""
         self.sidebar.set_active_tab(tab_id)
         self._on_tab_selected(tab_id)
 
     def _on_clear_results(self) -> None:
-        """Clear all search results from all tabs."""
-        # Clear dossier tab
         if hasattr(self.tab_dossier, '_clear_results'):
             self.tab_dossier._clear_results()
-        # Clear org tab
         if hasattr(self.tab_org, '_clear_results'):
             self.tab_org._clear_results()
-        # Clear archive tab
         if hasattr(self.tab_archives, '_clear_results'):
             self.tab_archives._clear_results()
 
@@ -174,13 +148,18 @@ class MainWindow(BaseWindow):
             self.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
         else:
             self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
-        self.show()  # Required after changing window flags
+        self.show()
 
     def closeEvent(self, event) -> None:
-        """Handle application shutdown."""
-        # Save geometry
-        from src.core.settings import SettingsManager
         sm = SettingsManager.instance()
+
+        if sm.minimize_to_tray_on_close and not QApplication.closingDown():
+            event.ignore()
+            self.window_hidden.emit()
+            self.hide()
+            return
+
+        # Full quit
         geom = self.geometry()
         sm.window_x = geom.x()
         sm.window_y = geom.y()
@@ -188,11 +167,8 @@ class MainWindow(BaseWindow):
         sm.window_h = geom.height()
         sm.force_save()
 
-        # Clean up temp cache older than configured days
         max_age = sm.temp_cache_max_age_days
         self.controller.cache_mgr.cleanup_temp(max_age)
 
-        # Emit exit event
         EventBus.instance().app_exit.emit()
-
         super().closeEvent(event)
