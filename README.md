@@ -23,10 +23,12 @@
 <div align="center">
   <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-archive.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-archive.png" width="100"></a>&nbsp;&nbsp;
   <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-org.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-org.png" width="100"></a>&nbsp;&nbsp;
-  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player.png" width="100"></a>
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player.png" width="100"></a>&nbsp;&nbsp;
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player-reputation.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-player-reputation.png" width="100"></a>
   <br>
   <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-search.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-search.png" width="100"></a>&nbsp;&nbsp;
   <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-settings.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-settings.png" width="100"></a>&nbsp;&nbsp;
+  <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-org-members.png" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-main-org-members.png" width="100"></a>&nbsp;&nbsp;
   <a href="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-toolbar.jpg" target="_blank"><img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/docs/preview/preview-toolbar.jpg" width="100"></a>
 </div>
 
