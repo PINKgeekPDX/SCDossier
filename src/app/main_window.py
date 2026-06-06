@@ -48,6 +48,7 @@ class MainWindow(BaseWindow):
         self._on_tab_selected("search")
 
         # Pin on startup if setting enabled
+        sm = SettingsManager.instance()
         if sm.pin_on_startup:
             self._toggle_always_on_top(True)
 
