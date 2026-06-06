@@ -142,7 +142,7 @@ class DossierSubTabBar(QWidget):
             if is_active:
                 painter.fillRect(rect, QColor(P.SURFACE_CONTAINER))
             elif is_hovered:
-                painter.fillRect(rect, QColor(0, 170, 255, 15))
+                painter.fillRect(rect, QColor(P.rgba(P.PRIMARY_CONTAINER, 0.06)))
             else:
                 painter.fillRect(rect, QColor(0, 0, 0, 0))
 
@@ -222,7 +222,7 @@ class ClickableOrgCard(GlassCard):
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             rect = self.rect()
-            painter.fillRect(rect, QColor(0, 170, 255, 12))
+            painter.fillRect(rect, QColor(P.rgba(P.PRIMARY_CONTAINER, 0.05)))
             painter.end()
 
 
@@ -490,6 +490,10 @@ class DossierTab(QWidget):
         if hasattr(self, 'reputation_tab'):
             self.reputation_tab.clear()
 
+    def clear(self) -> None:
+        """Public alias for _clear_results — called by MainWindow clear button."""
+        self._clear_results()
+
     def _on_search(self) -> None:
         handle = self.search_input.text().strip()
         if handle:
@@ -651,7 +655,7 @@ class DossierTab(QWidget):
 
         self._archive_glow_shadow = QGraphicsDropShadowEffect(self.archive_btn)
         self._archive_glow_shadow.setBlurRadius(0)
-        self._archive_glow_shadow.setColor(QColor(0, 170, 255, 180))
+        self._archive_glow_shadow.setColor(QColor(P.PRIMARY_CONTAINER))
         self._archive_glow_shadow.setOffset(0, 0)
         self.archive_btn.setGraphicsEffect(self._archive_glow_shadow)
 

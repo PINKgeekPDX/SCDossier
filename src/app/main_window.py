@@ -102,9 +102,9 @@ class MainWindow(BaseWindow):
 
         self.sidebar.tab_selected.connect(self._on_tab_selected)
 
-        EventBus.instance().navigate_to_tab.connect(self.sidebar.set_active_tab)
-        EventBus.instance().status_message.connect(self.status_bar.set_status)
+        # navigate_to_tab handled entirely by _on_navigate_requested (sets sidebar + stack)
         EventBus.instance().navigate_to_tab.connect(self._on_navigate_requested)
+        EventBus.instance().status_message.connect(self.status_bar.set_status)
 
     def _on_hide_requested(self) -> None:
         self.window_hidden.emit()
@@ -129,12 +129,12 @@ class MainWindow(BaseWindow):
         self._on_tab_selected(tab_id)
 
     def _on_clear_results(self) -> None:
-        if hasattr(self.tab_dossier, '_clear_results'):
-            self.tab_dossier._clear_results()
-        if hasattr(self.tab_org, '_clear_results'):
-            self.tab_org._clear_results()
-        if hasattr(self.tab_archives, '_clear_results'):
-            self.tab_archives._clear_results()
+        if hasattr(self.tab_dossier, 'clear'):
+            self.tab_dossier.clear()
+        if hasattr(self.tab_org, 'clear'):
+            self.tab_org.clear()
+        if hasattr(self.tab_archives, 'clear'):
+            self.tab_archives.clear()
 
     def _toggle_maximize(self) -> None:
         if self.isMaximized():

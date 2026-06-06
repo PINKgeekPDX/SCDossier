@@ -58,10 +58,11 @@ class StyledToggleButton(QPushButton):
         if self._active:
             # Active state: filled primary gradient
             grad = QLinearGradient(0, 0, rect.width(), 0)
-            grad.setColorAt(0, QColor(0, 130, 200, 200))
-            grad.setColorAt(1, QColor(0, 170, 255, 220))
+            grad.setColorAt(0, QColor(P.SURFACE_CONTAINER_HIGH))
+            grad.setColorAt(0.5, QColor(P.PRIMARY_CONTAINER))
+            grad.setColorAt(1, QColor(P.PRIMARY_CONTAINER))
             painter.setBrush(QBrush(grad))
-            painter.setPen(QPen(QColor(0, 200, 255, 150), 1))
+            painter.setPen(QPen(QColor(P.PRIMARY), 1))
             painter.drawRoundedRect(rect, 4, 4)
 
             # Draw text
@@ -70,8 +71,8 @@ class StyledToggleButton(QPushButton):
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
         elif self._hovered:
             # Hover state: subtle glow
-            painter.setBrush(QColor(0, 170, 255, 30))
-            painter.setPen(QPen(QColor(0, 170, 255, 120), 1))
+            painter.setBrush(QColor(P.rgba(P.PRIMARY_CONTAINER, 0.15)))
+            painter.setPen(QPen(QColor(P.PRIMARY_CONTAINER), 1))
             painter.drawRoundedRect(rect, 4, 4)
 
             painter.setPen(QColor(P.ON_SURFACE))
@@ -80,7 +81,7 @@ class StyledToggleButton(QPushButton):
         else:
             # Default: ghost style
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(QColor(0, 170, 255, 60), 1))
+            painter.setPen(QPen(QColor(P.rgba(P.PRIMARY_CONTAINER, 0.4)), 1))
             painter.drawRoundedRect(rect, 4, 4)
 
             painter.setPen(QColor(P.TEXT_DIM))
@@ -160,40 +161,27 @@ class AnimatedSearchInput(SearchInput):
         # Border with animation when focused
         if self._focused:
             alpha = int(100 + 155 * self._anim_progress)
-            border_color = QColor(0, 170, 255, alpha)
+            border_color = QColor(P.PRIMARY_CONTAINER)
+            border_color.setAlpha(alpha)
             painter.setPen(QPen(border_color, 2))
             painter.drawRoundedRect(rect, 5, 5)
 
             # Glow effect ring
-            glow_color = QColor(0, 170, 255, int(30 * self._anim_progress))
+            glow_color = QColor(P.PRIMARY_CONTAINER)
+            glow_color.setAlpha(int(30 * self._anim_progress))
             painter.setPen(QPen(glow_color, 4))
             painter.drawRoundedRect(rect.adjusted(-2, -2, 2, 2), 7, 7)
         elif self._hovered:
-            painter.setPen(QPen(QColor(0, 170, 255, 180), 2))
+            painter.setPen(QPen(QColor(P.PRIMARY_CONTAINER), 2))
             painter.drawRoundedRect(rect, 5, 5)
         else:
             painter.setPen(QPen(QColor(P.OUTLINE), 2))
             painter.drawRoundedRect(rect, 5, 5)
 
-        # Draw placeholder text or content
-        text_rect = rect.adjusted(16, 0, -16, 0)
-        text_color = QColor(P.TEXT_DIM) if not self.text() else QColor(P.ON_SURFACE)
-        painter.setPen(text_color)
-        font = font_inter(12)   # was 15
-        painter.setFont(font)
-
-        if not self.text():
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.placeholderText())
-        else:
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.text())
-
-        # Draw cursor if focused
-        if self._focused and self.text():
-            cursor_x = text_rect.x() + painter.fontMetrics().horizontalAdvance(self.text()[:self.cursorPosition()])
-            painter.setPen(QPen(QColor(P.PRIMARY), 2))
-            painter.drawLine(cursor_x, text_rect.center().y() - 8, cursor_x, text_rect.center().y() + 8)
-
         painter.end()
+
+        # Let Qt render the actual text, cursor, and selection natively
+        super().paintEvent(event)
 
     def mousePressEvent(self, event) -> None:
         super().mousePressEvent(event)
@@ -246,20 +234,21 @@ class StyledActionButton(QPushButton):
         rect = self.rect().adjusted(1, 1, -1, -1)
 
         if self._pressed:
-            painter.setBrush(QColor(0, 170, 255, 80))
-            painter.setPen(QPen(QColor(0, 200, 255, 150), 1))
+            painter.setBrush(QColor(P.rgba(P.PRIMARY_CONTAINER, 0.5)))
+            painter.setPen(QPen(QColor(P.PRIMARY), 1))
             painter.drawRoundedRect(rect, 5, 5)   # was 8
         elif self._hovered:
             grad = QLinearGradient(0, 0, rect.width(), 0)
-            grad.setColorAt(0, QColor(0, 170, 255, 50))
-            grad.setColorAt(1, QColor(0, 170, 255, 80))
+            grad.setColorAt(0, QColor(P.rgba(P.PRIMARY_CONTAINER, 0.3)))
+            grad.setColorAt(1, QColor(P.rgba(P.PRIMARY_CONTAINER, 0.5)))
             painter.setBrush(QBrush(grad))
-            painter.setPen(QPen(QColor(0, 200, 255, 120), 1))
+            painter.setPen(QPen(QColor(P.PRIMARY), 1))
             painter.drawRoundedRect(rect, 5, 5)   # was 8
         else:
-            painter.setBrush(QColor(P.PRIMARY))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(rect, 5, 5)   # was 8
+            # Default: transparent with subtle border
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(P.rgba(P.PRIMARY_CONTAINER, 0.3)), 1))
+            painter.drawRoundedRect(rect, 5, 5)
 
         painter.end()
 
@@ -277,9 +266,9 @@ class RecentSearchChip(QPushButton):
         self.setFlat(True)
         self.setStyleSheet(f"""
             QPushButton {{
-                background-color: rgba(0, 170, 255, 0.06);
+                background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.06)};
                 color: {P.PRIMARY};
-                border: 1px solid rgba(0, 170, 255, 0.22);
+                border: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.22)};
                 border-radius: 11px;
                 padding: 1px 10px;
                 font-family: "Inter", sans-serif;
@@ -287,12 +276,12 @@ class RecentSearchChip(QPushButton):
                 font-weight: 500;
             }}
             QPushButton:hover {{
-                background-color: rgba(0, 170, 255, 0.15);
+                background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
                 border-color: {P.PRIMARY};
                 color: #FFFFFF;
             }}
             QPushButton:pressed {{
-                background-color: rgba(0, 170, 255, 0.25);
+                background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.25)};
             }}
         """)
 
@@ -332,7 +321,7 @@ class SearchTab(QWidget):
             # Add faint glowing border
             logo_glow = QGraphicsDropShadowEffect()
             logo_glow.setBlurRadius(35)
-            logo_glow.setColor(QColor(0, 170, 255, 80))
+            logo_glow.setColor(QColor(P.rgba(P.PRIMARY_CONTAINER, 0.3)))
             logo_glow.setOffset(0, 0)
             logo_lbl.setGraphicsEffect(logo_glow)
         else:
@@ -375,7 +364,7 @@ class SearchTab(QWidget):
         # Glow effect behind search input
         glow = QGraphicsDropShadowEffect()
         glow.setBlurRadius(25)
-        glow.setColor(QColor(0, 170, 255, 40))
+        glow.setColor(QColor(P.rgba(P.PRIMARY_CONTAINER, 0.15)))
         glow.setOffset(0, 0)
         self.search_input.setGraphicsEffect(glow)
 

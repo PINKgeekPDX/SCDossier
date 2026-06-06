@@ -682,6 +682,10 @@ class ArchivesTab(QWidget):
         # Clear search/filter inputs
         self.filter_input.clear()
 
+    def clear(self) -> None:
+        """Public alias for _clear_results — called by MainWindow clear button."""
+        self._clear_results()
+
     @pyqtSlot(dict)
     def _on_profile_loaded(self, data: dict) -> None:
         """Refresh list when a profile is loaded/scraped."""

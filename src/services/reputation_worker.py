@@ -111,6 +111,52 @@ class ReputationSubmitWorker(QThread):
 
 
 # ---------------------------------------------------------------------------
+# ReputationCheckRateLimitWorker
+# ---------------------------------------------------------------------------
+
+class ReputationCheckRateLimitWorker(QThread):
+    """
+    Checks rate limit status for a player via the check-rate-limit Edge Function.
+
+    Emits:
+        finished_success(dict) — rate limit status dict
+        finished_error(str)    — error message on failure
+    """
+
+    finished_success = pyqtSignal(dict)
+    finished_error = pyqtSignal(str)
+
+    def __init__(self, handle: str, parent=None) -> None:
+        super().__init__(parent)
+        self._handle = handle
+
+    def run(self) -> None:
+        try:
+            svc = ReputationService.instance()
+
+            # Step 1: Get IP hash
+            ip_hash = svc._get_ip_hash()
+            if ip_hash is None:
+                self.finished_error.emit("Could not determine IP for rate limit check.")
+                return
+
+            # Step 2: Check rate limit
+            result = svc.check_rate_limit(self._handle, ip_hash)
+            if result is None:
+                self.finished_error.emit("Rate limit check returned no data.")
+                return
+
+            self.finished_success.emit(result)
+
+        except RuntimeError as e:
+            log.warning("ReputationCheckRateLimitWorker: %s", e)
+            self.finished_error.emit(str(e))
+        except Exception as e:
+            log.error("ReputationCheckRateLimitWorker.run() unexpected error: %s", e)
+            self.finished_error.emit(str(e))
+
+
+# ---------------------------------------------------------------------------
 # ReputationStartupWorker
 # ---------------------------------------------------------------------------
 

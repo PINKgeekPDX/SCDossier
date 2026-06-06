@@ -107,8 +107,8 @@ class ReputationBar(QWidget):
         self._bar.setFixedHeight(8)
         self._bar.setStyleSheet(f"""
             QProgressBar {{
-                background: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.08);
+                background: {P.rgba(P.ON_SURFACE, 0.05)};
+                border: 1px solid {P.OUTLINE_VARIANT};
                 border-radius: 4px;
             }}
             QProgressBar::chunk {{
@@ -295,7 +295,7 @@ class ReportDialog(QDialog):
         self._submit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._submit_btn.setStyleSheet(f"""
             QPushButton {{
-                background: rgba(0, 170, 255, 0.15);
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
                 color: {P.PRIMARY};
                 border: 1px solid {P.PRIMARY};
                 border-radius: 4px;
@@ -303,7 +303,7 @@ class ReportDialog(QDialog):
                 font-size: 12px;
                 font-weight: bold;
             }}
-            QPushButton:hover {{ background: rgba(0, 170, 255, 0.25); }}
+            QPushButton:hover {{ background: {P.rgba(P.PRIMARY_CONTAINER, 0.25)}; }}
             QPushButton:disabled {{
                 color: {P.TEXT_DIM};
                 border-color: {P.OUTLINE_VARIANT};
@@ -407,6 +407,10 @@ class ReputationTab(QWidget):
         super().__init__(parent)
         self._current_handle: str = ""
         self._bars: dict[str, ReputationBar] = {}
+        self._cooldown_end_time: float = 0.0
+        self._cooldown_timer = QTimer(self)
+        self._cooldown_timer.setInterval(1000)
+        self._cooldown_timer.timeout.connect(self._tick_cooldown)
         self._build_ui()
         self._connect_signals()
         # Initialize state based on current settings
@@ -481,7 +485,7 @@ class ReputationTab(QWidget):
             btn.setFixedHeight(32)
             btn.setStyleSheet(f"""
                 QPushButton {{
-                    background: rgba(0, 170, 255, 0.12);
+                    background: {P.rgba(P.PRIMARY_CONTAINER, 0.12)};
                     color: {P.PRIMARY};
                     border: 1px solid {P.PRIMARY};
                     border-radius: 4px;
@@ -489,10 +493,10 @@ class ReputationTab(QWidget):
                     font-size: 11px;
                     font-weight: bold;
                 }}
-                QPushButton:hover {{ background: rgba(0, 170, 255, 0.22); }}
+                QPushButton:hover {{ background: {P.rgba(P.PRIMARY_CONTAINER, 0.22)}; }}
                 QPushButton:disabled {{
-                    color: rgba(255, 255, 255, 0.3);
-                    border-color: rgba(255, 255, 255, 0.15);
+                    color: {P.TEXT_DIM};
+                    border-color: {P.OUTLINE_VARIANT};
                     background: transparent;
                 }}
             """)
@@ -619,7 +623,7 @@ class ReputationTab(QWidget):
         self._report_btn.setFixedHeight(32)
         self._report_btn.setStyleSheet(f"""
             QPushButton {{
-                background: rgba(0, 170, 255, 0.12);
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.12)};
                 color: {P.PRIMARY};
                 border: 1px solid {P.PRIMARY};
                 border-radius: 4px;
@@ -627,10 +631,10 @@ class ReputationTab(QWidget):
                 font-size: 11px;
                 font-weight: bold;
             }}
-            QPushButton:hover {{ background: rgba(0, 170, 255, 0.22); }}
+            QPushButton:hover {{ background: {P.rgba(P.PRIMARY_CONTAINER, 0.22)}; }}
             QPushButton:disabled {{
-                color: rgba(255, 255, 255, 0.3);
-                border-color: rgba(255, 255, 255, 0.15);
+                color: {P.TEXT_DIM};
+                border-color: {P.OUTLINE_VARIANT};
                 background: transparent;
             }}
         """)
@@ -727,6 +731,10 @@ class ReputationTab(QWidget):
         # Update handle label in case we arrive at 'loaded' state
         self._loaded_handle_lbl.setText(f"@{handle.upper()}")
 
+        # Stop any existing cooldown timer
+        self._cooldown_timer.stop()
+        self._cooldown_end_time = 0.0
+
         # Check self-report restriction
         from src.services.reputation_service import ReputationService
         is_self = False
@@ -739,46 +747,164 @@ class ReputationTab(QWidget):
             pass
 
         if is_self:
-            self._report_btn.setEnabled(False)
-            self._report_btn.setToolTip("You cannot submit a reputation report for yourself.")
-            self._no_data_report_btn.setEnabled(False)
-            self._no_data_report_btn.setToolTip("You cannot submit a reputation report for yourself.")
+            self._set_report_buttons_disabled(
+                False, "You cannot submit a reputation report for yourself."
+            )
         else:
-            # Check rate limits
-            import time
-            history = sm.reputation_history
-            handle_lower = handle.lower()
-            timestamps = history.get(handle_lower, [])
-            now = time.time()
-            
-            # Filter out timestamps older than 30 days
-            timestamps = [t for t in timestamps if now - t < 30 * 24 * 3600]
-            
-            # Check limits
-            limited_24h = bool(timestamps and now - timestamps[-1] < 24 * 3600)
-            limited_monthly = len(timestamps) >= 3
-            
-            if limited_24h:
-                msg = "You can only submit one report per player every 24 hours."
-                self._report_btn.setEnabled(False)
-                self._report_btn.setToolTip(msg)
-                self._no_data_report_btn.setEnabled(False)
-                self._no_data_report_btn.setToolTip(msg)
-            elif limited_monthly:
-                msg = "You have reached the limit of 3 reports for this player this month."
-                self._report_btn.setEnabled(False)
-                self._report_btn.setToolTip(msg)
-                self._no_data_report_btn.setEnabled(False)
-                self._no_data_report_btn.setToolTip(msg)
+            # Check rate limit server-side
+            self._check_rate_limit_server(handle)
+
+    def _check_rate_limit_server(self, handle: str) -> None:
+        """Check rate limit via server-side Edge Function in background."""
+        from src.services.reputation_service import ReputationService
+        from src.services.reputation_worker import ReputationCheckRateLimitWorker
+
+        if not ReputationService.is_initialized():
+            return
+
+        worker = ReputationCheckRateLimitWorker(handle, self)
+        worker.finished_success.connect(self._on_rate_limit_checked)
+        worker.finished_error.connect(self._on_rate_limit_check_failed)
+        worker.start()
+
+    @pyqtSlot(dict)
+    def _on_rate_limit_checked(self, result: dict) -> None:
+        """Handle server-side rate limit check result."""
+        if not result:
+            # Server error — allow submission (fail open)
+            self._set_report_buttons_enabled()
+            return
+
+        allowed = result.get("allowed", True)
+        cooldown_seconds = result.get("cooldown_seconds", 0)
+        monthly_remaining = result.get("monthly_remaining", 2)
+        reports_used = result.get("reports_used", 0)
+        monthly_limit = result.get("monthly_limit", 2)
+
+        if allowed:
+            self._set_report_buttons_enabled()
+        else:
+            if cooldown_seconds > 0:
+                # 24-hour cooldown active
+                import time
+                self._cooldown_end_time = time.time() + cooldown_seconds
+                self._cooldown_timer.start()
+                self._update_cooldown_display()
             else:
-                self._report_btn.setEnabled(True)
-                self._report_btn.setToolTip("")
-                self._no_data_report_btn.setEnabled(True)
-                self._no_data_report_btn.setToolTip("")
+                # Monthly limit reached
+                msg = f"Monthly limit reached ({reports_used}/{monthly_limit} reports). Try again later."
+                self._set_report_buttons_disabled(True, msg)
+
+    @pyqtSlot(str)
+    def _on_rate_limit_check_failed(self, error_msg: str) -> None:
+        """Handle server-side rate limit check failure — fail open."""
+        log.warning("Rate limit check failed, allowing submission: %s", error_msg)
+        self._set_report_buttons_enabled()
+
+    def _tick_cooldown(self) -> None:
+        """Update countdown display every second."""
+        import time
+        remaining = self._cooldown_end_time - time.time()
+        if remaining <= 0:
+            # Cooldown expired
+            self._cooldown_timer.stop()
+            self._cooldown_end_time = 0.0
+            self._set_report_buttons_enabled()
+            return
+        self._update_cooldown_display()
+
+    def _update_cooldown_display(self) -> None:
+        """Update button text with remaining cooldown time."""
+        import time
+        remaining = max(0, self._cooldown_end_time - time.time())
+        hours = int(remaining // 3600)
+        minutes = int((remaining % 3600) // 60)
+        seconds = int(remaining % 60)
+        time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        msg = f"COOLDOWN {time_str}"
+        self._set_report_buttons_disabled(True, msg, cooldown=True)
+
+    def _set_report_buttons_enabled(self) -> None:
+        """Enable both report buttons with normal styling."""
+        self._report_btn.setEnabled(True)
+        self._report_btn.setText("⊕  REPORT INTERACTION")
+        self._report_btn.setToolTip("")
+        self._report_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.12)};
+                color: {P.PRIMARY};
+                border: 1px solid {P.PRIMARY};
+                border-radius: 4px;
+                padding: 4px 16px;
+                font-size: 11px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{ background: {P.rgba(P.PRIMARY_CONTAINER, 0.22)}; }}
+            QPushButton:disabled {{
+                color: {P.TEXT_DIM};
+                border-color: {P.OUTLINE_VARIANT};
+                background: transparent;
+            }}
+        """)
+        self._no_data_report_btn.setEnabled(True)
+        self._no_data_report_btn.setText("REPORT INTERACTION")
+        self._no_data_report_btn.setToolTip("")
+
+    def _set_report_buttons_disabled(self, disabled: bool, tooltip: str = "", cooldown: bool = False) -> None:
+        """Disable/enable both report buttons with appropriate styling."""
+        if disabled and cooldown:
+            # Cooldown styling — amber/orange tint
+            btn_style = f"""
+                QPushButton {{
+                    background: rgba(255, 170, 0, 0.08);
+                    color: rgba(255, 170, 0, 0.7);
+                    border: 1px solid rgba(255, 170, 0, 0.3);
+                    border-radius: 4px;
+                    padding: 4px 16px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    font-family: 'JetBrains Mono', monospace;
+                }}
+            """
+            self._report_btn.setStyleSheet(btn_style)
+            self._no_data_report_btn.setStyleSheet(btn_style)
+        elif disabled:
+            # Standard disabled styling
+            btn_style = f"""
+                QPushButton {{
+                    color: {P.TEXT_DIM};
+                    border-color: {P.OUTLINE_VARIANT};
+                    background: transparent;
+                    border: 1px solid {P.OUTLINE_VARIANT};
+                    border-radius: 4px;
+                    padding: 4px 16px;
+                    font-size: 11px;
+                }}
+            """
+            self._report_btn.setStyleSheet(btn_style)
+            self._no_data_report_btn.setStyleSheet(btn_style)
+        else:
+            # Re-enable — reset to normal
+            self._set_report_buttons_enabled()
+            return
+
+        self._report_btn.setEnabled(not disabled)
+        self._no_data_report_btn.setEnabled(not disabled)
+
+        if tooltip:
+            self._report_btn.setToolTip(tooltip)
+            self._no_data_report_btn.setToolTip(tooltip)
+
+        # Update button text for cooldown
+        if cooldown and disabled:
+            self._report_btn.setText(tooltip)
+            self._no_data_report_btn.setText(tooltip)
 
     def clear(self) -> None:
         """Reset to empty state (called when DossierTab clears results)."""
         self._current_handle = ""
+        self._cooldown_timer.stop()
+        self._cooldown_end_time = 0.0
         sm = SettingsManager.instance()
         if not sm.reputation_enabled:
             self._set_state("disabled")
@@ -847,8 +973,8 @@ class ReputationTab(QWidget):
         """Re-trigger loading state after a successful report submission."""
         if handle.lower() != self._current_handle.lower():
             return
-            
-        # Record report timestamp in history
+
+        # Record report timestamp in local history (kept for offline fallback)
         import time
         from src.core.settings import SettingsManager
         sm = SettingsManager.instance()
@@ -862,7 +988,10 @@ class ReputationTab(QWidget):
         history[handle_lower] = [t for t in history[handle_lower] if now - t < 30 * 24 * 3600]
         sm.reputation_history = history
         sm.force_save()
-        
+
+        # Re-check rate limit server-side to get accurate cooldown
+        self._check_rate_limit_server(handle)
+
         # AppController will re-emit reputation_loaded after submit
         self._set_state("loading")
 
@@ -871,9 +1000,9 @@ class ReputationTab(QWidget):
         """Handle reputation report submission failure."""
         if handle.lower() != self._current_handle.lower():
             return
-        # Re-fetch reputation data to restore UI state from loading to loaded
+        # Re-fetch reputation data only (not a full player scrape)
         self._set_state("loading")
-        EventBus.instance().search_player_requested.emit(self._current_handle)
+        EventBus.instance().request_reputation_fetch.emit(self._current_handle)
 
         from src.ui.widgets.confirm_dialog import show_error_dialog
         show_error_dialog("REPORT SUBMISSION FAILED", error_msg, parent=self.window())
@@ -926,10 +1055,10 @@ class ReputationTab(QWidget):
                 )
 
     def _on_refresh_clicked(self) -> None:
-        """Manually re-trigger a reputation fetch for the current handle."""
+        """Manually re-trigger a reputation fetch for the current handle (not a full scrape)."""
         if self._current_handle:
             self._set_state("loading")
-            EventBus.instance().search_player_requested.emit(self._current_handle)
+            EventBus.instance().request_reputation_fetch.emit(self._current_handle)
 
     def _on_retry_clicked(self) -> None:
         """Retry after offline — attempt a re-fetch."""

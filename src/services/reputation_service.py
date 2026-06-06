@@ -263,6 +263,54 @@ class ReputationService:
             log.error("submit_report(%s) failed: %s", handle, e)
             raise ReputationServiceError(str(e)) from e
 
+    def check_rate_limit(self, handle: str, ip_hash: str) -> dict:
+        """
+        Check rate limit status for a given IP + player via the check-rate-limit Edge Function.
+
+        Returns a dict:
+            {
+                "allowed": bool,
+                "reports_used": int,
+                "reports_remaining": int,
+                "window_start": str | None,
+                "cooldown_seconds": int,
+                "monthly_limit": int,
+                "monthly_remaining": int,
+            }
+        Returns None on failure.
+        """
+        from src.app.constants import REP_APP_TOKEN
+        import json
+
+        try:
+            response = self._client.functions.invoke(
+                "check-rate-limit",
+                invoke_options={
+                    "headers": {"X-SCD-App-Token": REP_APP_TOKEN},
+                    "body": {
+                        "handle": handle.strip().lower(),
+                        "ip_hash": ip_hash,
+                    },
+                },
+            )
+
+            if isinstance(response, bytes):
+                try:
+                    response = json.loads(response.decode("utf-8"))
+                except json.JSONDecodeError:
+                    log.warning("check_rate_limit: failed to parse JSON response")
+                    return None
+
+            if isinstance(response, dict) and "error" in response:
+                log.warning("check_rate_limit error: %s", response["error"])
+                return None
+
+            return response if isinstance(response, dict) else None
+
+        except Exception as e:
+            log.warning("check_rate_limit(%s) failed: %s", handle, e)
+            return None
+
     def fetch_known_handles(self) -> list[str]:
         """
         Fetch all player handles that have reputation data.
@@ -338,7 +386,7 @@ class ReputationService:
     def _normalize_score(score: int, report_count: int, category: str) -> int:
         """
         Normalize score on a 0-100 scale.
-        Score % is computed such that achieving 100% requires the equivalent of 20 max score reports.
+        Score % is computed such that achieving 100% requires the equivalent of 50 max score reports.
         """
         if report_count <= 0 or score <= 0:
             return 0
@@ -348,7 +396,7 @@ class ReputationService:
         if max_score_per_report == 0:
             return 0
             
-        max_possible_points = max_score_per_report * 20
+        max_possible_points = max_score_per_report * 50
         denominator = max(report_count * max_score_per_report, max_possible_points)
         
         pct = int((score / denominator) * 100)

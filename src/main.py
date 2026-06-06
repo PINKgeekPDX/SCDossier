@@ -204,7 +204,12 @@ def main():
     tray_icon.open_logs_requested.connect(_open_logs)
     tray_icon.open_archive_requested.connect(_open_archive)
     def _quit_app():
-        log.info("Quit requested — exiting.")
+        log.info("Quit requested — saving settings and exiting.")
+        try:
+            sm.force_save()
+            EventBus.instance().app_exit.emit()
+        except Exception:
+            pass
         os._exit(0)
     tray_icon.quit_requested.connect(_quit_app)
     tray_icon.show()
@@ -212,8 +217,8 @@ def main():
     # 7. Restore Positions
     toolbar.restore_position(sm.toolbar_x, sm.toolbar_y, sm.toolbar_edge)
 
-    # Apply toolbar opacity from settings
-    toolbar.set_opacity(sm.toolbar_opacity)
+    # Apply toolbar opacity from settings (idle opacity for when SC is not running)
+    toolbar.set_opacity(sm.toolbar_idle_opacity)
 
     # Restore main window geometry
     geom = QRect(sm.window_x, sm.window_y, sm.window_w, sm.window_h)
@@ -297,16 +302,19 @@ def main():
     # 11. Finish up and fade out
     def _finalize_startup():
         splash.close()
-        
-        import subprocess
+
         sc_running = False
         try:
-            output = subprocess.check_output('tasklist /FI "IMAGENAME eq StarCitizen.exe" /NH', shell=True).decode()
+            output = subprocess.check_output(
+                'tasklist /FI "IMAGENAME eq StarCitizen.exe" /NH',
+                shell=True,
+                creationflags=0x08000000  # CREATE_NO_WINDOW
+            ).decode()
             if "StarCitizen.exe" in output:
                 sc_running = True
         except Exception:
             pass
-            
+
         if sc_running:
             toolbar.show()
             main_window.hide()

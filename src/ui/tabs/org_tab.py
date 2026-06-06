@@ -133,12 +133,14 @@ class _MemberCard(QWidget):
 
         # Background — glass effect
         bg_alpha = 200 if self._hovered else 120
-        bg = QColor(10, 29, 41, bg_alpha)
+        bg = QColor(P.SURFACE_CONTAINER_LOW)
+        bg.setAlpha(bg_alpha)
         painter.fillRect(rect, bg)
 
         # Border
-        border_alpha = 60 if self._hovered else 30
-        painter.setPen(QPen(QColor(0, 170, 255, border_alpha), 1))
+        border_col = QColor(P.PRIMARY_CONTAINER)
+        border_col.setAlpha(60 if self._hovered else 30)
+        painter.setPen(QPen(border_col, 1))
         painter.drawRect(rect.adjusted(0, 0, -1, -1))
 
         # Bracket corners
@@ -172,7 +174,7 @@ class _MemberCard(QWidget):
             clip = QPainterPath()
             clip.addEllipse(circle_rect)
             painter.setClipPath(clip)
-            painter.fillRect(circle_rect, QColor(0, 170, 255, 22))
+            painter.fillRect(circle_rect, QColor(P.rgba(P.PRIMARY_CONTAINER, 0.08)))
             painter.setClipping(False)
             painter.setPen(QPen(QColor(P.PRIMARY), 1))
             painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -220,7 +222,7 @@ class _MemberCard(QWidget):
 
             r_path = QPainterPath()
             r_path.addRoundedRect(badge_x, 52, rank_w, badge_h, 3, 3)
-            painter.fillPath(r_path, QColor(0, 170, 255, 14))
+            painter.fillPath(r_path, QColor(P.rgba(P.PRIMARY_CONTAINER, 0.05)))
             painter.setPen(QPen(QColor(P.PRIMARY), 1))
             painter.drawRoundedRect(badge_x, 52, rank_w, badge_h, 3, 3)
             painter.setPen(QColor(P.PRIMARY))
@@ -399,7 +401,7 @@ class OrgSubTabBar(QWidget):
             if is_active:
                 painter.fillRect(tab_rect, QColor(P.SURFACE_CONTAINER))
             elif is_hovered:
-                painter.fillRect(tab_rect, QColor(0, 170, 255, 15))
+                painter.fillRect(tab_rect, QColor(P.rgba(P.PRIMARY_CONTAINER, 0.06)))
             else:
                 painter.fillRect(tab_rect, QColor(0, 0, 0, 0))
 
@@ -524,8 +526,8 @@ class OrgTab(QWidget):
         # --- Banner container ---
         self.banner_container = QWidget()
         self.banner_container.setStyleSheet(
-            "background: rgba(0,170,255,0.04);"
-            "border-bottom: 1px solid rgba(0,170,255,0.15);"
+            f"background: {P.rgba(P.PRIMARY_CONTAINER, 0.04)};"
+            f"border-bottom: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.15)};"
         )
         banner_grid = QGridLayout(self.banner_container)
         banner_grid.setContentsMargins(14, 14, 14, 14)
@@ -620,7 +622,7 @@ class OrgTab(QWidget):
         self.focus_primary_icon.setFixedSize(48, 48)
         self.focus_primary_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.focus_primary_icon.setStyleSheet(
-            "background: rgba(0,170,255,0.08); border: 1px solid rgba(0,170,255,0.25);"
+            f"background: {P.rgba(P.PRIMARY_CONTAINER, 0.08)}; border: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.25)};"
             "border-radius: 24px;"
         )
         lbl_primary_cap = QLabel("PRIMARY FOCUS")
@@ -640,7 +642,7 @@ class OrgTab(QWidget):
         self.focus_secondary_icon.setFixedSize(48, 48)
         self.focus_secondary_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.focus_secondary_icon.setStyleSheet(
-            "background: rgba(0,170,255,0.08); border: 1px solid rgba(0,170,255,0.25);"
+            f"background: {P.rgba(P.PRIMARY_CONTAINER, 0.08)}; border: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.25)};"
             "border-radius: 24px;"
         )
         lbl_secondary_cap = QLabel("SECONDARY FOCUS")
@@ -767,7 +769,6 @@ class OrgTab(QWidget):
         """Check if org name matches a known SC manufacturer and return logo path."""
         for name_key, file_key in MANUFACTURER_MAP.items():
             if name_key.lower() in org_name.lower():
-                from src.core.paths import get_asset_path
                 logo_path = get_asset_path(f"assets/icons/manufact-names/sc-logo-{file_key}.svg")
                 if os.path.exists(logo_path):
                     return logo_path
@@ -836,6 +837,10 @@ class OrgTab(QWidget):
         self.detail_container.setVisible(False)
         self.empty_lbl.setVisible(True)
 
+    def clear(self) -> None:
+        """Public alias for _clear_results — called by MainWindow clear button."""
+        self._clear_results()
+
     def _on_search(self) -> None:
         query = self.search_input.text().strip()
         if query:
@@ -884,7 +889,7 @@ class OrgTab(QWidget):
                 border-radius: 3px;
             }}
             QListWidget::item:selected {{
-                background: rgba(0, 170, 255, 0.20);
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.20)};
             }}
         """)
         for c in candidates:

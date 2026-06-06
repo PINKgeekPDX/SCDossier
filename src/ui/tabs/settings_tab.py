@@ -15,7 +15,7 @@ from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
 from src.ui.theme.stylesheet import build_stylesheet
 from src.ui.widgets.tech_label import TechLabel
-from src.ui.widgets.smart_inputs import NoScrollSpinBox, NoScrollSlider, ColorPickerButton, NoScrollComboBox
+from src.ui.widgets.smart_inputs import NoScrollSpinBox, NoScrollSlider, ColorPickerButton, NoScrollComboBox  # noqa: F401 (NoScrollComboBox re-used below)
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.keybind_dialog import KeybindDetectDialog
 from src.services.updater_service import UpdaterService
@@ -79,7 +79,7 @@ class SettingsTab(QWidget):
             }}
             QCheckBox::indicator:hover {{
                 border: 2px solid {P.PRIMARY_CONTAINER};
-                background: rgba(0,170,255,0.1);
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.1)};
             }}
             QCheckBox::indicator:checked {{
                 border: 2px solid {P.PRIMARY};
@@ -88,10 +88,14 @@ class SettingsTab(QWidget):
         """
 
     def _btn_style(self, accent: bool = False) -> str:
-        c = "#00FF88" if accent else P.PRIMARY_CONTAINER
+        # accent uses SECONDARY_CONTAINER (teal-green); normal uses PRIMARY_CONTAINER (blue)
+        c = P.SECONDARY_CONTAINER if accent else P.PRIMARY_CONTAINER
+        bg_rgba = P.rgba(c, 0.12)
+        bg_hover_rgba = P.rgba(c, 0.25)
+        bg_pressed_rgba = P.rgba(c, 0.35)
         return f"""
             QPushButton {{
-                background: rgba({', '.join(str(int(c[i:i+2],16)) for i in (1,3,5))}, 0.12);
+                background: {bg_rgba};
                 color: {P.ON_SURFACE};
                 border: 1px solid {c};
                 border-radius: 4px;
@@ -100,8 +104,8 @@ class SettingsTab(QWidget):
                 font-weight: 600;
                 min-height: 24px;
             }}
-            QPushButton:hover {{ background: rgba({', '.join(str(int(c[i:i+2],16)) for i in (1,3,5))}, 0.25); }}
-            QPushButton:pressed {{ background: rgba({', '.join(str(int(c[i:i+2],16)) for i in (1,3,5))}, 0.35); }}
+            QPushButton:hover {{ background: {bg_hover_rgba}; }}
+            QPushButton:pressed {{ background: {bg_pressed_rgba}; }}
             QPushButton:disabled {{ color: {P.TEXT_DIM}; border-color: {P.OUTLINE_VARIANT}; background: transparent; }}
         """
 
@@ -251,13 +255,11 @@ class SettingsTab(QWidget):
         af.addWidget(self._slider_row("TOOLBAR OPACITY", self.toolbar_slider, self.toolbar_val_lbl,
             "Adjust overlay toolbar idle transparency (30% very transparent, 100% solid)"))
 
-        from src.ui.widgets.smart_inputs import NoScrollComboBox
+        # NoScrollComboBox already imported at module level
         self.app_font_combo = NoScrollComboBox()
         self.app_font_combo.addItems(["Default", "Sora", "Inter", "JetBrains Mono"])
         self.app_font_combo.setStyleSheet(self._input_style())
         af.addWidget(self._row("APP FONT", self.app_font_combo, "Change the global font family used throughout the app"))
-
-
 
         ac.content_layout.addLayout(af)
         lo.addWidget(ac, 1, 0)
@@ -581,7 +583,7 @@ class SettingsTab(QWidget):
         lo.addWidget(self._about_row("FRAMEWORK", "PyQt6"))
         lo.addWidget(self._about_row("LICENSE", "MIT License"))
 
-        ghv = QLabel('<a href="https://github.com/pinkgeekpdx" style="color:#00AAFF;">github.com/pinkgeekpdx</a>')
+        ghv = QLabel(f'<a href="https://github.com/pinkgeekpdx" style="color:{P.PRIMARY};">github.com/pinkgeekpdx</a>')
         ghv.setFont(font_inter(10))
         ghv.setStyleSheet("background:transparent;border:none;")
         ghv.setTextFormat(Qt.TextFormat.RichText)
@@ -594,7 +596,7 @@ class SettingsTab(QWidget):
         lo.addWidget(self._row("GITHUB", gh_wrap, "View the project on GitHub"))
 
         bio = QLabel(
-            'Developed by <a href="https://github.com/pinkgeekpdx" style="color:#00AAFF;">PINKgeekPDX</a> '
+            f'Developed by <a href="https://github.com/pinkgeekpdx" style="color:{P.PRIMARY};">PINKgeekPDX</a> '
             "- a community fan project for Star Citizen players. Not affiliated with Cloud Imperium Games."
         )
         bio.setFont(font_inter(9))
@@ -652,18 +654,18 @@ class SettingsTab(QWidget):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-        from src.core.settings import DEFAULT_SETTINGS
-        self.sm._data = json.loads(json.dumps(DEFAULT_SETTINGS))
-        self.sm.force_save()
-        
+
+        # Use the public reset API — no direct _data access
+        self.sm.reset_to_defaults()
+
         from src.ui.theme import palette as P
         P.apply_overrides({})
-        
+
         self._load_values()
         EventBus.instance().settings_changed.emit("font_size_scaling", self.sm.font_size_scaling)
         EventBus.instance().settings_changed.emit("theme_accent_override", self.sm.theme_accent_override)
         EventBus.instance().settings_changed.emit("theme_palette_overrides", {})
-        
+
         QMessageBox.information(self, "Settings Reset", "All settings have been restored to factory defaults.")
 
     # ------------------------------------------------------------------
@@ -697,8 +699,6 @@ class SettingsTab(QWidget):
         dhk_val = self.sm.toolbar_drag_hotkey
         self.drag_hk_lbl.setText(dhk_val.upper() if dhk_val else "None")
 
-        pass
-
         self.minimize_tray_cb.setChecked(self.sm.minimize_to_tray_on_close)
         self.pin_startup_cb.setChecked(self.sm.pin_on_startup)
         self.tray_notif_cb.setChecked(self.sm.show_tray_notifications)
@@ -706,7 +706,6 @@ class SettingsTab(QWidget):
 
         self.auto_check_cb.setChecked(self.sm.auto_check_updates)
         self.auto_download_cb.setChecked(self.sm.auto_download_updates)
-
 
 
         idx = self.log_level_combo.findData(self.sm.log_level)
@@ -741,7 +740,6 @@ class SettingsTab(QWidget):
         self.drag_hk_btn.clicked.connect(self._on_detect_drag_hotkey)
 
 
-
         # Hotkeys
         self.hotkey_btn.clicked.connect(self._on_detect_hotkey)
 
@@ -753,8 +751,6 @@ class SettingsTab(QWidget):
         # Updater
         self.auto_check_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_check_updates', v))
         self.auto_download_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_download_updates', v))
-
-
 
         # Diagnostics
         self.log_level_combo.currentIndexChanged.connect(
@@ -814,6 +810,13 @@ class SettingsTab(QWidget):
             import os
             target_cmd = [sys.executable] + sys.argv
             subprocess.Popen(restarter + target_cmd, creationflags=0x08000000)
+            # Emit app_exit for cleanup before hard exit
+            from src.core.events import EventBus
+            try:
+                self.sm.force_save()
+                EventBus.instance().app_exit.emit()
+            except Exception:
+                pass
             os._exit(0)
 
     def _open_theme_editor(self) -> None:

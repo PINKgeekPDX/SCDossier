@@ -38,9 +38,6 @@ class EventBus(QObject):
     # Data Loaded Signals
     # ------------------------------------------------------------------
 
-    # Player profile data is ready for display (PlayerProfile dict)
-    profile_loaded = pyqtSignal(dict)
-    
     # Scrape completed successfully (dict)
     scrape_completed = pyqtSignal(dict)
 
@@ -87,16 +84,6 @@ class EventBus(QObject):
 
     # Request main window to show and switch to a specific tab (TabId.value)
     navigate_to_tab = pyqtSignal(str)
-    nav_requested = pyqtSignal(int)
-
-    # Request the main window to become visible
-    show_main_window = pyqtSignal()
-
-    # Request main window to hide (return to toolbar)
-    hide_main_window = pyqtSignal()
-
-    # Request OCR capture mode to begin
-    start_capture = pyqtSignal()
 
     # Emitted when the global hotkey is pressed
     capture_hotkey_pressed = pyqtSignal()
@@ -115,9 +102,6 @@ class EventBus(QObject):
 
     # General status message for the status bar (message, level: StatusLevel.value)
     status_message = pyqtSignal(str, str)
-
-    # Scraping/loading progress (0.0–1.0, or -1.0 for indeterminate)
-    progress_update = pyqtSignal(float)
 
     # ------------------------------------------------------------------
     # Settings Signals

@@ -137,7 +137,7 @@ class AppController(QObject):
 
         if self.cache_mgr.is_archived(handle):
             self.sync_svc.sync_profile(handle, data)
-            data = self.cache_mgr.load_profile(handle, archived=True)
+            # Determine storage dir but keep fresh scraped data for image queueing
             temp_dir = self.cache_mgr.paths.archived_dir(handle)
         else:
             self.cache_mgr.save_temp_profile(data)
@@ -147,6 +147,13 @@ class AppController(QObject):
 
         EventBus.instance().status_message.emit("DATA RETRIEVED SUCCESSFULLY", "success")
         EventBus.instance().scrape_completed.emit(data)
+
+        # Auto-check reputation if enabled
+        sm = SettingsManager.instance()
+        if sm.reputation_enabled and sm.reputation_auto_check and handle:
+            from src.services.reputation_service import ReputationService
+            if ReputationService.is_initialized():
+                EventBus.instance().request_reputation_fetch.emit(handle)
 
     @pyqtSlot(str)
     def _on_scrape_error(self, error_msg: str) -> None:

@@ -595,30 +595,6 @@ class SettingsManager(QObject):
     # ------------------------------------------------------------------
 
     @property
-    def reputation_enabled(self) -> bool:
-        return bool(self.get("reputation_enabled", False))
-
-    @reputation_enabled.setter
-    def reputation_enabled(self, v: bool) -> None:
-        self.set("reputation_enabled", v)
-
-    @property
-    def reputation_auto_check(self) -> bool:
-        return bool(self.get("reputation_auto_check", True))
-
-    @reputation_auto_check.setter
-    def reputation_auto_check(self, v: bool) -> None:
-        self.set("reputation_auto_check", v)
-
-    @property
-    def reputation_prefetch_archived(self) -> bool:
-        return bool(self.get("reputation_prefetch_archived", False))
-
-    @reputation_prefetch_archived.setter
-    def reputation_prefetch_archived(self, v: bool) -> None:
-        self.set("reputation_prefetch_archived", v)
-
-    @property
     def reputation_history(self) -> dict:
         return self.get("reputation_history", {})
 
@@ -649,6 +625,18 @@ class SettingsManager(QObject):
     @toolbar_idle_opacity.setter
     def toolbar_idle_opacity(self, v: float) -> None:
         self.set("toolbar_idle_opacity", max(0.1, min(1.0, v)))
+
+    def reset_to_defaults(self) -> None:
+        """Reset all settings to factory defaults and save immediately."""
+        self._data = json.loads(json.dumps(DEFAULT_SETTINGS))
+        self._dirty = True
+        self._flush()
+        log.info("Settings reset to factory defaults.")
+        try:
+            from src.core.events import EventBus
+            EventBus.instance().settings_changed.emit("_reset_all", None)
+        except Exception:
+            pass
 
     def force_save(self) -> None:
         """Force an immediate save regardless of dirty state."""

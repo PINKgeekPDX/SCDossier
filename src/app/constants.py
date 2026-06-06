@@ -129,7 +129,7 @@ REP_APP_TOKEN = "6UILwmiuzMeXtpXRnoX2Yg"
 # Reputation System — Rate Limiting
 # ---------------------------------------------------------------------------
 REPUTATION_MAX_TAGS = 5
-REPUTATION_RATE_LIMIT_PER_MONTH = 3
+REPUTATION_RATE_LIMIT_PER_MONTH = 2
 
 
 # ---------------------------------------------------------------------------
@@ -139,25 +139,25 @@ REPUTATION_RATE_LIMIT_PER_MONTH = 3
 # ---------------------------------------------------------------------------
 REPUTATION_TAGS: dict = {
     # --- Dangerous ---
-    "killed_me":        {"label": "They Killed Me",          "category": "dangerous",   "points": 3},
-    "killed_us":        {"label": "They Killed Us All",       "category": "dangerous",   "points": 5},
-    "ambushed":         {"label": "Set an Ambush / Trap",     "category": "dangerous",   "points": 4},
-    "griefer":          {"label": "Griefed / Harassed Me",    "category": "dangerous",   "points": 4},
+    "killed_me":        {"label": "They Killed Me",          "category": "dangerous",   "points": 1},
+    "killed_us":        {"label": "They Killed Us All",       "category": "dangerous",   "points": 2},
+    "ambushed":         {"label": "Set an Ambush / Trap",     "category": "dangerous",   "points": 1},
+    "griefer":          {"label": "Griefed / Harassed Me",    "category": "dangerous",   "points": 1},
     # --- Shady ---
-    "scammed":          {"label": "Scammed Me",               "category": "shady",       "points": 5},
-    "lied":             {"label": "Lied / Deceived Me",       "category": "shady",       "points": 3},
-    "manipulated":      {"label": "Manipulated / Lured Me",   "category": "shady",       "points": 4},
+    "scammed":          {"label": "Scammed Me",               "category": "shady",       "points": 2},
+    "lied":             {"label": "Lied / Deceived Me",       "category": "shady",       "points": 1},
+    "manipulated":      {"label": "Manipulated / Lured Me",   "category": "shady",       "points": 1},
     # --- Pirate ---
-    "pirate_act":       {"label": "Acted Like a Pirate",      "category": "pirate",      "points": 4},
-    "pirate_confirmed": {"label": "Confirmed Pirate",          "category": "pirate",      "points": 6},
+    "pirate_act":       {"label": "Acted Like a Pirate",      "category": "pirate",      "points": 1},
+    "pirate_confirmed": {"label": "Confirmed Pirate",          "category": "pirate",      "points": 2},
     # --- Elusive ---
-    "elusive":          {"label": "Hard to Track / Elusive",  "category": "elusive",     "points": 3},
-    "escaped":          {"label": "Escaped Every Time",        "category": "elusive",     "points": 4},
+    "elusive":          {"label": "Hard to Track / Elusive",  "category": "elusive",     "points": 1},
+    "escaped":          {"label": "Escaped Every Time",        "category": "elusive",     "points": 1},
     # --- Trustworthy ---
-    "trustworthy":      {"label": "Trustworthy / Reliable",   "category": "trustworthy", "points": 5},
-    "helpful":          {"label": "Helped Me Out",             "category": "trustworthy", "points": 3},
-    "fair_fight":       {"label": "Honorable Fighter",         "category": "trustworthy", "points": 2},
-    "friendly":         {"label": "Friendly Encounter",        "category": "trustworthy", "points": 2},
+    "trustworthy":      {"label": "Trustworthy / Reliable",   "category": "trustworthy", "points": 2},
+    "helpful":          {"label": "Helped Me Out",             "category": "trustworthy", "points": 1},
+    "fair_fight":       {"label": "Honorable Fighter",         "category": "trustworthy", "points": 1},
+    "friendly":         {"label": "Friendly Encounter",        "category": "trustworthy", "points": 1},
 }
 
 
@@ -165,7 +165,7 @@ REPUTATION_TAGS: dict = {
 # Reputation System — Category Definitions
 # Each category has a display label, hex accent color, and score thresholds.
 # Thresholds: list of (min_pct_inclusive, verdict_label) in ascending order.
-# Score % is computed as: min(100, int(score / (report_count * 6) * 100))
+# Score % is computed as: min(100, int(score / max(report_count * max_pts, max_pts * 50) * 100))
 # Shape: category_id -> {"label": str, "color_hex": str, "thresholds": list}
 # ---------------------------------------------------------------------------
 REPUTATION_CATEGORIES: dict = {
