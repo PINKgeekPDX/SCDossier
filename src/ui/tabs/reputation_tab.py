@@ -744,10 +744,37 @@ class ReputationTab(QWidget):
             self._no_data_report_btn.setEnabled(False)
             self._no_data_report_btn.setToolTip("You cannot submit a reputation report for yourself.")
         else:
-            self._report_btn.setEnabled(True)
-            self._report_btn.setToolTip("")
-            self._no_data_report_btn.setEnabled(True)
-            self._no_data_report_btn.setToolTip("")
+            # Check rate limits
+            import time
+            history = sm.reputation_history
+            handle_lower = handle.lower()
+            timestamps = history.get(handle_lower, [])
+            now = time.time()
+            
+            # Filter out timestamps older than 30 days
+            timestamps = [t for t in timestamps if now - t < 30 * 24 * 3600]
+            
+            # Check limits
+            limited_24h = bool(timestamps and now - timestamps[-1] < 24 * 3600)
+            limited_monthly = len(timestamps) >= 3
+            
+            if limited_24h:
+                msg = "You can only submit one report per player every 24 hours."
+                self._report_btn.setEnabled(False)
+                self._report_btn.setToolTip(msg)
+                self._no_data_report_btn.setEnabled(False)
+                self._no_data_report_btn.setToolTip(msg)
+            elif limited_monthly:
+                msg = "You have reached the limit of 3 reports for this player this month."
+                self._report_btn.setEnabled(False)
+                self._report_btn.setToolTip(msg)
+                self._no_data_report_btn.setEnabled(False)
+                self._no_data_report_btn.setToolTip(msg)
+            else:
+                self._report_btn.setEnabled(True)
+                self._report_btn.setToolTip("")
+                self._no_data_report_btn.setEnabled(True)
+                self._no_data_report_btn.setToolTip("")
 
     def clear(self) -> None:
         """Reset to empty state (called when DossierTab clears results)."""
@@ -790,7 +817,7 @@ class ReputationTab(QWidget):
             s = row.get("score", 0)
             rc = row.get("report_count", 0)
             from src.services.reputation_service import ReputationService
-            pct = ReputationService._normalize_score(s, rc)
+            pct = ReputationService._normalize_score(s, rc, cat_id)
             verdict = _verdict_for_score(cat_id, pct)
             bar.set_value(pct, rc, verdict)
             total_reports = max(total_reports, rc)
@@ -820,6 +847,22 @@ class ReputationTab(QWidget):
         """Re-trigger loading state after a successful report submission."""
         if handle.lower() != self._current_handle.lower():
             return
+            
+        # Record report timestamp in history
+        import time
+        from src.core.settings import SettingsManager
+        sm = SettingsManager.instance()
+        history = sm.reputation_history
+        now = time.time()
+        handle_lower = handle.lower()
+        if handle_lower not in history:
+            history[handle_lower] = []
+        history[handle_lower].append(now)
+        # Keep only the last 30 days
+        history[handle_lower] = [t for t in history[handle_lower] if now - t < 30 * 24 * 3600]
+        sm.reputation_history = history
+        sm.force_save()
+        
         # AppController will re-emit reputation_loaded after submit
         self._set_state("loading")
 

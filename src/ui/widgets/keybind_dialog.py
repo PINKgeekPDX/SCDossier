@@ -4,8 +4,10 @@ KeybindDetectDialog — A QDialog to capture a custom keybind combination.
 """
 
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtCore import Qt, pyqtSignal, QObject
+
+class KeyboardBridge(QObject):
+    hotkey_detected = pyqtSignal(str)
 
 class KeybindDetectDialog(QDialog):
     def __init__(self, parent=None, current_keybind=""):
@@ -14,7 +16,11 @@ class KeybindDetectDialog(QDialog):
         self.setFixedSize(300, 150)
         
         self.detected_keybind = ""
-        self.is_listening = True
+        self.is_listening = False
+        self._hook_callback = None
+        
+        self.bridge = KeyboardBridge()
+        self.bridge.hotkey_detected.connect(self._on_hotkey_detected)
         
         layout = QVBoxLayout(self)
         
@@ -45,85 +51,93 @@ class KeybindDetectDialog(QDialog):
         btn_layout.addWidget(self.cancel_btn)
         
         layout.addLayout(btn_layout)
+        
+        self.retry_listening()
 
     def retry_listening(self):
-        self.is_listening = True
+        import keyboard
         self.detected_keybind = ""
         self.keybind_label.setText("Listening...")
         self.set_btn.setEnabled(False)
-
-    def keyPressEvent(self, event: QKeyEvent):
-        if not self.is_listening:
-            super().keyPressEvent(event)
-            return
-
-        key = event.key()
-        modifiers = event.modifiers()
         
-        # Ignore modifier-only key presses
-        if key in (Qt.Key.Key_Control, Qt.Key.Key_Shift, Qt.Key.Key_Alt, Qt.Key.Key_Meta):
-            return
-            
-        parts = []
-        if modifiers & Qt.KeyboardModifier.ControlModifier:
-            parts.append("ctrl")
-        if modifiers & Qt.KeyboardModifier.AltModifier:
-            parts.append("alt")
-        if modifiers & Qt.KeyboardModifier.ShiftModifier:
-            parts.append("shift")
-            
-        # Get the main key text
-        # If it's a normal key, we can use QKeySequence to get its string representation
-        # Or just parse the key text
-        key_str = ""
+        self._pressed_keys = set()
         
-        # Handle special keys manually to match `keyboard` module format
-        special_keys = {
-            Qt.Key.Key_Escape: "esc",
-            Qt.Key.Key_Tab: "tab",
-            Qt.Key.Key_Space: "space",
-            Qt.Key.Key_Enter: "enter",
-            Qt.Key.Key_Return: "enter",
-            Qt.Key.Key_Backspace: "backspace",
-            Qt.Key.Key_Delete: "delete",
-            Qt.Key.Key_Insert: "insert",
-            Qt.Key.Key_Home: "home",
-            Qt.Key.Key_End: "end",
-            Qt.Key.Key_PageUp: "page up",
-            Qt.Key.Key_PageDown: "page down",
-            Qt.Key.Key_F1: "f1", Qt.Key.Key_F2: "f2", Qt.Key.Key_F3: "f3",
-            Qt.Key.Key_F4: "f4", Qt.Key.Key_F5: "f5", Qt.Key.Key_F6: "f6",
-            Qt.Key.Key_F7: "f7", Qt.Key.Key_F8: "f8", Qt.Key.Key_F9: "f9",
-            Qt.Key.Key_F10: "f10", Qt.Key.Key_F11: "f11", Qt.Key.Key_F12: "f12",
-        }
-        
-        if key in special_keys:
-            key_str = special_keys[key]
-        else:
+        if self._hook_callback:
             try:
-                k_val = key.value if hasattr(key, 'value') else int(key)
-                if Qt.Key.Key_A.value <= k_val <= Qt.Key.Key_Z.value:
-                    key_str = chr(k_val).lower()
-                elif Qt.Key.Key_0.value <= k_val <= Qt.Key.Key_9.value:
-                    key_str = chr(k_val)
-                else:
-                    from PyQt6.QtGui import QKeySequence
-                    key_str = QKeySequence(k_val).toString().lower()
+                keyboard.unhook(self._hook_callback)
             except Exception:
-                if event.text():
-                    key_str = event.text().lower()
-                    
-        if not key_str:
-            return  # Could not map key
+                pass
+                
+        self.is_listening = True
+        self._hook_callback = keyboard.hook(self._on_keyboard_event)
+
+    def _on_keyboard_event(self, event):
+        if not self.is_listening:
+            return
             
-        parts.append(key_str)
-        
-        self.detected_keybind = "+".join(parts)
-        self.keybind_label.setText(self.detected_keybind.upper())
+        import keyboard
+        if event.event_type == keyboard.KEY_DOWN:
+            if event.name not in self._pressed_keys:
+                self._pressed_keys.add(event.name)
+        elif event.event_type == keyboard.KEY_UP:
+            if self._pressed_keys:
+                # User released a key, so the combination is complete
+                # Order modifiers first
+                mods = {"ctrl", "left ctrl", "right ctrl", 
+                        "alt", "left alt", "right alt", 
+                        "shift", "left shift", "right shift", 
+                        "windows", "left windows", "right windows"}
+                
+                parts = []
+                # Add modifiers
+                for k in self._pressed_keys:
+                    if k in mods:
+                        parts.append(k)
+                # Add non-modifiers
+                for k in self._pressed_keys:
+                    if k not in mods:
+                        parts.append(k)
+                        
+                hotkey_str = "+".join(parts)
+                self.bridge.hotkey_detected.emit(hotkey_str)
+                self._pressed_keys.clear()
+
+    def _on_hotkey_detected(self, hotkey_str: str):
+        if not self.is_listening:
+            return
+            
         self.is_listening = False
+        if self._hook_callback:
+            import keyboard
+            try:
+                keyboard.unhook(self._hook_callback)
+            except Exception:
+                pass
+            self._hook_callback = None
+            
+        self.detected_keybind = hotkey_str
+        self.keybind_label.setText(self.detected_keybind.upper())
         self.set_btn.setEnabled(True)
-        
-        event.accept()
+
+    def reject(self):
+        if self._hook_callback:
+            import keyboard
+            try:
+                keyboard.unhook(self._hook_callback)
+            except Exception:
+                pass
+            self._hook_callback = None
+        super().reject()
+
+    def accept(self):
+        if self._hook_callback:
+            import keyboard
+            try:
+                keyboard.unhook(self._hook_callback)
+            except Exception:
+                pass
+            self._hook_callback = None
+        super().accept()
 
     def get_keybind(self) -> str:
         return self.detected_keybind

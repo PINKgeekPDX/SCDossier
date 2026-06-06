@@ -9,7 +9,7 @@ import os
 import sys
 import logging
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import QRect, QSharedMemory
+from PyQt6.QtCore import QRect, QSharedMemory, Qt
 
 from src.core.logger import setup_logging
 from src.core.events import EventBus
@@ -88,14 +88,22 @@ def main():
     splash.fade_in()
     splash.update_progress("Initializing core systems...", 10)
 
-    # 2. Load SCPINK Design System
-    splash.update_progress("Loading SCPINK Design System...", 30)
-    register_fonts()
-    app.setStyleSheet(build_stylesheet())
-
     # Ensure Settings are loaded
-    splash.update_progress("Loading user settings...", 50)
+    splash.update_progress("Loading user settings...", 30)
     sm = SettingsManager.initialize(pm.settings_file)
+
+    # 2. Load SCPINK Design System
+    splash.update_progress("Loading SCPINK Design System...", 50)
+    register_fonts()
+    
+    from src.ui.theme import palette
+    palette.apply_overrides(sm.theme_palette_overrides)
+    
+    app.setStyleSheet(build_stylesheet(
+        accent_override=sm.theme_accent_override,
+        font_scale=sm.font_size_scaling,
+        app_font_family=sm.app_font_family
+    ))
 
 
     # 3. Instantiate Architecture
@@ -122,10 +130,16 @@ def main():
 
     # 4. Connect Toolbar Events
     splash.update_progress("Wiring up event bus...", 80)
-    def _show_main_window():
+    def _bring_main_window_to_front():
+        main_window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         main_window.show()
         main_window.raise_()
         main_window.activateWindow()
+        main_window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+        main_window.show()
+
+    def _show_main_window():
+        _bring_main_window_to_front()
         toolbar.hide()
         # Always navigate to search tab when showing window
         EventBus.instance().navigate_to_tab.emit("search")
@@ -144,9 +158,7 @@ def main():
 
         def _on_captured(path):
             EventBus.instance().capture_completed.emit(str(path))
-            main_window.show()
-            main_window.raise_()
-            main_window.activateWindow()
+            _bring_main_window_to_front()
             toolbar.hide()
 
         def _on_cancelled():
@@ -164,9 +176,7 @@ def main():
     main_window.window_hidden.connect(toolbar.show)
 
     def _open_settings():
-        main_window.show()
-        main_window.raise_()
-        main_window.activateWindow()
+        _bring_main_window_to_front()
         toolbar.hide()
         EventBus.instance().navigate_to_tab.emit("settings")
 
@@ -178,8 +188,17 @@ def main():
         import os
         os.startfile(pm.archived_root)
 
+    def _toggle_main_window():
+        if main_window.isVisible():
+            _hide_main_window()
+        else:
+            _show_main_window()
+
     # 6. Connect Tray Events
-    tray_icon.show_main_requested.connect(_show_main_window)
+    tray_icon.show_main_requested.connect(_toggle_main_window)
+    tray_icon.menu.aboutToShow.connect(
+        lambda: tray_icon.action_open_dossier.setText("Hide SC Dossier" if main_window.isVisible() else "Show SC Dossier")
+    )
     tray_icon.quick_capture_requested.connect(_start_capture)
     tray_icon.open_settings_requested.connect(_open_settings)
     tray_icon.open_logs_requested.connect(_open_logs)
@@ -239,11 +258,16 @@ def main():
 
     # 10. Global settings_changed listener (hot-reload outside SettingsTab)
     def _on_settings_changed(key: str, value: object) -> None:
-        if key in ("font_size_scaling", "theme_accent_override"):
+        if key in ("font_size_scaling", "theme_accent_override", "theme_palette_overrides", "theme_palette_preview", "app_font_family"):
             app.setStyleSheet(build_stylesheet(
                 accent_override=sm.theme_accent_override,
-                font_scale=sm.font_size_scaling
+                font_scale=sm.font_size_scaling,
+                app_font_family=sm.app_font_family
             ))
+            
+            # Force update on all top-level widgets to apply custom QPainter themes immediately
+            for widget in QApplication.topLevelWidgets():
+                widget.update()
         elif key == "auto_hide_toolbar_without_game":
             import subprocess
             sc_running = False
@@ -259,7 +283,7 @@ def main():
                 pass
             if not sc_running and value is True:
                 toolbar.hide()
-                main_window.show()
+                _bring_main_window_to_front()
             elif value is False:
                 toolbar.show()
         elif key == "log_level":
@@ -288,14 +312,10 @@ def main():
             main_window.hide()
         elif sm.auto_hide_toolbar_without_game:
             toolbar.hide()
-            main_window.show()
-            main_window.raise_()
-            main_window.activateWindow()
+            _bring_main_window_to_front()
         else:
             toolbar.show()
-            main_window.show()
-            main_window.raise_()
-            main_window.activateWindow()
+            _bring_main_window_to_front()
 
     splash.fade_out_finished.connect(_finalize_startup)
     splash.fade_out()

@@ -8,7 +8,7 @@ class WrapLayout(QWidget):
         super().__init__(parent)
         self._widgets = []
         self._spacing = 8
-        self._margin = 0
+        self._margin = 4
 
     def addWidget(self, widget):
         self._widgets.append(widget)

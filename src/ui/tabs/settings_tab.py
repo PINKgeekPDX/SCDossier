@@ -15,7 +15,7 @@ from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
 from src.ui.theme.stylesheet import build_stylesheet
 from src.ui.widgets.tech_label import TechLabel
-from src.ui.widgets.smart_inputs import NoScrollSpinBox, NoScrollSlider, ColorPickerButton
+from src.ui.widgets.smart_inputs import NoScrollSpinBox, NoScrollSlider, ColorPickerButton, NoScrollComboBox
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.keybind_dialog import KeybindDetectDialog
 from src.services.updater_service import UpdaterService
@@ -112,7 +112,7 @@ class SettingsTab(QWidget):
         lo.setContentsMargins(0, 1, 0, 1)
         lo.setSpacing(6)
         lbl = TechLabel(label)
-        lbl.setFixedWidth(110)
+        lbl.setFixedWidth(135)
         if tip:
             lbl.setToolTip(tip)
             widget.setToolTip(tip)
@@ -139,7 +139,7 @@ class SettingsTab(QWidget):
         lo.setContentsMargins(0, 1, 0, 1)
         lo.setSpacing(6)
         lbl = TechLabel(label)
-        lbl.setFixedWidth(110)
+        lbl.setFixedWidth(135)
         if tip:
             lbl.setToolTip(tip)
             slider.setToolTip(tip)
@@ -233,9 +233,11 @@ class SettingsTab(QWidget):
         af.addWidget(self._slider_row("FONT SCALE", self.font_scaling_slider, self.font_scaling_lbl,
             "Scale UI font size from 80% to 150%"))
 
-        self.theme_accent_btn = ColorPickerButton(self.sm.theme_accent_override or "")
-        fr = self._row("ACCENT COLOR", self.theme_accent_btn,
-            "Override the default blue accent color")
+        self.theme_editor_btn = QPushButton("OPEN THEME EDITOR...")
+        self.theme_editor_btn.setStyleSheet(self._btn_style(accent=True))
+        self.theme_editor_btn.clicked.connect(self._open_theme_editor)
+        fr = self._row("THEME COLORS", self.theme_editor_btn,
+            "Customize the entire application color palette")
         af.addWidget(fr)
 
         self.toolbar_slider = NoScrollSlider(Qt.Orientation.Horizontal)
@@ -247,78 +249,63 @@ class SettingsTab(QWidget):
         self.toolbar_val_lbl.setFont(font_inter(10))
         self.toolbar_val_lbl.setStyleSheet(f"color:{P.PRIMARY};background:transparent;border:none;min-width:36px;")
         af.addWidget(self._slider_row("TOOLBAR OPACITY", self.toolbar_slider, self.toolbar_val_lbl,
-            "Adjust overlay toolbar transparency (30% very transparent, 100% solid)"))
+            "Adjust overlay toolbar idle transparency (30% very transparent, 100% solid)"))
+
+        from src.ui.widgets.smart_inputs import NoScrollComboBox
+        self.app_font_combo = NoScrollComboBox()
+        self.app_font_combo.addItems(["Default", "Sora", "Inter", "JetBrains Mono"])
+        self.app_font_combo.setStyleSheet(self._input_style())
+        af.addWidget(self._row("APP FONT", self.app_font_combo, "Change the global font family used throughout the app"))
+
+
 
         ac.content_layout.addLayout(af)
         lo.addWidget(ac, 1, 0)
 
-        # --- SCRAPER -------------------------------------------------
-        sc_card = GlassCard(title="SCRAPER")
-        sf = QVBoxLayout()
-        sf.setContentsMargins(0, 2, 0, 2)
-        sf.setSpacing(2)
+        # --- HOTKEYS -------------------------------------------------
+        hc = GlassCard(title="HOTKEYS")
+        hf = QVBoxLayout()
+        hf.setContentsMargins(0, 2, 0, 2)
+        hf.setSpacing(2)
 
-        self.delay_spin = NoScrollSpinBox()
-        self.delay_spin.setRange(0, 10000)
-        self.delay_spin.setSingleStep(100)
-        self.delay_spin.setSuffix(" ms")
-        self.delay_spin.setStyleSheet(self._compact_input_style())
-        sf.addWidget(self._row("REQUEST DELAY", self.delay_spin,
-            "Delay between HTTP requests to RSI to avoid rate limiting (0-10,000ms)"))
+        # Interact Hotkey
+        ihk_wrap = QWidget()
+        ihk = QHBoxLayout(ihk_wrap)
+        ihk.setContentsMargins(0, 0, 0, 0)
+        ihk.setSpacing(6)
+        self.interact_hk_lbl = QLabel("None")
+        self.interact_hk_lbl.setFont(font_inter(10))
+        self.interact_hk_lbl.setStyleSheet(f"color:{P.PRIMARY};background:transparent;border:none;")
+        self.interact_hk_btn = QPushButton("DETECT")
+        self.interact_hk_btn.setFixedWidth(64)
+        self.interact_hk_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.interact_hk_btn.setStyleSheet(self._btn_style())
+        ihk.addWidget(self.interact_hk_lbl)
+        ihk.addWidget(self.interact_hk_btn)
+        ihk.addStretch()
+        hf.addWidget(self._row("INTERACT KEY", ihk_wrap, "Global hotkey used to confirm interactions and selections"))
 
-        self.timeout_spin = NoScrollSpinBox()
-        self.timeout_spin.setRange(5, 120)
-        self.timeout_spin.setSuffix(" sec")
-        self.timeout_spin.setStyleSheet(self._compact_input_style())
-        sf.addWidget(self._row("TIMEOUT", self.timeout_spin,
-            "Maximum time to wait for a scraper request before timing out (5-120 seconds)"))
+        # Drag Hotkey
+        dhk_wrap = QWidget()
+        dhk = QHBoxLayout(dhk_wrap)
+        dhk.setContentsMargins(0, 0, 0, 0)
+        dhk.setSpacing(6)
+        self.drag_hk_lbl = QLabel("None")
+        self.drag_hk_lbl.setFont(font_inter(10))
+        self.drag_hk_lbl.setStyleSheet(f"color:{P.PRIMARY};background:transparent;border:none;")
+        self.drag_hk_btn = QPushButton("DETECT")
+        self.drag_hk_btn.setFixedWidth(64)
+        self.drag_hk_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.drag_hk_btn.setStyleSheet(self._btn_style())
+        dhk.addWidget(self.drag_hk_lbl)
+        dhk.addWidget(self.drag_hk_btn)
+        dhk.addStretch()
+        hf.addWidget(self._row("DRAG KEY", dhk_wrap, "Hold this key to click and drag the overlay toolbar across the screen"))
 
-        self.proxy_input = QLineEdit()
-        self.proxy_input.setFont(font_inter(10))
-        self.proxy_input.setStyleSheet(self._compact_input_style())
-        self.proxy_input.setPlaceholderText("http://proxy:8080 (blank = direct)")
-        sf.addWidget(self._row("PROXY", self.proxy_input,
-            "Optional HTTP proxy URL for scraper requests (leave blank for direct connection)"))
-
-        self.ua_input = QLineEdit()
-        self.ua_input.setFont(font_inter(10))
-        self.ua_input.setStyleSheet(self._compact_input_style())
-        sf.addWidget(self._row("USER AGENT", self.ua_input,
-            "Custom User-Agent string sent with scraper HTTP requests"))
-
-        sc_card.content_layout.addLayout(sf)
-        lo.addWidget(sc_card, 1, 1)
-
-        # --- OCR -----------------------------------------------------
-        oc = GlassCard(title="OCR")
-        of = QVBoxLayout()
-        of.setContentsMargins(0, 2, 0, 2)
-        of.setSpacing(2)
-
-        self.ocr_combo = QComboBox()
-        self.ocr_combo.setFont(font_inter(10))
-        self.ocr_combo.setStyleSheet(self._compact_input_style())
-        self.ocr_combo.addItem("RapidOCR", "rapidocr")
-        of.addWidget(self._row("ENGINE", self.ocr_combo, "OCR engine used for screen capture text recognition"))
-
-        self.ocr_slider = NoScrollSlider(Qt.Orientation.Horizontal)
-        self.ocr_slider.setRange(10, 99)
-        self.ocr_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.ocr_slider.setTickInterval(10)
-        self.ocr_slider.setStyleSheet("background:transparent;border:none;")
-        self.ocr_val_lbl = QLabel("50%")
-        self.ocr_val_lbl.setFont(font_inter(10))
-        self.ocr_val_lbl.setStyleSheet(f"color:{P.PRIMARY};background:transparent;border:none;min-width:36px;")
-        of.addWidget(self._slider_row("CONFIDENCE", self.ocr_slider, self.ocr_val_lbl,
-            "Minimum confidence threshold (10-99%) for OCR text detection"))
-
-        self.ocr_thread_spin = NoScrollSpinBox()
-        self.ocr_thread_spin.setRange(1, 8)
-        self.ocr_thread_spin.setStyleSheet(self._compact_input_style())
-        of.addWidget(self._row("THREADS", self.ocr_thread_spin,
-            "Number of CPU threads dedicated to OCR processing (1-8)"))
-
-        hk = QHBoxLayout()
+        # Snipping Tool Hotkey
+        hk_wrap = QWidget()
+        hk = QHBoxLayout(hk_wrap)
+        hk.setContentsMargins(0, 0, 0, 0)
         hk.setSpacing(6)
         self.hotkey_lbl = QLabel("None")
         self.hotkey_lbl.setFont(font_inter(10))
@@ -330,35 +317,16 @@ class SettingsTab(QWidget):
         hk.addWidget(self.hotkey_lbl)
         hk.addWidget(self.hotkey_btn)
         hk.addStretch()
-        hk_w = QWidget()
-        hk_w.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-        hk_lo = QHBoxLayout(hk_w)
-        hk_lo.setContentsMargins(0, 1, 0, 1)
-        hk_lo.setSpacing(6)
-        hk_lo.addWidget(TechLabel("GLOBAL HOTKEY"))
-        hk_lo.addLayout(hk, 1)
-        of.addWidget(hk_w)
+        hf.addWidget(self._row("SNIPPING KEY", hk_wrap, "Global hotkey to activate the screen capture selection tool"))
 
-        oc.content_layout.addLayout(of)
-        lo.addWidget(oc, 2, 0)
+        hc.content_layout.addLayout(hf)
+        lo.addWidget(hc, 2, 0)
 
         # --- SYNC & CACHE --------------------------------------------
-        scc = GlassCard(title="SYNC & CACHE")
+        scc = GlassCard(title="CACHE")
         scf = QVBoxLayout()
         scf.setContentsMargins(0, 2, 0, 2)
         scf.setSpacing(2)
-
-        self.sync_interval_spin = NoScrollSpinBox()
-        self.sync_interval_spin.setRange(1, 168)
-        self.sync_interval_spin.setSuffix(" hours")
-        self.sync_interval_spin.setStyleSheet(self._compact_input_style())
-        scf.addWidget(self._row("SYNC INTERVAL", self.sync_interval_spin,
-            "How often archived profiles are auto-re-synced with RSI (1-168 hours)"))
-
-        self.sync_on_load_cb = QCheckBox()
-        self.sync_on_load_cb.setStyleSheet(self._cb_style())
-        scf.addWidget(self._cb_row("AUTO-SYNC ON LOAD", self.sync_on_load_cb,
-            "Automatically re-sync archived profiles when loading them in the archive viewer"))
 
         self.cache_spin = NoScrollSpinBox()
         self.cache_spin.setRange(1, 365)
@@ -372,32 +340,23 @@ class SettingsTab(QWidget):
         scf.addWidget(self._cb_row("AUTO-CLEAR CACHE", self.cache_auto_cb,
             "Automatically delete temp cache files that have exceeded the maximum age"))
 
-        self.dl_concurrency_spin = NoScrollSpinBox()
-        self.dl_concurrency_spin.setRange(1, 10)
-        self.dl_concurrency_spin.setStyleSheet(self._compact_input_style())
-        scf.addWidget(self._row("DL CONCURRENCY", self.dl_concurrency_spin,
-            "Number of simultaneous image downloads (1-10)"))
-
         scc.content_layout.addLayout(scf)
-        lo.addWidget(scc, 2, 1)
+        lo.addWidget(scc, 1, 1)
 
         # --- UPDATE BEHAVIOR -----------------------------------------
         lo.addWidget(self._build_update_card(), 3, 0)
 
-        # --- ARCHIVE & EXPORT ----------------------------------------
-        lo.addWidget(self._build_archive_card(), 3, 1)
+        # --- COMMUNITY REPUTATION ------------------------------------
+        lo.addWidget(self._build_reputation_card(), 2, 1)
 
         # --- DIAGNOSTICS & LOGS --------------------------------------
         lo.addWidget(self._build_diagnostics_card(), 4, 0)
 
-        # --- COMMUNITY REPUTATION ------------------------------------
-        lo.addWidget(self._build_reputation_card(), 4, 1)
-
         # --- DATA PATHS ----------------------------------------------
-        lo.addWidget(self._build_paths_card(), 5, 0)
+        lo.addWidget(self._build_paths_card(), 3, 1)
 
         # --- ABOUT ---------------------------------------------------
-        lo.addWidget(self._build_about_card(), 5, 1)
+        lo.addWidget(self._build_about_card(), 4, 1)
 
         # --- RESET ALL ------------------------------------------------
         reset_card = GlassCard(title="RESET")
@@ -496,51 +455,7 @@ class SettingsTab(QWidget):
         card.content_layout.addLayout(lo)
         return card
 
-    def _build_archive_card(self) -> GlassCard:
-        card = GlassCard(title="ARCHIVE & EXPORT")
-        lo = QVBoxLayout()
-        lo.setContentsMargins(0, 2, 0, 2)
-        lo.setSpacing(2)
 
-        er = QHBoxLayout()
-        er.setSpacing(4)
-        self.export_dest_input = QLineEdit()
-        self.export_dest_input.setFont(font_inter(10))
-        self.export_dest_input.setStyleSheet(self._compact_input_style())
-        self.export_dest_input.setPlaceholderText("Default export folder...")
-        browse_btn = QPushButton("BROWSE")
-        browse_btn.setFixedHeight(24)
-        browse_btn.setStyleSheet(self._btn_style())
-        browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        browse_btn.clicked.connect(self._on_browse_export_dest)
-        er.addWidget(self.export_dest_input)
-        er.addWidget(browse_btn)
-        er_w = QWidget()
-        er_w.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-        er_lo = QHBoxLayout(er_w)
-        er_lo.setContentsMargins(0, 1, 0, 1)
-        er_lo.setSpacing(6)
-        er_lo.addWidget(TechLabel("EXPORT FOLDER"))
-        er_lo.addLayout(er, 1)
-        lo.addWidget(er_w)
-
-        self.remember_export_cb = QCheckBox()
-        self.remember_export_cb.setStyleSheet(self._cb_style())
-        lo.addWidget(self._cb_row("REMEMBER FOLDER", self.remember_export_cb,
-            "Reuse the last export folder you selected next time you export"))
-
-        self.archive_sort_combo = QComboBox()
-        self.archive_sort_combo.setFont(font_inter(10))
-        self.archive_sort_combo.setStyleSheet(self._compact_input_style())
-        self.archive_sort_combo.addItem("Date (newest first)", "date_desc")
-        self.archive_sort_combo.addItem("Date (oldest first)", "date_asc")
-        self.archive_sort_combo.addItem("Name (A-Z)", "name_asc")
-        self.archive_sort_combo.addItem("Name (Z-A)", "name_desc")
-        lo.addWidget(self._row("DEFAULT SORT", self.archive_sort_combo,
-            "Default sort order for the archive list"))
-
-        card.content_layout.addLayout(lo)
-        return card
 
     def _build_diagnostics_card(self) -> GlassCard:
         card = GlassCard(title="DIAGNOSTICS & LOGS")
@@ -548,9 +463,9 @@ class SettingsTab(QWidget):
         lo.setContentsMargins(0, 2, 0, 2)
         lo.setSpacing(2)
 
-        self.log_level_combo = QComboBox()
-        self.log_level_combo.setFont(font_inter(10))
-        self.log_level_combo.setStyleSheet(self._compact_input_style())
+        self.log_level_combo = NoScrollComboBox()
+        self.log_level_combo.setStyleSheet(self._input_style())
+        self.log_level_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.log_level_combo.addItem("Normal", "normal")
         self.log_level_combo.addItem("Debug (verbose)", "debug")
         lo.addWidget(self._row("LOG LEVEL", self.log_level_combo,
@@ -617,20 +532,10 @@ class SettingsTab(QWidget):
         lo.addWidget(self._cb_row("PRE-FETCH AT STARTUP", self.rep_prefetch_cb,
             "Fetch reputation scores for all archived players when the app starts"))
 
-        sr = QWidget()
-        sr.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-        sr_lo = QHBoxLayout(sr)
-        sr_lo.setContentsMargins(0, 1, 0, 1)
-        sr_lo.setSpacing(6)
-        srk = TechLabel("CONNECTION STATUS")
-        srk.setFixedWidth(110)
         self.rep_status_lbl = QLabel("CHECKING..." if self.sm.reputation_enabled else "DISABLED")
         self.rep_status_lbl.setFont(font_inter(10, QFont.Weight.Bold))
         self.rep_status_lbl.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
-        sr_lo.addWidget(srk)
-        sr_lo.addWidget(self.rep_status_lbl)
-        sr_lo.addStretch()
-        lo.addWidget(sr)
+        lo.addWidget(self._row("CONNECTION STATUS", self.rep_status_lbl, "Current status of the connection to the reputation network"))
 
         priv = QLabel(
             "Privacy: Your public IP is SHA-256 hashed locally before being sent. "
@@ -656,20 +561,11 @@ class SettingsTab(QWidget):
             ("Temp Cache", str(self.paths.temp_root)),
             ("Archived", str(self.paths.archived_root)),
         ]:
-            row = QHBoxLayout()
-            row.setSpacing(6)
-            lbl = TechLabel(label)
-            lbl.setFixedWidth(80)
             pl = QLabel(path)
             pl.setFont(font_inter(9))
             pl.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
             pl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            row.addWidget(lbl)
-            row.addWidget(pl, 1)
-            rw = QWidget()
-            rw.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-            rw.setLayout(row)
-            lo.addWidget(rw)
+            lo.addWidget(self._row(label.upper(), pl, f"Storage path for {label.lower()}"))
 
         card.content_layout.addLayout(lo)
         return card
@@ -685,21 +581,17 @@ class SettingsTab(QWidget):
         lo.addWidget(self._about_row("FRAMEWORK", "PyQt6"))
         lo.addWidget(self._about_row("LICENSE", "MIT License"))
 
-        gh = QWidget()
-        gh.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-        gh_lo = QHBoxLayout(gh)
-        gh_lo.setContentsMargins(0, 1, 0, 1)
-        gh_lo.setSpacing(6)
-        ghk = TechLabel("GITHUB")
-        ghk.setFixedWidth(100)
         ghv = QLabel('<a href="https://github.com/pinkgeekpdx" style="color:#00AAFF;">github.com/pinkgeekpdx</a>')
         ghv.setFont(font_inter(10))
         ghv.setStyleSheet("background:transparent;border:none;")
         ghv.setTextFormat(Qt.TextFormat.RichText)
         ghv.setOpenExternalLinks(True)
-        gh_lo.addWidget(ghk)
+        gh_wrap = QWidget()
+        gh_lo = QHBoxLayout(gh_wrap)
+        gh_lo.setContentsMargins(0, 0, 0, 0)
         gh_lo.addWidget(ghv)
-        lo.addWidget(gh)
+        gh_lo.addStretch()
+        lo.addWidget(self._row("GITHUB", gh_wrap, "View the project on GitHub"))
 
         bio = QLabel(
             'Developed by <a href="https://github.com/pinkgeekpdx" style="color:#00AAFF;">PINKgeekPDX</a> '
@@ -737,7 +629,7 @@ class SettingsTab(QWidget):
         lo.setContentsMargins(0, 1, 0, 1)
         lo.setSpacing(6)
         lbl = TechLabel(label)
-        lbl.setFixedWidth(100)
+        lbl.setFixedWidth(135)
         val = QLabel(value)
         val.setFont(font_inter(11))
         val.setStyleSheet(f"color:{P.ON_SURFACE};background:transparent;border:none;")
@@ -763,9 +655,15 @@ class SettingsTab(QWidget):
         from src.core.settings import DEFAULT_SETTINGS
         self.sm._data = json.loads(json.dumps(DEFAULT_SETTINGS))
         self.sm.force_save()
+        
+        from src.ui.theme import palette as P
+        P.apply_overrides({})
+        
         self._load_values()
         EventBus.instance().settings_changed.emit("font_size_scaling", self.sm.font_size_scaling)
         EventBus.instance().settings_changed.emit("theme_accent_override", self.sm.theme_accent_override)
+        EventBus.instance().settings_changed.emit("theme_palette_overrides", {})
+        
         QMessageBox.information(self, "Settings Reset", "All settings have been restored to factory defaults.")
 
     # ------------------------------------------------------------------
@@ -773,16 +671,6 @@ class SettingsTab(QWidget):
     # ------------------------------------------------------------------
 
     def _load_values(self) -> None:
-        self.delay_spin.setValue(self.sm.scraper_delay_ms)
-        self.timeout_spin.setValue(self.sm.scraper_timeout_sec)
-        self.proxy_input.setText(self.sm.scraper_proxy)
-        self.ua_input.setText(self.sm.user_agent)
-
-        conf = int(self.sm.ocr_confidence_threshold * 100)
-        self.ocr_slider.setValue(conf)
-        self.ocr_val_lbl.setText(f"{conf}%")
-        self.ocr_combo.setCurrentText("RapidOCR")
-        self.ocr_thread_spin.setValue(self.sm.ocr_thread_count)
 
         hotkey = self.sm.ocr_hotkey
         self.hotkey_lbl.setText(hotkey.upper() if hotkey else "None")
@@ -790,18 +678,26 @@ class SettingsTab(QWidget):
         self.font_scaling_slider.setValue(self.sm.font_size_scaling)
         self.font_scaling_lbl.setText(f"{self.sm.font_size_scaling}%")
 
-        self.sync_interval_spin.setValue(self.sm.sync_interval_hours)
-        self.sync_on_load_cb.setChecked(self.sm.sync_on_load)
+        font_fam = self.sm.app_font_family
+        idx = self.app_font_combo.findText(font_fam)
+        if idx >= 0:
+            self.app_font_combo.setCurrentIndex(idx)
 
         self.cache_spin.setValue(self.sm.temp_cache_max_age_days)
         self.cache_auto_cb.setChecked(self.sm.temp_cache_auto_clear)
-        self.dl_concurrency_spin.setValue(self.sm.image_download_concurrency)
+        self.cache_spin.setEnabled(self.sm.temp_cache_auto_clear)
 
-        opacity = int(self.sm.toolbar_opacity * 100)
+        opacity = int(self.sm.toolbar_idle_opacity * 100)
         self.toolbar_slider.setValue(opacity)
         self.toolbar_val_lbl.setText(f"{opacity}%")
 
-        self.theme_accent_btn.setColor(self.sm.theme_accent_override or "")
+        ihk_val = self.sm.toolbar_interact_hotkey
+        self.interact_hk_lbl.setText(ihk_val.upper() if ihk_val else "None")
+
+        dhk_val = self.sm.toolbar_drag_hotkey
+        self.drag_hk_lbl.setText(dhk_val.upper() if dhk_val else "None")
+
+        pass
 
         self.minimize_tray_cb.setChecked(self.sm.minimize_to_tray_on_close)
         self.pin_startup_cb.setChecked(self.sm.pin_on_startup)
@@ -811,11 +707,7 @@ class SettingsTab(QWidget):
         self.auto_check_cb.setChecked(self.sm.auto_check_updates)
         self.auto_download_cb.setChecked(self.sm.auto_download_updates)
 
-        self.export_dest_input.setText(self.sm.export_destination)
-        self.remember_export_cb.setChecked(self.sm.remember_export_folder)
-        idx = self.archive_sort_combo.findData(self.sm.archive_default_sort)
-        if idx >= 0:
-            self.archive_sort_combo.setCurrentIndex(idx)
+
 
         idx = self.log_level_combo.findData(self.sm.log_level)
         if idx >= 0:
@@ -826,6 +718,9 @@ class SettingsTab(QWidget):
         self.rep_enabled_cb.setChecked(self.sm.reputation_enabled)
         self.rep_auto_check_cb.setChecked(self.sm.reputation_auto_check)
         self.rep_prefetch_cb.setChecked(self.sm.reputation_prefetch_archived)
+        
+        self.rep_auto_check_cb.setEnabled(self.sm.reputation_enabled)
+        self.rep_prefetch_cb.setEnabled(self.sm.reputation_enabled)
 
     # ------------------------------------------------------------------
     # Connect signals
@@ -840,39 +735,26 @@ class SettingsTab(QWidget):
 
         # Appearance
         self.font_scaling_slider.valueChanged.connect(self._on_font_scaling_changed)
-        self.theme_accent_btn.colorChanged.connect(self._on_accent_changed)
+        self.app_font_combo.currentTextChanged.connect(self._on_app_font_changed)
         self.toolbar_slider.valueChanged.connect(self._on_toolbar_opacity_changed)
+        self.interact_hk_btn.clicked.connect(self._on_detect_interact_hotkey)
+        self.drag_hk_btn.clicked.connect(self._on_detect_drag_hotkey)
 
-        # Scraper
-        self.delay_spin.valueChanged.connect(lambda v: setattr(self.sm, 'scraper_delay_ms', v))
-        self.timeout_spin.valueChanged.connect(lambda v: setattr(self.sm, 'scraper_timeout_sec', v))
-        self.proxy_input.editingFinished.connect(lambda: setattr(self.sm, 'scraper_proxy', self.proxy_input.text()))
-        self.ua_input.editingFinished.connect(lambda: setattr(self.sm, 'user_agent', self.ua_input.text()))
 
-        # OCR
-        self.ocr_slider.valueChanged.connect(self._on_ocr_changed)
-        self.ocr_combo.currentIndexChanged.connect(
-            lambda: setattr(self.sm, 'ocr_engine', self.ocr_combo.currentData()))
-        self.ocr_thread_spin.valueChanged.connect(lambda v: setattr(self.sm, 'ocr_thread_count', v))
+
+        # Hotkeys
         self.hotkey_btn.clicked.connect(self._on_detect_hotkey)
 
-        # Sync & Cache
-        self.sync_interval_spin.valueChanged.connect(lambda v: setattr(self.sm, 'sync_interval_hours', v))
-        self.sync_on_load_cb.toggled.connect(lambda v: setattr(self.sm, 'sync_on_load', v))
+        # Cache
         self.cache_spin.valueChanged.connect(lambda v: setattr(self.sm, 'temp_cache_max_age_days', v))
         self.cache_auto_cb.toggled.connect(lambda v: setattr(self.sm, 'temp_cache_auto_clear', v))
-        self.dl_concurrency_spin.valueChanged.connect(lambda v: setattr(self.sm, 'image_download_concurrency', v))
+        self.cache_auto_cb.toggled.connect(self.cache_spin.setEnabled)
 
         # Updater
         self.auto_check_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_check_updates', v))
         self.auto_download_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_download_updates', v))
 
-        # Archive & Export
-        self.export_dest_input.editingFinished.connect(
-            lambda: setattr(self.sm, 'export_destination', self.export_dest_input.text()))
-        self.remember_export_cb.toggled.connect(lambda v: setattr(self.sm, 'remember_export_folder', v))
-        self.archive_sort_combo.currentIndexChanged.connect(
-            lambda: setattr(self.sm, 'archive_default_sort', self.archive_sort_combo.currentData()))
+
 
         # Diagnostics
         self.log_level_combo.currentIndexChanged.connect(
@@ -891,29 +773,61 @@ class SettingsTab(QWidget):
     # Slots
     # ------------------------------------------------------------------
 
-    def _on_ocr_changed(self, value: int) -> None:
-        self.ocr_val_lbl.setText(f"{value}%")
-        self.sm.ocr_confidence_threshold = value / 100.0
+
 
     def _on_toolbar_opacity_changed(self, value: int) -> None:
         self.toolbar_val_lbl.setText(f"{value}%")
-        self.sm.toolbar_opacity = value / 100.0
+        self.sm.toolbar_idle_opacity = value / 100.0
 
     def _on_font_scaling_changed(self, value: int) -> None:
         self.font_scaling_lbl.setText(f"{value}%")
         self.sm.font_size_scaling = value
         self._rebuild_stylesheet()
 
-    def _on_accent_changed(self, hex_color: str) -> None:
-        self.sm.theme_accent_override = hex_color
-        self._rebuild_stylesheet()
+    def _on_app_font_changed(self, value: str) -> None:
+        self.sm.app_font_family = value
+        from src.core.events import EventBus
+        EventBus.instance().settings_changed.emit("app_font_family", value)
+        
+        from PyQt6.QtWidgets import QApplication, QDialog
+        import sys, subprocess
+        from src.ui.widgets.confirm_dialog import ConfirmDialog
+        
+        dlg = ConfirmDialog(
+            title="RESTART REQUIRED",
+            message="App font saved.\n\nA restart is required to apply the new font to all elements.\n\nWould you like to restart the application now?",
+            confirm_text="RESTART NOW",
+            cancel_text="LATER",
+            danger=False,
+            parent=self
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            from PyQt6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if hasattr(app, '_single_instance_lock'):
+                app._single_instance_lock.detach()
+
+            restarter = [
+                sys.executable, "-c",
+                "import time, subprocess, sys; time.sleep(1.0); subprocess.Popen(sys.argv[1:], creationflags=0x08000000)"
+            ]
+            import os
+            target_cmd = [sys.executable] + sys.argv
+            subprocess.Popen(restarter + target_cmd, creationflags=0x08000000)
+            os._exit(0)
+
+    def _open_theme_editor(self) -> None:
+        from src.ui.tabs.theme_editor_dialog import ThemeEditorDialog
+        dlg = ThemeEditorDialog(self)
+        dlg.exec()
 
     def _rebuild_stylesheet(self) -> None:
         app = QApplication.instance()
         if app:
             app.setStyleSheet(build_stylesheet(
                 accent_override=self.sm.theme_accent_override,
-                font_scale=self.sm.font_size_scaling
+                font_scale=self.sm.font_size_scaling,
+                app_font_family=self.sm.app_font_family
             ))
 
     def _init_updater(self) -> None:
@@ -976,13 +890,22 @@ class SettingsTab(QWidget):
                 self.sm.ocr_hotkey = new_bind
                 self.hotkey_lbl.setText(new_bind.upper())
 
-    def _on_browse_export_dest(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "Select Default Export Folder",
-            self.export_dest_input.text() or self.paths.export_root)
-        if path:
-            self.export_dest_input.setText(path)
-            self.sm.export_destination = path
+    def _on_detect_interact_hotkey(self) -> None:
+        dlg = KeybindDetectDialog(self, current_keybind=self.sm.toolbar_interact_hotkey)
+        if dlg.exec():
+            new_bind = dlg.get_keybind()
+            if new_bind:
+                self.sm.toolbar_interact_hotkey = new_bind
+                self.interact_hk_lbl.setText(new_bind.upper())
+
+    def _on_detect_drag_hotkey(self) -> None:
+        dlg = KeybindDetectDialog(self, current_keybind=self.sm.toolbar_drag_hotkey)
+        if dlg.exec():
+            new_bind = dlg.get_keybind()
+            if new_bind:
+                self.sm.toolbar_drag_hotkey = new_bind
+                self.drag_hk_lbl.setText(new_bind.upper())
+
 
     def _on_open_logs_folder(self) -> None:
         import os, platform
@@ -1010,6 +933,8 @@ class SettingsTab(QWidget):
 
     def _on_rep_enabled_toggled(self, enabled: bool) -> None:
         self.sm.reputation_enabled = enabled
+        self.rep_auto_check_cb.setEnabled(enabled)
+        self.rep_prefetch_cb.setEnabled(enabled)
         if not enabled:
             self._update_rep_status_lbl("DISABLED", P.TEXT_DIM)
         else:

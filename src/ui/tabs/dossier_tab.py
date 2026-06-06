@@ -314,13 +314,20 @@ class DossierTab(QWidget):
         self.content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Empty state
+        self.empty_container = QWidget()
+        empty_layout = QVBoxLayout(self.empty_container)
+        empty_layout.setContentsMargins(0, 0, 0, 0)
+        
         self.empty_lbl = QLabel("SEARCH FOR A CITIZEN TO VIEW THEIR DOSSIER")
         self.empty_lbl.setFont(label_caps())
         self.empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
-        self.content_layout.addStretch()
-        self.content_layout.addWidget(self.empty_lbl)
-        self.content_layout.addStretch()
+        
+        empty_layout.addStretch()
+        empty_layout.addWidget(self.empty_lbl)
+        empty_layout.addStretch()
+        
+        self.content_layout.addWidget(self.empty_container)
 
         # Detail content (hidden until data loaded)
         self.detail_container = QWidget()
@@ -406,9 +413,9 @@ class DossierTab(QWidget):
         self.f_enlisted = DataField("ENLISTED")
         self.f_location = DataField("LOCATION")
         self.f_fluency = DataField("FLUENCY")
-        grid_row1.addWidget(self.f_enlisted)
-        grid_row1.addWidget(self.f_location)
-        grid_row1.addWidget(self.f_fluency)
+        grid_row1.addWidget(self.f_enlisted, alignment=Qt.AlignmentFlag.AlignTop)
+        grid_row1.addWidget(self.f_location, alignment=Qt.AlignmentFlag.AlignTop)
+        grid_row1.addWidget(self.f_fluency, alignment=Qt.AlignmentFlag.AlignTop)
         grid_layout.addLayout(grid_row1)
         self.grid_card.content_layout.addLayout(grid_layout)
         dl.addWidget(self.grid_card)
@@ -472,7 +479,7 @@ class DossierTab(QWidget):
         self._current_data = None
         self.search_input.clear()
         self.detail_container.setVisible(False)
-        self.empty_lbl.setVisible(True)
+        self.empty_container.setVisible(True)
         self.archive_btn.setEnabled(False)
         if hasattr(self, '_archive_pulse_anim'):
             self._archive_pulse_anim.stop()
@@ -508,7 +515,7 @@ class DossierTab(QWidget):
         self.search_input.clear()
         self.archive_btn.setEnabled(bool(self.current_handle))
 
-        self.empty_lbl.setVisible(False)
+        self.empty_container.setVisible(False)
         self.detail_container.setVisible(True)
 
         self.moniker_lbl.setText(data.get("moniker", "—"))

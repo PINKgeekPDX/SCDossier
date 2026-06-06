@@ -5,7 +5,7 @@ import os
 from PyQt6.QtCore import (
     Qt, QPoint, QPointF, QRectF, QRect, QTimer,
     QPropertyAnimation, QEasingCurve,
-    pyqtSignal, pyqtProperty,
+    pyqtSignal, pyqtProperty, pyqtSlot
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush,
@@ -110,6 +110,9 @@ class ToolbarButton(QWidget):
         self._anim.start()
 
     def enterEvent(self, e) -> None:
+        parent = self.parent()
+        if parent and not getattr(parent, "_interact_held", False):
+            return
         self._animate(1.0)
 
     def leaveEvent(self, e) -> None:
@@ -117,6 +120,15 @@ class ToolbarButton(QWidget):
         self._animate(0.0)
 
     def mousePressEvent(self, e) -> None:
+        parent = self.parent()
+        if parent:
+            if getattr(parent, "_drag_held", False):
+                e.ignore()
+                return
+            if not getattr(parent, "_interact_held", False):
+                e.ignore()
+                return
+
         if e.button() == Qt.MouseButton.LeftButton:
             self._pressed = True
             self.update()
@@ -200,7 +212,19 @@ class OverlayToolbar(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setMouseTracking(True)
+        
+        from src.core.settings import SettingsManager
+        sm = SettingsManager.instance()
+        self.set_opacity(sm.toolbar_idle_opacity)
+
+        self._interact_held = False
+        self._drag_held = False
+
+        self._fade_anim = QPropertyAnimation(self, b"windowOpacity", self)
+        self._fade_anim.setDuration(200)
+        self._fade_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         self._edge               = ScreenEdge.LEFT
         self._drag_active        = False
@@ -221,6 +245,119 @@ class OverlayToolbar(QWidget):
         self._game_check_timer.timeout.connect(self._check_game_state)
         self._game_check_timer.start(3000)
         self._check_game_state()
+        
+        from src.core.events import EventBus
+        bus = EventBus.instance()
+        bus.toolbar_interact_pressed.connect(self._on_interact_pressed)
+        bus.toolbar_interact_released.connect(self._on_interact_released)
+        bus.toolbar_drag_pressed.connect(self._on_drag_pressed)
+        bus.toolbar_drag_released.connect(self._on_drag_released)
+        bus.settings_changed.connect(self._on_settings_changed)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._update_interaction_state()
+
+    def _update_interaction_state(self) -> None:
+        from src.core.settings import SettingsManager
+        sm = SettingsManager.instance()
+        active = self._interact_held or self._drag_held
+        
+        flags = getattr(self, "_current_window_flags", self.windowFlags())
+        was_transparent = bool(flags & Qt.WindowType.WindowTransparentForInput)
+        should_be_transparent = not active
+        
+        if was_transparent != should_be_transparent:
+            import sys
+            if sys.platform == "win32":
+                import ctypes
+                hwnd = int(self.winId())
+                GWL_EXSTYLE = -20
+                WS_EX_TRANSPARENT = 0x00000020
+                
+                ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                if should_be_transparent:
+                    ex_style |= WS_EX_TRANSPARENT
+                else:
+                    ex_style &= ~WS_EX_TRANSPARENT
+                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style)
+                
+                # Flush the style change so Windows recalculates hit-testing
+                SWP_NOMOVE = 0x0002
+                SWP_NOSIZE = 0x0001
+                SWP_NOZORDER = 0x0004
+                SWP_FRAMECHANGED = 0x0020
+                ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+                
+                # Update Qt's internal state without triggering window recreation if possible, 
+                # but it's actually safer to just update the windows ex_style directly and leave Qt out of it.
+                # However, to keep our 'was_transparent' logic working:
+                if should_be_transparent:
+                    self._current_window_flags = flags | Qt.WindowType.WindowTransparentForInput
+                else:
+                    self._current_window_flags = flags & ~Qt.WindowType.WindowTransparentForInput
+            else:
+                if should_be_transparent:
+                    flags |= Qt.WindowType.WindowTransparentForInput
+                else:
+                    flags &= ~Qt.WindowType.WindowTransparentForInput
+                    
+                self.setWindowFlags(flags)
+                if self.isVisible():
+                    self.show()
+                
+        self._fade_anim.stop()
+        if self._interact_held:
+            self._fade_anim.setStartValue(self.windowOpacity())
+            self._fade_anim.setEndValue(1.0)
+            self._fade_anim.start()
+        elif self._drag_held:
+            self.set_opacity(sm.toolbar_idle_opacity)
+        else:
+            self._fade_anim.setStartValue(self.windowOpacity())
+            self._fade_anim.setEndValue(sm.toolbar_idle_opacity)
+            self._fade_anim.start()
+            
+        self.update()
+
+    @pyqtSlot()
+    def _on_interact_pressed(self) -> None:
+        self._interact_held = True
+        self._update_interaction_state()
+        
+        from PyQt6.QtGui import QCursor
+        pos = self.mapFromGlobal(QCursor.pos())
+        child = self.childAt(pos)
+        if isinstance(child, ToolbarButton):
+            child._animate(1.0)
+
+    @pyqtSlot()
+    def _on_interact_released(self) -> None:
+        self._interact_held = False
+        self._update_interaction_state()
+        
+        for btn in (self._expand_btn, self._capture_btn):
+            btn._animate(0.0)
+            btn._pressed = False
+
+    @pyqtSlot()
+    def _on_drag_pressed(self) -> None:
+        self._drag_held = True
+        self._update_interaction_state()
+
+    @pyqtSlot()
+    def _on_drag_released(self) -> None:
+        self._drag_held = False
+        if self._drag_active:
+            self._drag_active = False
+            self.releaseMouse()
+            self.snap_to_nearest_edge()
+        self._update_interaction_state()
+
+    @pyqtSlot(str, object)
+    def _on_settings_changed(self, key: str, value: object) -> None:
+        if key == "toolbar_idle_opacity":
+            self._update_interaction_state()
 
     def _check_game_state(self) -> None:
         from src.core.settings import SettingsManager
@@ -256,6 +393,17 @@ class OverlayToolbar(QWidget):
             else:
                 if not self.isVisible():
                     self.show()
+                    
+        if is_running:
+            import sys
+            if sys.platform == "win32":
+                import ctypes
+                hwnd = int(self.winId())
+                HWND_TOPMOST = -1
+                SWP_NOMOVE = 0x0002
+                SWP_NOSIZE = 0x0001
+                SWP_NOACTIVATE = 0x0010
+                ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
 
     def set_main_window_ref(self, main_window) -> None:
         import weakref
@@ -371,14 +519,20 @@ class OverlayToolbar(QWidget):
             log.debug("Could not save toolbar position: %s", exc)
 
     def mousePressEvent(self, e) -> None:
-        if e.button() == Qt.MouseButton.LeftButton:
+        if e.button() == Qt.MouseButton.LeftButton and self._drag_held:
             self._drag_active   = True
             self._drag_start_pos    = e.globalPosition().toPoint()
             self._drag_start_window = self.pos()
+            self.grabMouse()
             e.accept()
 
     def mouseMoveEvent(self, e) -> None:
         if self._drag_active:
+            if not (e.buttons() & Qt.MouseButton.LeftButton):
+                self._drag_active = False
+                self.releaseMouse()
+                self.snap_to_nearest_edge()
+                return
             delta = e.globalPosition().toPoint() - self._drag_start_pos
             self.move(self._drag_start_window + delta)
             e.accept()
@@ -386,6 +540,7 @@ class OverlayToolbar(QWidget):
     def mouseReleaseEvent(self, e) -> None:
         if self._drag_active:
             self._drag_active = False
+            self.releaseMouse()
             self.snap_to_nearest_edge()
             e.accept()
 
@@ -434,6 +589,9 @@ class OverlayToolbar(QWidget):
         p.restore()
 
         border_col = QColor(0, int(160 + 40 * (pulse / 72.0)), 230, int(pulse))
+        if self._drag_held:
+            border_col = QColor(255, 255, 0, 255)
+            
         p.setPen(QPen(border_col, 1.0))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPath(body)

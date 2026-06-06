@@ -150,6 +150,40 @@ class MainWindow(BaseWindow):
             self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
         self.show()
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(50, self._pop_to_top)
+
+    def _pop_to_top(self) -> None:
+        import sys
+        if sys.platform == "win32":
+            import ctypes
+            hwnd = int(self.winId())
+            HWND_TOPMOST = -1
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_SHOWWINDOW = 0x0040
+            
+            ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+            
+            # Allow Windows DWM to process the topmost state before demoting it
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, self._remove_topmost)
+
+    def _remove_topmost(self) -> None:
+        import sys
+        if sys.platform == "win32":
+            import ctypes
+            hwnd = int(self.winId())
+            HWND_NOTOPMOST = -2
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_SHOWWINDOW = 0x0040
+
+            if not bool(self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint):
+                ctypes.windll.user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+
     def closeEvent(self, event) -> None:
         sm = SettingsManager.instance()
 

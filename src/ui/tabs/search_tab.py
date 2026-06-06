@@ -328,6 +328,13 @@ class SearchTab(QWidget):
             )
             logo_lbl.setPixmap(scaled_pix)
             logo_lbl.setFixedSize(scaled_pix.size())
+            
+            # Add faint glowing border
+            logo_glow = QGraphicsDropShadowEffect()
+            logo_glow.setBlurRadius(35)
+            logo_glow.setColor(QColor(0, 170, 255, 80))
+            logo_glow.setOffset(0, 0)
+            logo_lbl.setGraphicsEffect(logo_glow)
         else:
             logo_lbl.setText("SC DOSSIER")
             logo_lbl.setFont(font_inter(32))

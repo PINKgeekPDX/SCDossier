@@ -23,57 +23,87 @@ class SplashScreen(QWidget):
         self.setWindowFlags(Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
-        self.setFixedSize(440, 265)
+        self.setFixedSize(460, 294)
 
         # Layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(30, 30, 30, 30)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(0)
 
-        # 1. Image Label
+        # 1. Main Container
+        self.container = QWidget(self)
+        container_layout = QVBoxLayout(self.container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+        container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Apply Glow Effect to the composite container
+        glow = QGraphicsDropShadowEffect(self)
+        glow.setBlurRadius(25)
+        glow.setColor(QColor(PRIMARY_CONTAINER))
+        glow.setOffset(0, 0)
+        self.container.setGraphicsEffect(glow)
+
+        # 2. Image Label
         self.image_lbl = QLabel()
         self.image_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_lbl.setFixedSize(400, 225)
+        self.image_lbl.setFixedSize(400, 200)
         
         img_path = get_asset_path("assets/social_preview.png")
         pixmap = QPixmap(img_path)
         if not pixmap.isNull():
             # Scale down
             scaled_pixmap = pixmap.scaled(
-                400, 225, 
+                400, 200, 
                 Qt.AspectRatioMode.KeepAspectRatio, 
                 Qt.TransformationMode.SmoothTransformation
             )
-            self.image_lbl.setPixmap(scaled_pixmap)
+            # Create a new transparent pixmap to hold the rounded image
+            rounded = QPixmap(400, 200)
+            rounded.fill(Qt.GlobalColor.transparent)
+            
+            painter = QPainter(rounded)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            
+            # Create a path with rounded top corners and square bottom corners
+            path = QPainterPath()
+            path.setFillRule(Qt.FillRule.WindingFill)
+            path.addRoundedRect(0, 0, 400, 200, 12, 12)
+            # Add a square rect for the bottom half to override bottom rounding
+            path.addRect(0, 100, 400, 100)
+            
+            painter.setClipPath(path)
+            painter.drawPixmap(0, 0, scaled_pixmap)
+            painter.end()
+            
+            self.image_lbl.setPixmap(rounded)
 
-        # Glow Effect on Image
-        glow = QGraphicsDropShadowEffect(self)
-        glow.setBlurRadius(25)
-        glow.setColor(QColor(PRIMARY_CONTAINER))
-        glow.setOffset(0, 0)
-        self.image_lbl.setGraphicsEffect(glow)
-        
-        layout.addWidget(self.image_lbl, alignment=Qt.AlignmentFlag.AlignHCenter)
+        container_layout.addWidget(self.image_lbl)
 
-        # 2. Status Block - overlayed on the bottom of the image label
-        self.status_block = QWidget(self.image_lbl)
-        self.status_block.setFixedWidth(360)
-        self.status_block.setFixedHeight(40)
-        self.status_block.move(20, 168)
+        # 3. Status Block - repositioned below image, matching width, decreased height
+        self.status_block = QWidget()
+        self.status_block.setFixedWidth(400)
+        self.status_block.setFixedHeight(34)
         self.status_block.setObjectName("SplashStatusBlock")
+        self.status_block.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         # Paint the status block with glass background using StyleSheet
         self.status_block.setStyleSheet(f"""
             QWidget#SplashStatusBlock {{
                 background-color: {GLASS_BG_DARK};
                 border: 1px solid rgba(0, 170, 255, 0.3);
-                border-radius: 6px;
+                border-top: none;
+                border-top-left-radius: 0px;
+                border-top-right-radius: 0px;
+                border-bottom-left-radius: 12px;
+                border-bottom-right-radius: 12px;
             }}
         """)
         
         block_layout = QVBoxLayout(self.status_block)
-        block_layout.setContentsMargins(12, 6, 12, 8)
-        block_layout.setSpacing(4)
+        block_layout.setContentsMargins(16, 5, 16, 6)
+        block_layout.setSpacing(3)
 
         # Status Label
         self.status_lbl = QLabel("Initializing...")
@@ -83,20 +113,23 @@ class SplashScreen(QWidget):
 
         # Progress Bar
         self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(6)
+        self.progress_bar.setFixedHeight(5)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet(f"""
             QProgressBar {{
                 background-color: rgba(0, 0, 0, 0.4);
                 border: 1px solid rgba(0, 170, 255, 0.2);
-                border-radius: 3px;
+                border-radius: 2px;
             }}
             QProgressBar::chunk {{
                 background-color: {PRIMARY};
-                border-radius: 2px;
+                border-radius: 1px;
             }}
         """)
         block_layout.addWidget(self.progress_bar)
+
+        container_layout.addWidget(self.status_block)
+        layout.addWidget(self.container, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # 3. Setup Animations
         self.setWindowOpacity(0.0)

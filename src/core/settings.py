@@ -68,9 +68,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "image_download_concurrency": 3,
     "toolbar_opacity": 1.0,
     "theme_accent_override": None,
+    "theme_palette_overrides": {},
     "auto_check_updates": True,
     "auto_download_updates": False,
     "font_size_scaling": 100,
+    "app_font_family": "Default",
     # Archive & Export Preferences
     "export_destination": "",
     "remember_export_folder": True,
@@ -88,6 +90,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "reputation_prefetch_archived": False,
     "reputation_supabase_url": "",  # power-user override; uses constants default when empty
     "reputation_anon_key": "",      # power-user override; uses constants default when empty
+    "reputation_history": {},
+    "toolbar_interact_hotkey": "left alt",
+    "toolbar_drag_hotkey": "left ctrl",
+    "toolbar_idle_opacity": 0.4,
     "_version": APP_VERSION,
 }
 
@@ -401,12 +407,29 @@ class SettingsManager(QObject):
         self.set("theme_accent_override", v)
 
     @property
+    def theme_palette_overrides(self) -> dict[str, str]:
+        val = self.get("theme_palette_overrides", {})
+        return dict(val) if isinstance(val, dict) else {}
+
+    @theme_palette_overrides.setter
+    def theme_palette_overrides(self, v: dict[str, str]) -> None:
+        self.set("theme_palette_overrides", v)
+
+    @property
     def font_size_scaling(self) -> int:
         return int(self.get("font_size_scaling", 100))
 
     @font_size_scaling.setter
     def font_size_scaling(self, v: int) -> None:
         self.set("font_size_scaling", max(80, min(150, v)))
+
+    @property
+    def app_font_family(self) -> str:
+        return self.get("app_font_family", "Default")
+
+    @app_font_family.setter
+    def app_font_family(self, v: str) -> None:
+        self.set("app_font_family", v)
 
     # General / behaviour
     @property
@@ -594,6 +617,38 @@ class SettingsManager(QObject):
     @reputation_prefetch_archived.setter
     def reputation_prefetch_archived(self, v: bool) -> None:
         self.set("reputation_prefetch_archived", v)
+
+    @property
+    def reputation_history(self) -> dict:
+        return self.get("reputation_history", {})
+
+    @reputation_history.setter
+    def reputation_history(self, v: dict) -> None:
+        self.set("reputation_history", v)
+
+    @property
+    def toolbar_interact_hotkey(self) -> str:
+        return str(self.get("toolbar_interact_hotkey", "left alt"))
+
+    @toolbar_interact_hotkey.setter
+    def toolbar_interact_hotkey(self, v: str) -> None:
+        self.set("toolbar_interact_hotkey", v)
+
+    @property
+    def toolbar_drag_hotkey(self) -> str:
+        return str(self.get("toolbar_drag_hotkey", "left ctrl"))
+
+    @toolbar_drag_hotkey.setter
+    def toolbar_drag_hotkey(self, v: str) -> None:
+        self.set("toolbar_drag_hotkey", v)
+
+    @property
+    def toolbar_idle_opacity(self) -> float:
+        return float(self.get("toolbar_idle_opacity", 0.4))
+
+    @toolbar_idle_opacity.setter
+    def toolbar_idle_opacity(self, v: float) -> None:
+        self.set("toolbar_idle_opacity", max(0.1, min(1.0, v)))
 
     def force_save(self) -> None:
         """Force an immediate save regardless of dirty state."""

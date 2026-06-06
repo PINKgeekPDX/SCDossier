@@ -388,14 +388,21 @@ class ArchivesTab(QWidget):
         self.detail_layout.setSpacing(12)
         self.detail_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Empty state
-        self.empty_state = QLabel("SELECT AN ARCHIVED PROFILE TO VIEW DETAILS")
+        # Empty state for detail view
+        self.empty_container = QWidget()
+        empty_layout = QVBoxLayout(self.empty_container)
+        empty_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.empty_state = QLabel("SELECT A PROFILE TO VIEW ARCHIVED DATA")
         self.empty_state.setFont(label_caps())
         self.empty_state.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_state.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
-        self.detail_layout.addStretch()
-        self.detail_layout.addWidget(self.empty_state)
-        self.detail_layout.addStretch()
+        
+        empty_layout.addStretch()
+        empty_layout.addWidget(self.empty_state)
+        empty_layout.addStretch()
+        
+        self.detail_layout.addWidget(self.empty_container)
 
         # Detail content (hidden until selection)
         self.detail_content = QWidget()
@@ -545,7 +552,7 @@ class ArchivesTab(QWidget):
         if not data:
             return
 
-        self.empty_state.setVisible(False)
+        self.empty_container.setVisible(False)
         self.detail_content.setVisible(True)
         self.sub_tab_bar.setVisible(True)
 
@@ -667,8 +674,7 @@ class ArchivesTab(QWidget):
         self.list_widget.clearSelection()
         # Hide detail content, show empty state
         self.detail_content.setVisible(False)
-        self.sub_tab_bar.setVisible(False)
-        self.empty_state.setVisible(True)
+        self.empty_container.setVisible(True)
         # Reset stack to page 0
         self.sub_tab_bar.set_active("dossier")
         self.stack.setCurrentIndex(0)

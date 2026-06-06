@@ -101,6 +101,14 @@ class EventBus(QObject):
     # Emitted when the global hotkey is pressed
     capture_hotkey_pressed = pyqtSignal()
 
+    # Emitted when the toolbar interact hotkey is pressed/released
+    toolbar_interact_pressed = pyqtSignal()
+    toolbar_interact_released = pyqtSignal()
+
+    # Emitted when the toolbar drag hotkey is pressed/released
+    toolbar_drag_pressed = pyqtSignal()
+    toolbar_drag_released = pyqtSignal()
+
     # ------------------------------------------------------------------
     # Status / Feedback Signals
     # ------------------------------------------------------------------

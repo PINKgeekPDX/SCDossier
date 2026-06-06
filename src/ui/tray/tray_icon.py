@@ -46,9 +46,8 @@ class TrayIcon(QSystemTrayIcon):
             }
         """)
 
-        self.action_open_dossier = QAction("Open Dossier", self)
+        self.action_open_dossier = QAction("Show SC Dossier", self)
         self.action_open_dossier.setToolTip("Open the main SC Dossier application window")
-        self.action_open_dossier.setIcon(QIcon(get_asset_path("assets/appicon.png")))
         self.action_open_dossier.triggered.connect(self.show_main_requested.emit)
         self.menu.addAction(self.action_open_dossier)
 

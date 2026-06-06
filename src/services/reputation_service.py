@@ -335,12 +335,21 @@ class ReputationService:
             return None
 
     @staticmethod
-    def _normalize_score(score: int, report_count: int) -> int:
+    def _normalize_score(score: int, report_count: int, category: str) -> int:
         """
         Normalize score on a 0-100 scale.
-        Score % is computed as: min(100, int(score / (report_count * 6) * 100))
+        Score % is computed such that achieving 100% requires the equivalent of 20 max score reports.
         """
         if report_count <= 0 or score <= 0:
             return 0
-        pct = int((score / (report_count * 6)) * 100)
+            
+        from src.app.constants import REPUTATION_TAGS
+        max_score_per_report = sum(t["points"] for t in REPUTATION_TAGS.values() if t["category"] == category)
+        if max_score_per_report == 0:
+            return 0
+            
+        max_possible_points = max_score_per_report * 20
+        denominator = max(report_count * max_score_per_report, max_possible_points)
+        
+        pct = int((score / denominator) * 100)
         return min(100, max(0, pct))

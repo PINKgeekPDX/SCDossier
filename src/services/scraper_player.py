@@ -141,7 +141,7 @@ class PlayerScraperWorker(QThread):
                 if "enlisted" in label_text:
                     data["enlisted"] = val
                 elif "location" in label_text:
-                    data["location"] = val
+                    data["location"] = val.replace(" , ", ", ")
                 elif "fluency" in label_text:
                     data["fluency"] = [f.strip() for f in val.split(",") if f.strip()]
 

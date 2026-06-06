@@ -125,3 +125,23 @@ def rgba(hex_color: str, alpha: float) -> str:
     g = int(hex_color[2:4], 16)
     b = int(hex_color[4:6], 16)
     return f"rgba({r}, {g}, {b}, {alpha:.2f})"
+
+_DEFAULTS = {}
+def _store_defaults():
+    g = globals()
+    for k, v in list(g.items()):
+        if isinstance(v, str) and k.isupper() and k != "BRACKET_COLOR":
+            _DEFAULTS[k] = v
+
+_store_defaults()
+
+def apply_overrides(overrides: dict[str, str]) -> None:
+    """Apply dynamic overrides to the palette globals."""
+    g = globals()
+    for k, v in _DEFAULTS.items():
+        g[k] = v
+    if not overrides:
+        return
+    for k, v in overrides.items():
+        if k in _DEFAULTS:
+            g[k] = v

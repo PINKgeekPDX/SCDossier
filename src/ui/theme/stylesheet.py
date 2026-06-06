@@ -6,11 +6,20 @@ def _scale(sizes: list[int], factor: int) -> list[int]:
     return [max(1, int(s * f)) for s in sizes]
 
 
-def build_stylesheet(accent_override: str | None = None, font_scale: int = 100) -> str:
+def build_stylesheet(accent_override: str | None = None, font_scale: int = 100, app_font_family: str | None = None) -> str:
     accent = accent_override or P.PRIMARY_CONTAINER
 
     fs = _scale([12, 10, 9, 11, 18, 8, 7], font_scale)
     fs_body, fs_caps, fs_caps_sm, fs_data, fs_head, fs_tiny, fs_micro = fs
+
+    global_font_override = f"""
+* {{
+    font-family: "{app_font_family}" !important;
+}}
+QToolTip {{
+    font-family: "Inter" !important;
+}}
+""" if app_font_family and app_font_family != "Default" else ""
 
     return f"""
 QWidget {{
@@ -123,6 +132,34 @@ QPushButton[class="danger"] {{
 QPushButton[class="danger"]:hover {{
     background-color: {P.HAZARD_RED};
     color: #FFFFFF;
+}}
+
+QPushButton[class="danger-ghost"] {{
+    background-color: transparent;
+    color: {P.HAZARD_RED};
+    font-family: "JetBrains Mono", monospace;
+    font-size: {fs_caps}px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    border: 1px solid {P.HAZARD_RED};
+    border-radius: 3px;
+    padding: 4px 12px;
+    min-height: 26px;
+}}
+
+QPushButton[class="danger-ghost"]:hover {{
+    background-color: rgba(255, 68, 68, 0.10);
+    border-color: {P.ERROR_CONTAINER};
+    color: {P.ERROR_CONTAINER};
+}}
+
+QPushButton[class="danger-ghost"]:pressed {{
+    background-color: rgba(255, 68, 68, 0.20);
+}}
+
+QPushButton[class="danger-ghost"]:disabled {{
+    border-color: {P.OUTLINE_VARIANT};
+    color: {P.TEXT_DIM};
 }}
 
 QLineEdit {{
@@ -454,4 +491,4 @@ QProgressBar::chunk {{
     );
     border-radius: 2px;
 }}
-"""
+""" + global_font_override
