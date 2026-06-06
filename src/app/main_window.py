@@ -44,14 +44,8 @@ class MainWindow(BaseWindow):
         self._build_ui()
         self._connect_signals()
 
-        sm = SettingsManager.instance()
-        last_tab = sm.last_tab
-        if last_tab and last_tab != "search":
-            self.sidebar.set_active_tab(last_tab)
-            self._on_tab_selected(last_tab)
-        else:
-            self.sidebar.set_active_tab("search")
-            self._on_tab_selected("search")
+        self.sidebar.set_active_tab("search")
+        self._on_tab_selected("search")
 
         # Pin on startup if setting enabled
         if sm.pin_on_startup:
