@@ -595,6 +595,46 @@ class SettingsManager(QObject):
     # ------------------------------------------------------------------
 
     @property
+    def reputation_enabled(self) -> bool:
+        return bool(self.get("reputation_enabled", False))
+
+    @reputation_enabled.setter
+    def reputation_enabled(self, v: bool) -> None:
+        self.set("reputation_enabled", v)
+
+    @property
+    def reputation_auto_check(self) -> bool:
+        return bool(self.get("reputation_auto_check", True))
+
+    @reputation_auto_check.setter
+    def reputation_auto_check(self, v: bool) -> None:
+        self.set("reputation_auto_check", v)
+
+    @property
+    def reputation_prefetch_archived(self) -> bool:
+        return bool(self.get("reputation_prefetch_archived", False))
+
+    @reputation_prefetch_archived.setter
+    def reputation_prefetch_archived(self, v: bool) -> None:
+        self.set("reputation_prefetch_archived", v)
+
+    @property
+    def reputation_supabase_url(self) -> str:
+        return str(self.get("reputation_supabase_url", ""))
+
+    @reputation_supabase_url.setter
+    def reputation_supabase_url(self, v: str) -> None:
+        self.set("reputation_supabase_url", v)
+
+    @property
+    def reputation_anon_key(self) -> str:
+        return str(self.get("reputation_anon_key", ""))
+
+    @reputation_anon_key.setter
+    def reputation_anon_key(self, v: str) -> None:
+        self.set("reputation_anon_key", v)
+
+    @property
     def reputation_history(self) -> dict:
         return self.get("reputation_history", {})
 
