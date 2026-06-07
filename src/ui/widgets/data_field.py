@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame
 
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, data_point
+from src.core.events import EventBus
 
 
 class DataField(QWidget):
@@ -29,6 +30,15 @@ class DataField(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self._build_ui(label, value)
+        EventBus.instance().theme_changed.connect(self._refresh_theme)
+
+    def _refresh_theme(self) -> None:
+        """Re-apply inline styles from current palette."""
+        self.setStyleSheet(
+            f"background: {P.rgba(P.SURFACE_CONTAINER_LOWEST, 0.5)}; border-radius: 3px;"
+        )
+        self._label_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
+        self._value_lbl.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent;")
 
     def _build_ui(self, label: str, value: str) -> None:
         layout = QVBoxLayout(self)

@@ -101,7 +101,6 @@ def main():
     palette.apply_overrides(sm.theme_palette_overrides)
     
     app.setStyleSheet(build_stylesheet(
-        accent_override=sm.theme_accent_override,
         font_scale=sm.font_size_scaling,
         app_font_family=sm.app_font_family
     ))
@@ -244,8 +243,8 @@ def main():
             from src.services.reputation_service import ReputationService
             from src.services.reputation_worker import ReputationStartupWorker
 
-            url = sm.get("reputation_supabase_url") or REP_SUPABASE_URL
-            key = sm.get("reputation_anon_key") or REP_ANON_KEY
+            url = REP_SUPABASE_URL
+            key = REP_ANON_KEY
 
             if url and key:
                 ReputationService.initialize(url, key)
@@ -257,23 +256,26 @@ def main():
                     "Reputation is enabled but REP_SUPABASE_URL/REP_ANON_KEY are not set. "
                     "Reputation system will be unavailable."
                 )
-                EventBus.instance().reputation_system_status.emit("offline")
+                EventBus.instance().reputation_system_status.emit("error")
         except Exception as e:
             log.error("Failed to initialize ReputationService: %s", e)
-            EventBus.instance().reputation_system_status.emit("offline")
+            EventBus.instance().reputation_system_status.emit("error")
 
     # 10. Global settings_changed listener (hot-reload outside SettingsTab)
     def _on_settings_changed(key: str, value: object) -> None:
-        if key in ("font_size_scaling", "theme_accent_override", "theme_palette_overrides", "theme_palette_preview", "app_font_family"):
+        if key in ("font_size_scaling", "theme_palette_overrides", "theme_palette_preview", "app_font_family"):
+            if key == "theme_palette_overrides":
+                palette.apply_overrides(sm.theme_palette_overrides)
+
             app.setStyleSheet(build_stylesheet(
-                accent_override=sm.theme_accent_override,
                 font_scale=sm.font_size_scaling,
                 app_font_family=sm.app_font_family
             ))
-            
-            # Force update on all top-level widgets to apply custom QPainter themes immediately
+
             for widget in QApplication.topLevelWidgets():
                 widget.update()
+
+            EventBus.instance().theme_changed.emit()
         elif key == "auto_hide_toolbar_without_game":
             sc_running = False
             try:

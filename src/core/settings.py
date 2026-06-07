@@ -67,7 +67,6 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "temp_cache_max_age_days": DEFAULT_TEMP_CACHE_MAX_AGE_DAYS,
     "image_download_concurrency": 3,
     "toolbar_opacity": 1.0,
-    "theme_accent_override": None,
     "theme_palette_overrides": {},
     "auto_check_updates": True,
     "auto_download_updates": False,
@@ -89,8 +88,6 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "reputation_enabled": False,
     "reputation_auto_check": True,
     "reputation_prefetch_archived": False,
-    "reputation_supabase_url": "",  # power-user override; uses constants default when empty
-    "reputation_anon_key": "",      # power-user override; uses constants default when empty
     "reputation_history": {},
     "toolbar_interact_hotkey": "left alt",
     "toolbar_drag_hotkey": "left ctrl",
@@ -159,12 +156,15 @@ class SettingsManager(QObject):
     def _merge_defaults(defaults: dict, loaded: dict) -> dict:
         """Recursively merge loaded values over defaults so missing keys use defaults."""
         result = dict(defaults)
-        for key, default_val in defaults.items():
-            if key in loaded:
-                if isinstance(default_val, dict) and isinstance(loaded[key], dict):
-                    result[key] = SettingsManager._merge_defaults(default_val, loaded[key])
+        for key, val in loaded.items():
+            if key in defaults:
+                default_val = defaults[key]
+                if isinstance(default_val, dict) and isinstance(val, dict):
+                    result[key] = SettingsManager._merge_defaults(default_val, val)
                 else:
-                    result[key] = loaded[key]
+                    result[key] = val
+            else:
+                result[key] = val
         return result
 
     def _flush(self) -> None:
@@ -399,15 +399,6 @@ class SettingsManager(QObject):
         self.set("toolbar_opacity", max(0.3, min(1.0, v)))
 
     @property
-    def theme_accent_override(self) -> str | None:
-        val = self.get("theme_accent_override", None)
-        return str(val) if val else None
-
-    @theme_accent_override.setter
-    def theme_accent_override(self, v: str | None) -> None:
-        self.set("theme_accent_override", v)
-
-    @property
     def theme_palette_overrides(self) -> dict[str, str]:
         val = self.get("theme_palette_overrides", {})
         return dict(val) if isinstance(val, dict) else {}
@@ -628,22 +619,6 @@ class SettingsManager(QObject):
     @reputation_prefetch_archived.setter
     def reputation_prefetch_archived(self, v: bool) -> None:
         self.set("reputation_prefetch_archived", v)
-
-    @property
-    def reputation_supabase_url(self) -> str:
-        return str(self.get("reputation_supabase_url", ""))
-
-    @reputation_supabase_url.setter
-    def reputation_supabase_url(self, v: str) -> None:
-        self.set("reputation_supabase_url", v)
-
-    @property
-    def reputation_anon_key(self) -> str:
-        return str(self.get("reputation_anon_key", ""))
-
-    @reputation_anon_key.setter
-    def reputation_anon_key(self, v: str) -> None:
-        self.set("reputation_anon_key", v)
 
     @property
     def reputation_history(self) -> dict:

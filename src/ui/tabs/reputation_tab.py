@@ -23,11 +23,11 @@ Signal flow:
 """
 
 import logging
-from PyQt6.QtCore import Qt, pyqtSlot, QPropertyAnimation, QEasingCurve, QTimer
-from PyQt6.QtGui import QColor, QPainter, QFont
+from PyQt6.QtCore import Qt, QPoint, pyqtSlot, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt6.QtGui import QColor, QPainter, QPen, QFont, QGuiApplication
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QProgressBar, QDialog, QDialogButtonBox, QScrollArea, QFrame,
+    QProgressBar, QDialog, QScrollArea, QFrame,
     QStackedWidget, QGridLayout, QSizePolicy
 )
 
@@ -39,6 +39,8 @@ from src.ui.widgets.glass_card import GlassCard
 from src.app.constants import REPUTATION_TAGS, REPUTATION_CATEGORIES, REPUTATION_MAX_TAGS
 
 log = logging.getLogger(__name__)
+
+_COOLDOWN_COLOR = "#FFAA00"
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +174,7 @@ class ReportDialog(QDialog):
     - Max REPUTATION_MAX_TAGS (5) selections enforced client-side
     - Chips for un-selected become disabled (not just styled) once limit reached
     - Submit button disabled until ≥1 tag selected
+    - Styled to match ConfirmDialog (glass container, bracket corners)
     """
 
     def __init__(self, handle: str, parent: QWidget | None = None) -> None:
@@ -179,16 +182,17 @@ class ReportDialog(QDialog):
         self._handle = handle
         self._selected: set[str] = set()
         self._chip_btns: dict[str, QPushButton] = {}
-        self.setWindowTitle(f"REPORT INTERACTION — @{handle.upper()}")
+        self._drag_active = False
+        self._drag_start_pos = QPoint()
+        self._drag_start_window_pos = QPoint()
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setModal(True)
         self.setMinimumWidth(560)
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {P.SURFACE_CONTAINER_LOW};
-                color: {P.ON_SURFACE};
-            }}
-        """)
         self._build_ui()
+        self._center_on_screen()
 
     def _chip_style(self, category_id: str, selected: bool, disabled: bool) -> str:
         cat = REPUTATION_CATEGORIES.get(category_id, {})
@@ -196,9 +200,9 @@ class ReportDialog(QDialog):
         if disabled and not selected:
             return f"""
                 QPushButton {{
-                    background: rgba(255,255,255,0.03);
+                    background: {P.rgba(P.ON_SURFACE, 0.03)};
                     color: {P.TEXT_DIM};
-                    border: 1px solid rgba(255,255,255,0.07);
+                    border: 1px solid {P.rgba(P.ON_SURFACE, 0.07)};
                     border-radius: 4px;
                     padding: 6px 10px;
                     font-size: 11px;
@@ -223,7 +227,7 @@ class ReportDialog(QDialog):
             """
         return f"""
             QPushButton {{
-                background: rgba(255,255,255,0.05);
+                background: {P.rgba(P.ON_SURFACE, 0.05)};
                 color: {P.ON_SURFACE};
                 border: 1px solid {color}60;
                 border-radius: 4px;
@@ -238,11 +242,34 @@ class ReportDialog(QDialog):
         """
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(12)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
 
-        # Header
+        container = QWidget(self)
+        container.setObjectName("ReportContainer")
+        container.setStyleSheet(f"""
+            #ReportContainer {{
+                background-color: {P.rgba(P.SURFACE_CONTAINER_LOW, 0.97)};
+                border: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.30)};
+                border-radius: 6px;
+            }}
+        """)
+        outer.addWidget(container)
+
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(10)
+
+        title_lbl = QLabel(f"REPORT INTERACTION — @{self._handle.upper()}")
+        title_lbl.setFont(label_caps())
+        title_lbl.setStyleSheet(
+            f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.15em;"
+        )
+
+        divider = QWidget()
+        divider.setFixedHeight(1)
+        divider.setStyleSheet(f"background: {P.OUTLINE_VARIANT};")
+
         header_lbl = QLabel(
             f"Select up to {REPUTATION_MAX_TAGS} tags that describe your interaction with "
             f"@{self._handle}. This report is anonymous."
@@ -250,12 +277,14 @@ class ReportDialog(QDialog):
         header_lbl.setFont(font_inter(11))
         header_lbl.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent; border: none;")
         header_lbl.setWordWrap(True)
-        layout.addWidget(header_lbl)
 
-        # Selection counter
         self._counter_lbl = QLabel(f"0 / {REPUTATION_MAX_TAGS} selected")
         self._counter_lbl.setFont(label_caps())
         self._counter_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent; border: none;")
+
+        layout.addWidget(title_lbl)
+        layout.addWidget(divider)
+        layout.addWidget(header_lbl)
         layout.addWidget(self._counter_lbl)
 
         # Tag chips grid
@@ -287,50 +316,26 @@ class ReportDialog(QDialog):
             grid.addWidget(btn, row, col)
 
         layout.addLayout(grid)
-
-        # Buttons
-        btn_box = QDialogButtonBox()
-        self._submit_btn = QPushButton("SUBMIT REPORT")
-        self._submit_btn.setEnabled(False)
-        self._submit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._submit_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
-                color: {P.PRIMARY};
-                border: 1px solid {P.PRIMARY};
-                border-radius: 4px;
-                padding: 6px 16px;
-                font-size: 12px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{ background: {P.rgba(P.PRIMARY_CONTAINER, 0.25)}; }}
-            QPushButton:disabled {{
-                color: {P.TEXT_DIM};
-                border-color: {P.OUTLINE_VARIANT};
-                background: transparent;
-            }}
-        """)
-        self._submit_btn.clicked.connect(self.accept)
-
-        cancel_btn = QPushButton("CANCEL")
-        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        cancel_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent;
-                color: {P.TEXT_DIM};
-                border: 1px solid {P.OUTLINE_VARIANT};
-                border-radius: 4px;
-                padding: 6px 16px;
-                font-size: 11px;
-            }}
-            QPushButton:hover {{ color: {P.ON_SURFACE}; border-color: {P.OUTLINE}; }}
-        """)
-        cancel_btn.clicked.connect(self.reject)
+        layout.addSpacing(4)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
+
+        cancel_btn = QPushButton("CANCEL")
+        cancel_btn.setProperty("class", "ghost")
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.setMinimumWidth(88)
+        cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(cancel_btn)
+
+        self._submit_btn = QPushButton("SUBMIT REPORT")
+        self._submit_btn.setProperty("class", "primary")
+        self._submit_btn.setEnabled(False)
+        self._submit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._submit_btn.setMinimumWidth(88)
+        self._submit_btn.clicked.connect(self.accept)
         btn_row.addWidget(self._submit_btn)
+
         layout.addLayout(btn_row)
 
     def _on_chip_clicked(self, tag_id: str, category_id: str) -> None:
@@ -364,10 +369,59 @@ class ReportDialog(QDialog):
         self._counter_lbl.setText(f"{len(self._selected)} / {REPUTATION_MAX_TAGS} selected")
         self._submit_btn.setEnabled(len(self._selected) > 0)
 
+    def paintEvent(self, event) -> None:
+        """Paint bracket corners on the dialog border."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect()
+        s = 8
+        pen = QPen(QColor(P.BRACKET_COLOR), 1.5)
+        painter.setPen(pen)
+        x0, y0 = rect.left(), rect.top()
+        x1, y1 = rect.right(), rect.bottom()
+        for px, py, dx, dy in [(x0,y0,1,1),(x1,y0,-1,1),(x0,y1,1,-1),(x1,y1,-1,-1)]:
+            painter.drawLine(px, py, px + dx*s, py)
+            painter.drawLine(px, py, px, py + dy*s)
+        painter.end()
+
     @property
     def selected_tags(self) -> list[str]:
         """Return the list of selected tag IDs."""
         return list(self._selected)
+
+    def _center_on_screen(self) -> None:
+        """Center the dialog on the primary screen."""
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            geo = screen.availableGeometry()
+            x = geo.x() + (geo.width() - self.width()) // 2
+            y = geo.y() + (geo.height() - self.height()) // 2
+            self.move(x, y)
+        else:
+            self.move(200, 200)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and event.position().y() < 50:
+            self._drag_active = True
+            self._drag_start_pos = event.globalPosition().toPoint()
+            self._drag_start_window_pos = self.pos()
+            event.accept()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_active:
+            delta = event.globalPosition().toPoint() - self._drag_start_pos
+            self.move(self._drag_start_window_pos + delta)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._drag_active:
+            self._drag_active = False
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
 
 
 # ---------------------------------------------------------------------------
@@ -856,9 +910,9 @@ class ReputationTab(QWidget):
             # Cooldown styling — amber/orange tint
             btn_style = f"""
                 QPushButton {{
-                    background: rgba(255, 170, 0, 0.08);
-                    color: rgba(255, 170, 0, 0.7);
-                    border: 1px solid rgba(255, 170, 0, 0.3);
+                    background: {P.rgba(_COOLDOWN_COLOR, 0.08)};
+                    color: {P.rgba(_COOLDOWN_COLOR, 0.7)};
+                    border: 1px solid {P.rgba(_COOLDOWN_COLOR, 0.3)};
                     border-radius: 4px;
                     padding: 4px 16px;
                     font-size: 11px;
@@ -1009,8 +1063,8 @@ class ReputationTab(QWidget):
 
     @pyqtSlot(str)
     def _on_system_status(self, status: str) -> None:
-        """React to reputation system going online or offline."""
-        if status == "offline" and self._stack.currentIndex() == _STATE_LOADING:
+        """React to reputation system going online, offline, error, or disabled."""
+        if status in ("offline", "error") and self._stack.currentIndex() == _STATE_LOADING:
             self._set_state("offline")
         elif status == "disabled":
             self._set_state("disabled")

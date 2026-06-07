@@ -110,6 +110,11 @@ class EventBus(QObject):
     # A settings key changed (key, new_value)
     settings_changed = pyqtSignal(str, object)
 
+    # Emitted after palette overrides are applied and stylesheet is rebuilt.
+    # Widgets should connect to this and call _refresh_theme() to update
+    # inline styles that can't be handled by the app stylesheet alone.
+    theme_changed = pyqtSignal()
+
     # ------------------------------------------------------------------
     # Image Download Signals
     # ------------------------------------------------------------------
@@ -138,7 +143,7 @@ class EventBus(QObject):
     reputation_report_failed = pyqtSignal(str, str)
 
     # Reputation system connection status changed
-    # Values: "online" | "offline" | "disabled"
+    # Values: "online" | "offline" | "error" | "disabled"
     reputation_system_status = pyqtSignal(str)
 
     # User requested to submit a report (handle, list_of_tag_ids)

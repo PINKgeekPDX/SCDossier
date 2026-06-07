@@ -18,16 +18,33 @@ from src.ui.theme.fonts import label_caps
 
 
 # Constants — tightened for compact layout
-_HEADER_HEIGHT = 24        # was 32
-_BORDER_RADIUS = 3         # was 4
-_MARGIN = 10               # was 16
-_BRACKET_SIZE = 6          # was 8
+_HEADER_HEIGHT = 24
+_BORDER_RADIUS = 3
+_MARGIN = 10
+_BRACKET_SIZE = 6
 _BRACKET_WIDTH = P.BRACKET_WIDTH
-_BRACKET_COLOR = QColor(P.BRACKET_COLOR)
-_GLASS_BG = QColor(10, 29, 41, 90)        # slightly more transparent
-_BORDER_COLOR = QColor(0, 170, 255, 32)   # rgba(0,170,255,0.125)
-_HEADER_BG = QColor(0, 170, 255, 14)      # rgba(0,170,255,0.055)
-_HEADER_LINE = QColor(0, 170, 255, 20)    # rgba(0,170,255,0.08)
+
+
+def _bracket_color():
+    return QColor(P.BRACKET_COLOR)
+
+def _glass_bg():
+    return P.qcolor(P.SURFACE_CONTAINER_LOW, 90)
+
+def _border_color():
+    c = QColor(P.PRIMARY_CONTAINER)
+    c.setAlpha(32)
+    return c
+
+def _header_bg():
+    c = QColor(P.PRIMARY_CONTAINER)
+    c.setAlpha(14)
+    return c
+
+def _header_line():
+    c = QColor(P.PRIMARY_CONTAINER)
+    c.setAlpha(20)
+    return c
 
 
 class GlassCard(QFrame):
@@ -77,7 +94,6 @@ class GlassCard(QFrame):
         br = _BORDER_RADIUS
         half_pen = _BRACKET_WIDTH / 2
 
-        # Clip path for rounded rect (prevents overflow)
         clip_path = QPainterPath()
         clip_path.addRoundedRect(
             QRectF(
@@ -88,21 +104,18 @@ class GlassCard(QFrame):
         )
         painter.setClipPath(clip_path)
 
-        # --- Glass background ---
-        painter.setBrush(QBrush(_GLASS_BG))
+        painter.setBrush(QBrush(_glass_bg()))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(rect)
 
         painter.setClipping(False)
 
-        # --- Header strip (if title) ---
         if self._title:
             header_rect = QRect(0, 0, rect.width(), _HEADER_HEIGHT)
-            painter.setBrush(QBrush(_HEADER_BG))
+            painter.setBrush(QBrush(_header_bg()))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(header_rect)
 
-            # Title text
             painter.setPen(QColor(P.TEXT_DIM))
             painter.setFont(label_caps())
             painter.drawText(
@@ -111,12 +124,10 @@ class GlassCard(QFrame):
                 self._title.upper(),
             )
 
-            # Header bottom border
-            painter.setPen(QPen(_HEADER_LINE, 1))
+            painter.setPen(QPen(_header_line(), 1))
             painter.drawLine(0, _HEADER_HEIGHT, rect.width(), _HEADER_HEIGHT)
 
-        # --- 1px border ---
-        painter.setPen(QPen(_BORDER_COLOR, 1))
+        painter.setPen(QPen(_border_color(), 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(
             QRectF(
@@ -126,7 +137,6 @@ class GlassCard(QFrame):
             br, br
         )
 
-        # --- Tech bracket corners ---
         self._draw_brackets(painter, rect)
 
         painter.end()
@@ -134,7 +144,7 @@ class GlassCard(QFrame):
     def _draw_brackets(self, painter: QPainter, rect: QRect) -> None:
         """Draw L-shaped corner bracket ornaments in primary blue."""
         size = _BRACKET_SIZE
-        pen = QPen(_BRACKET_COLOR, _BRACKET_WIDTH)
+        pen = QPen(_bracket_color(), _BRACKET_WIDTH)
         pen.setCapStyle(Qt.PenCapStyle.SquareCap)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)

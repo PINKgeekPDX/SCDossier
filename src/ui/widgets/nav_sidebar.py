@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QSizePolicy, QFrame
 )
-import webbrowser
 
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
@@ -47,11 +46,14 @@ class NavItem(QWidget):
         self._label = label
         self._active = False
         self._hovered = False
-        self.setFixedHeight(44)   # was 52
+        self.setFixedHeight(44)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMouseTracking(True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        from src.core.events import EventBus
+        EventBus.instance().theme_changed.connect(self.update)
 
     @property
     def active(self) -> bool:
@@ -105,19 +107,22 @@ class NavItem(QWidget):
         parent_width = self.parent().width() if self.parent() else SIDEBAR_WIDTH_COLLAPSED
         expanded = parent_width > SIDEBAR_WIDTH_COLLAPSED + 10
 
-        # --- Active background ---
         if self._active:
-            painter.fillRect(rect, QColor(0, 170, 255, 36))
-            # Left accent bar (2px — slimmer)
+            active_bg = QColor(P.PRIMARY_CONTAINER)
+            active_bg.setAlpha(36)
+            painter.fillRect(rect, active_bg)
             accent_pen = QPen(QColor(P.PRIMARY_CONTAINER), 2)
             painter.setPen(accent_pen)
             painter.drawLine(0, 3, 0, rect.height() - 3)
 
-        # --- Hover gradient ---
         elif self._hovered:
             grad = QLinearGradient(0, 0, rect.width(), 0)
-            grad.setColorAt(0, QColor(79, 142, 255, 45))
-            grad.setColorAt(1, QColor(79, 142, 255, 0))
+            hover_start = QColor(P.SECONDARY_CONTAINER)
+            hover_start.setAlpha(45)
+            hover_end = QColor(P.SECONDARY_CONTAINER)
+            hover_end.setAlpha(0)
+            grad.setColorAt(0, hover_start)
+            grad.setColorAt(1, hover_end)
             painter.fillRect(rect, QBrush(grad))
 
         # --- Icon (18×18, centred in the collapsed rail) ---
@@ -131,7 +136,9 @@ class NavItem(QWidget):
                 tp = QPainter(tinted)
                 tp.drawPixmap(0, 0, pixmap)
                 tp.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceAtop)
-                tp.fillRect(tinted.rect(), QColor(0, 200, 255, 200))
+                tint_color = QColor(P.PRIMARY_CONTAINER)
+                tint_color.setAlpha(200)
+                tp.fillRect(tinted.rect(), tint_color)
                 tp.end()
                 painter.drawPixmap(icon_x, icon_y, tinted)
             else:
@@ -218,37 +225,11 @@ class NavSidebar(QWidget):
 
         layout.addStretch(1)
 
-        # Github profile button at bottom
-        self._toggle_btn = QPushButton()
-        icon_path = get_asset_path("assets/icons/Icons/!.png")
-        if os.path.exists(icon_path):
-            self._toggle_btn.setIcon(QIcon(icon_path))
-            self._toggle_btn.setIconSize(QSize(16, 16))
-        self._toggle_btn.setFixedHeight(32)   # was 40
-        self._toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._toggle_btn.setToolTip("Open PINKgeekPDX GitHub profile in your browser")
-        self._toggle_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent;
-                color: {P.TEXT_DIM};
-                border: none;
-                border-top: 1px solid {P.OUTLINE_VARIANT};
-                font-size: 11px;
-            }}
-            QPushButton:hover {{
-                color: {P.PRIMARY};
-                background: rgba(0, 170, 255, 0.10);
-            }}
-        """)
-        self._toggle_btn.clicked.connect(self._open_github)
-        layout.addWidget(self._toggle_btn)
-
-        # Set initial active
         self._items[self._active_id].active = True
 
     def _setup_animation(self) -> None:
         self._anim = QPropertyAnimation(self, b"maximumWidth")
-        self._anim.setDuration(180)   # was 200 — slightly snappier
+        self._anim.setDuration(180)
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
     # ------------------------------------------------------------------
@@ -273,19 +254,18 @@ class NavSidebar(QWidget):
         self.set_active_tab(tab_id)
         self.tab_selected.emit(tab_id)
 
-    def _open_github(self) -> None:
-        webbrowser.open("https://github.com/pinkgeekpdx")
-
     # ------------------------------------------------------------------
     # Paint
     # ------------------------------------------------------------------
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
-        # Dark sidebar background — slightly more opaque for clear delineation
-        painter.fillRect(self.rect(), QColor(8, 18, 26, 200))
-        # Right border — subtle glow line
-        pen = QPen(QColor(0, 170, 255, 22), 1)
+        bg = QColor(P.SURFACE)
+        bg.setAlpha(200)
+        painter.fillRect(self.rect(), bg)
+        border_color = QColor(P.PRIMARY_CONTAINER)
+        border_color.setAlpha(22)
+        pen = QPen(border_color, 1)
         painter.setPen(pen)
         painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
         painter.end()

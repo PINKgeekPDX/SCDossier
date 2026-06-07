@@ -88,8 +88,8 @@ class ConfirmDialog(QDialog):
         container.setObjectName("ConfirmContainer")
         container.setStyleSheet(f"""
             #ConfirmContainer {{
-                background-color: rgba(10, 29, 41, 0.97);
-                border: 1px solid rgba(0, 170, 255, 0.30);
+                background-color: {P.rgba(P.SURFACE_CONTAINER_LOW, 0.97)};
+                border: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.30)};
                 border-radius: 6px;
             }}
         """)

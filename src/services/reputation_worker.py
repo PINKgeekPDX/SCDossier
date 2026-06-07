@@ -165,9 +165,12 @@ class ReputationStartupWorker(QThread):
     Startup worker that pings the keep-alive endpoint and pre-fetches
     the list of known player handles.
 
-    Emits EventBus.reputation_system_status("online") or ("offline").
+    Emits EventBus.reputation_system_status with:
+        "online"  — ping OK and handles fetched
+        "offline" — ping failed (network unreachable)
+        "error"   — service not initialized or fetch_known_handles failed
     Emits finished_success(list) with the list of known handles.
-    Emits finished_error(str) on critical failure (non-fatal — status is offline).
+    Emits finished_error(str) on failure (non-fatal — status reflects error state).
     """
 
     finished_success = pyqtSignal(list)
@@ -206,11 +209,11 @@ class ReputationStartupWorker(QThread):
             )
 
         except RuntimeError as e:
-            # Service not initialized
+            # Service not initialized or fetch_known_handles failed
             log.warning("ReputationStartupWorker: %s", e)
-            bus.reputation_system_status.emit("offline")
+            bus.reputation_system_status.emit("error")
             self.finished_error.emit(str(e))
         except Exception as e:
             log.error("ReputationStartupWorker.run() unexpected error: %s", e)
-            bus.reputation_system_status.emit("offline")
+            bus.reputation_system_status.emit("error")
             self.finished_error.emit(str(e))

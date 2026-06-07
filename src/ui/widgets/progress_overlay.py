@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
+from src.core.events import EventBus
 
 
 class ProgressOverlay(QWidget):
@@ -40,6 +41,14 @@ class ProgressOverlay(QWidget):
 
         self._build_ui()
         self._setup_animation()
+        EventBus.instance().theme_changed.connect(self._refresh_theme)
+
+    def _refresh_theme(self) -> None:
+        """Re-apply label styles from current palette."""
+        self._status_label.setStyleSheet(
+            f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.20em;"
+        )
+        self._sub_label.setStyleSheet(f"color: {P.TEXT_DIM}; background: transparent;")
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -118,24 +127,24 @@ class ProgressOverlay(QWidget):
         w, h = rect.width(), rect.height()
 
         # --- Dark overlay backdrop ---
-        painter.fillRect(rect, QColor(3, 21, 33, 210))
+        painter.fillRect(rect, P.qcolor(P.SURFACE_DIM, 210))
 
         # --- Scanline beam ---
         if self._scan_y > 0 and self._scan_y < h:
             beam_h = 60   # was 80
             grad = QLinearGradient(0, self._scan_y - beam_h, 0, self._scan_y + beam_h)
-            grad.setColorAt(0.0, QColor(0, 170, 255, 0))
-            grad.setColorAt(0.4, QColor(0, 170, 255, 30))
-            grad.setColorAt(0.5, QColor(0, 170, 255, 60))
-            grad.setColorAt(0.6, QColor(0, 170, 255, 30))
-            grad.setColorAt(1.0, QColor(0, 170, 255, 0))
+            grad.setColorAt(0.0, P.qcolor(P.PRIMARY_CONTAINER, 0))
+            grad.setColorAt(0.4, P.qcolor(P.PRIMARY_CONTAINER, 30))
+            grad.setColorAt(0.5, P.qcolor(P.PRIMARY_CONTAINER, 60))
+            grad.setColorAt(0.6, P.qcolor(P.PRIMARY_CONTAINER, 30))
+            grad.setColorAt(1.0, P.qcolor(P.PRIMARY_CONTAINER, 0))
             painter.fillRect(
                 QRect(0, max(0, int(self._scan_y) - beam_h), w, beam_h * 2),
                 QBrush(grad),
             )
 
             # Scanline core line
-            pen = QPen(QColor(0, 170, 255, 120), 1)
+            pen = QPen(P.qcolor(P.PRIMARY_CONTAINER, 120), 1)
             painter.setPen(pen)
             painter.drawLine(0, int(self._scan_y), w, int(self._scan_y))
 
@@ -151,14 +160,14 @@ class ProgressOverlay(QWidget):
         clip_path.addRoundedRect(QRectF(panel_rect), 4, 4)
         painter.setClipPath(clip_path)
 
-        painter.setBrush(QColor(10, 29, 41, 180))
+        painter.setBrush(P.qcolor(P.SURFACE_CONTAINER_LOW, 180))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(panel_rect)
 
         painter.setClipping(False)
 
         # Panel border
-        painter.setPen(QPen(QColor(0, 170, 255, 60), 1))
+        painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, 60), 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(QRectF(panel_rect), 4, 4)
 

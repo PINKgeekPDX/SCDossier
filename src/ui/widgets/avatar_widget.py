@@ -129,7 +129,7 @@ class AvatarWidget(QWidget):
         self._draw_brackets(painter, rect)
 
         # Border
-        pen = QPen(QColor(0, 170, 255, 45), 1)
+        pen = QPen(P.qcolor(P.PRIMARY_CONTAINER, 45), 1)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(rect.adjusted(0, 0, -1, -1), radius, radius)

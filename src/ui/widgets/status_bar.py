@@ -13,27 +13,24 @@ from src.ui.theme.fonts import label_caps
 from src.app.constants import STATUSBAR_HEIGHT
 from src.core.events import EventBus
 
+_STATUS_SUCCESS = "#00FF88"
+_STATUS_WARNING = "#FFAA00"
+
 class CustomStatusBar(QWidget):
     """Ultra-thin status bar at the bottom of the main window."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFixedHeight(20)  # Ultra-slim
+        self.setFixedHeight(26)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(f"""
-            CustomStatusBar {{
-                background-color: {P.SURFACE_CONTAINER};
-                border-top: 1px solid {P.OUTLINE_VARIANT};
-            }}
-        """)
+        
+        self._current_rep_color = P.TEXT_DIM
+        self._pulse_step = 0
+        self._is_pulsing = False
         
         self._pulse_timer = QTimer(self)
         self._pulse_timer.timeout.connect(self._on_pulse)
         self._pulse_timer.setInterval(50)
-        self._pulse_step = 0
-        self._is_pulsing = False
-        
-        self._current_rep_color = P.TEXT_DIM
 
         self._hide_status_timer = QTimer(self)
         self._hide_status_timer.setSingleShot(True)
@@ -41,10 +38,13 @@ class CustomStatusBar(QWidget):
 
         self._build_ui()
         self._connect_signals()
+        self._refresh_bar_style()
+
+        EventBus.instance().theme_changed.connect(self._refresh_bar_style)
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 0, 8, 0)  # Tightly packed layout
+        layout.setContentsMargins(8, 3, 8, 3)
         layout.setSpacing(8)
 
         font = label_caps()
@@ -83,6 +83,15 @@ class CustomStatusBar(QWidget):
         bus.reputation_report_submitted.connect(lambda _: self._stop_pulse())
         bus.reputation_report_failed.connect(lambda _, __: self._stop_pulse())
 
+    def _refresh_bar_style(self) -> None:
+        self.setStyleSheet(f"""
+            CustomStatusBar {{
+                background-color: {P.SURFACE_CONTAINER};
+                border-top: 1px solid {P.OUTLINE_VARIANT};
+            }}
+        """)
+        self._update_rep_style()
+
     def _update_rep_style(self, alpha: float = 0.1, border_alpha: float = 0.3) -> None:
         c = QColor(self._current_rep_color)
         bg = f"rgba({c.red()}, {c.green()}, {c.blue()}, {alpha})"
@@ -102,14 +111,21 @@ class CustomStatusBar(QWidget):
 
     def _on_rep_status(self, status: str) -> None:
         if status == "online":
-            self._current_rep_color = "#00FF88"
+            self._current_rep_color = _STATUS_SUCCESS
             self._rep_lbl.setText("REP: ONLINE")
+            self._rep_lbl.setToolTip("Reputation database is connected and operational.")
         elif status == "offline":
             self._current_rep_color = P.HAZARD_RED
             self._rep_lbl.setText("REP: OFFLINE")
+            self._rep_lbl.setToolTip("Reputation database is unreachable. Check your network connection.")
+        elif status == "error":
+            self._current_rep_color = P.HAZARD_RED
+            self._rep_lbl.setText("REP: ERROR")
+            self._rep_lbl.setToolTip("Reputation system connected but failed to load data. Possible authentication or database error.")
         else:
             self._current_rep_color = P.TEXT_DIM
             self._rep_lbl.setText("REP: DISABLED")
+            self._rep_lbl.setToolTip("Reputation system is disabled in settings.")
             
         self._update_rep_style()
 
@@ -135,8 +151,8 @@ class CustomStatusBar(QWidget):
     def set_status(self, text: str, level: str = "info") -> None:
         colors = {
             "info": P.TEXT_DIM,
-            "success": "#00FF88",
-            "warning": "#FFAA00",
+            "success": _STATUS_SUCCESS,
+            "warning": _STATUS_WARNING,
             "error": P.HAZARD_RED,
         }
         hex_color = colors.get(level, P.TEXT_DIM)

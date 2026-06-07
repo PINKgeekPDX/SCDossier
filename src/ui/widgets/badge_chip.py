@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
 
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, data_point
+from src.core.events import EventBus
 
 
 class BadgeChip(QWidget):
@@ -36,6 +37,16 @@ class BadgeChip(QWidget):
         self.setFixedHeight(28)        # was 36
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._build_ui(name, image_path)
+        EventBus.instance().theme_changed.connect(self._refresh_theme)
+
+    def _refresh_theme(self) -> None:
+        """Re-apply inline styles and repaint for theme changes."""
+        self._name_label.setStyleSheet(f"color: {P.ON_SURFACE}; background: transparent;")
+        if not self._image_path:
+            self._img_label.setStyleSheet(
+                f"color: {P.PRIMARY_CONTAINER}; background: transparent; font-size: 11px;"
+            )
+        self.update()
 
     def _build_ui(self, name: str, image_path: str | Path | None) -> None:
         layout = QHBoxLayout(self)
@@ -94,7 +105,7 @@ class BadgeChip(QWidget):
         rect = self.rect().adjusted(0, 0, -1, -1)
         pill_radius = rect.height() // 2
         # Pill background
-        painter.setBrush(QColor(0, 170, 255, 12))   # slightly more visible
-        painter.setPen(QPen(QColor(0, 170, 255, 45), 1))
+        painter.setBrush(P.qcolor(P.PRIMARY_CONTAINER, 12))
+        painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, 45), 1))
         painter.drawRoundedRect(rect, pill_radius, pill_radius)
         painter.end()

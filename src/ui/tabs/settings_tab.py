@@ -1,19 +1,19 @@
 import json
 
-from PyQt6.QtCore import Qt, pyqtSlot
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QUrl, pyqtSlot
+from PyQt6.QtGui import QColor, QFont, QDesktopServices, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QSpinBox,
     QCheckBox, QPushButton, QComboBox, QLineEdit, QScrollArea, QFrame,
-    QGridLayout, QProgressBar, QFileDialog, QApplication, QMessageBox,
+    QGridLayout, QProgressBar, QFileDialog, QApplication,
     QListWidget, QListWidgetItem, QSplitter, QTextBrowser
 )
 
 from src.core.settings import SettingsManager
-from src.core.paths import PathManager
+from src.core.paths import PathManager, get_asset_path
 from src.core.events import EventBus
 from src.ui.theme import palette as P
-from src.ui.theme.fonts import label_caps, font_inter
+from src.ui.theme.fonts import label_caps, font_inter, font_mono, font_sora
 from src.ui.theme.stylesheet import build_stylesheet
 from src.ui.widgets.tech_label import TechLabel
 from src.ui.widgets.smart_inputs import NoScrollSpinBox, NoScrollSlider, ColorPickerButton, NoScrollComboBox  # noqa: F401 (NoScrollComboBox re-used below)
@@ -21,6 +21,9 @@ from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.keybind_dialog import KeybindDetectDialog
 from src.services.updater_service import UpdaterService, _parse_version_parts
 from src.app.constants import APP_NAME, APP_VERSION
+
+_STATUS_SUCCESS = "#00FF88"
+_STATUS_WARNING = "#FFAA00"
 
 
 class SettingsTab(QWidget):
@@ -37,6 +40,7 @@ class SettingsTab(QWidget):
         self._load_values()
         self._init_updater()
         self._connect_signals()
+        EventBus.instance().theme_changed.connect(self._refresh_styles)
 
     # ------------------------------------------------------------------
     # Style helpers
@@ -44,7 +48,7 @@ class SettingsTab(QWidget):
 
     def _input_style(self) -> str:
         return f"""
-            background: rgba(5, 11, 15, 0.85);
+            background: {P.rgba(P.SPACE_VOID, 0.85)};
             color: {P.ON_SURFACE};
             border: 1px solid {P.OUTLINE_VARIANT};
             border-radius: 4px;
@@ -54,7 +58,7 @@ class SettingsTab(QWidget):
 
     def _compact_input_style(self) -> str:
         return f"""
-            background: rgba(5, 11, 15, 0.85);
+            background: {P.rgba(P.SPACE_VOID, 0.85)};
             color: {P.ON_SURFACE};
             border: 1px solid {P.OUTLINE_VARIANT};
             border-radius: 4px;
@@ -78,7 +82,7 @@ class SettingsTab(QWidget):
                 width: 16px; height: 16px;
                 border: 2px solid {P.OUTLINE};
                 border-radius: 3px;
-                background: rgba(0,0,0,0.3);
+                background: {P.rgba(P.SPACE_VOID, 0.3)};
             }}
             QCheckBox::indicator:hover {{
                 border: 2px solid {P.PRIMARY_CONTAINER};
@@ -166,17 +170,17 @@ class SettingsTab(QWidget):
         main_lo.setSpacing(0)
 
         # Header
-        hdr = QWidget()
-        hdr.setFixedHeight(40)
-        hdr.setStyleSheet(f"background:{P.SURFACE_CONTAINER_LOW};border-bottom:1px solid {P.OUTLINE_VARIANT};")
-        hdr_lo = QHBoxLayout(hdr)
+        self._hdr = QWidget()
+        self._hdr.setFixedHeight(40)
+        self._hdr.setStyleSheet(f"background:{P.SURFACE_CONTAINER_LOW};border-bottom:1px solid {P.OUTLINE_VARIANT};")
+        hdr_lo = QHBoxLayout(self._hdr)
         hdr_lo.setContentsMargins(14, 4, 14, 4)
-        hl = QLabel("SYSTEM PREFERENCES")
-        hl.setFont(label_caps())
-        hl.setStyleSheet(f"color:{P.PRIMARY};letter-spacing:0.15em;background:transparent;border:none;")
-        hdr_lo.addWidget(hl)
+        self._hdr_lbl = QLabel("SYSTEM PREFERENCES")
+        self._hdr_lbl.setFont(label_caps())
+        self._hdr_lbl.setStyleSheet(f"color:{P.PRIMARY};letter-spacing:0.15em;background:transparent;border:none;")
+        hdr_lo.addWidget(self._hdr_lbl)
         hdr_lo.addStretch()
-        main_lo.addWidget(hdr)
+        main_lo.addWidget(self._hdr)
 
         # Scroll area
         sc = QScrollArea()
@@ -189,6 +193,8 @@ class SettingsTab(QWidget):
         lo.setContentsMargins(10, 8, 10, 8)
         lo.setSpacing(6)
         lo.setAlignment(Qt.AlignmentFlag.AlignTop)
+        lo.setColumnStretch(0, 1)
+        lo.setColumnStretch(1, 1)
 
         # --- GENERAL -------------------------------------------------
         gc = GlassCard(title="GENERAL")
@@ -325,7 +331,7 @@ class SettingsTab(QWidget):
         hf.addWidget(self._row("SNIPPING KEY", hk_wrap, "Global hotkey to activate the screen capture selection tool"))
 
         hc.content_layout.addLayout(hf)
-        lo.addWidget(hc, 2, 0)
+        lo.addWidget(hc, 3, 1)
 
         # --- SYNC & CACHE --------------------------------------------
         scc = GlassCard(title="CACHE")
@@ -349,31 +355,31 @@ class SettingsTab(QWidget):
         lo.addWidget(scc, 1, 1)
 
         # --- UPDATE BEHAVIOR -----------------------------------------
-        lo.addWidget(self._build_update_card(), 3, 0)
-
-        # --- COMMUNITY REPUTATION ------------------------------------
-        lo.addWidget(self._build_reputation_card(), 2, 1)
-
-        # --- DIAGNOSTICS & LOGS --------------------------------------
-        lo.addWidget(self._build_diagnostics_card(), 4, 0)
+        lo.addWidget(self._build_update_card(), 2, 0)
 
         # --- DATA PATHS ----------------------------------------------
-        lo.addWidget(self._build_paths_card(), 3, 1)
+        lo.addWidget(self._build_paths_card(), 2, 1)
 
-        # --- ABOUT ---------------------------------------------------
-        lo.addWidget(self._build_about_card(), 4, 1)
+        # --- DIAGNOSTICS & LOGS --------------------------------------
+        lo.addWidget(self._build_diagnostics_card(), 3, 0)
+
+        # --- COMMUNITY REPUTATION (full width) -----------------------
+        lo.addWidget(self._build_reputation_card(), 4, 0, 1, 2)
+
+        # --- ABOUT (full width) --------------------------------------
+        lo.addWidget(self._build_about_card(), 5, 0, 1, 2)
 
         # --- RESET ALL ------------------------------------------------
         reset_card = GlassCard(title="RESET")
         reset_lo = QVBoxLayout()
         reset_lo.setContentsMargins(0, 2, 0, 2)
         reset_lo.setSpacing(4)
-        reset_btn = QPushButton("RESET ALL SETTINGS TO DEFAULT")
-        reset_btn.setStyleSheet(f"""
+        self._reset_btn = QPushButton("RESET ALL SETTINGS TO DEFAULT")
+        self._reset_btn.setStyleSheet(f"""
             QPushButton {{
-                background: rgba(255, 59, 59, 0.12);
-                color: #FF3B3B;
-                border: 1px solid #FF3B3B;
+                background: {P.rgba(P.HAZARD_RED, 0.12)};
+                color: {P.HAZARD_RED};
+                border: 1px solid {P.HAZARD_RED};
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-size: 11px;
@@ -381,17 +387,17 @@ class SettingsTab(QWidget):
                 letter-spacing: 0.05em;
                 min-height: 28px;
             }}
-            QPushButton:hover {{ background: rgba(255, 59, 59, 0.25); }}
-            QPushButton:pressed {{ background: rgba(255, 59, 59, 0.35); }}
+            QPushButton:hover {{ background: {P.rgba(P.HAZARD_RED, 0.25)}; }}
+            QPushButton:pressed {{ background: {P.rgba(P.HAZARD_RED, 0.35)}; }}
         """)
-        reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        reset_btn.clicked.connect(self._on_reset_all)
-        reset_lo.addWidget(reset_btn)
-        reset_desc = QLabel("Reverts all preferences, appearance, scraper, and cache settings to factory defaults. This cannot be undone.")
-        reset_desc.setFont(font_inter(9))
-        reset_desc.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
-        reset_desc.setWordWrap(True)
-        reset_lo.addWidget(reset_desc)
+        self._reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._reset_btn.clicked.connect(self._on_reset_all)
+        reset_lo.addWidget(self._reset_btn)
+        self._reset_desc = QLabel("Reverts all preferences, appearance, scraper, and cache settings to factory defaults. This cannot be undone.")
+        self._reset_desc.setFont(font_inter(9))
+        self._reset_desc.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
+        self._reset_desc.setWordWrap(True)
+        reset_lo.addWidget(self._reset_desc)
         reset_card.content_layout.addLayout(reset_lo)
         lo.addWidget(reset_card, 6, 0, 1, 2)
 
@@ -455,7 +461,7 @@ class SettingsTab(QWidget):
         self.update_progress.setFixedHeight(12)
         self.update_progress.setStyleSheet(f"""
             QProgressBar {{
-                background: rgba(5,11,15,0.85); border:1px solid {P.OUTLINE_VARIANT};
+                background: {P.rgba(P.SPACE_VOID, 0.85)}; border:1px solid {P.OUTLINE_VARIANT};
                 border-radius:3px; text-align:center; font-size:10px; color:{P.ON_SURFACE};
             }}
             QProgressBar::chunk {{ background:{P.PRIMARY}; border-radius:2px; }}
@@ -502,7 +508,7 @@ class SettingsTab(QWidget):
         self.version_list.setFixedHeight(140)
         self.version_list.setStyleSheet(f"""
             QListWidget {{
-                background: rgba(5, 11, 15, 0.85);
+                background: {P.rgba(P.SPACE_VOID, 0.85)};
                 color: {P.ON_SURFACE};
                 border: 1px solid {P.OUTLINE_VARIANT};
                 border-radius: 4px;
@@ -511,7 +517,7 @@ class SettingsTab(QWidget):
             }}
             QListWidget::item {{
                 padding: 4px 8px;
-                border-bottom: 1px solid rgba(62, 72, 81, 0.3);
+                border-bottom: 1px solid {P.rgba(P.OUTLINE_VARIANT, 0.3)};
             }}
             QListWidget::item:selected {{
                 background: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
@@ -529,7 +535,7 @@ class SettingsTab(QWidget):
         self.version_desc.setOpenExternalLinks(True)
         self.version_desc.setStyleSheet(f"""
             QTextBrowser {{
-                background: rgba(5, 11, 15, 0.85);
+                background: {P.rgba(P.SPACE_VOID, 0.85)};
                 color: {P.TEXT_DIM};
                 border: 1px solid {P.OUTLINE_VARIANT};
                 border-radius: 4px;
@@ -674,9 +680,19 @@ class SettingsTab(QWidget):
             "Fetch reputation scores for all archived players when the app starts"))
 
         self.rep_status_lbl = QLabel("CHECKING..." if self.sm.reputation_enabled else "DISABLED")
-        self.rep_status_lbl.setFont(font_inter(10, QFont.Weight.Bold))
-        self.rep_status_lbl.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
-        lo.addWidget(self._row("CONNECTION STATUS", self.rep_status_lbl, "Current status of the connection to the reputation network"))
+        self.rep_status_lbl.setFont(font_mono(8, QFont.Weight.Bold))
+        self.rep_status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.rep_status_lbl.setMinimumWidth(80)
+        self._update_rep_status_pill("CHECKING..." if self.sm.reputation_enabled else "DISABLED", P.TEXT_DIM)
+
+        conn_wrap = QWidget()
+        conn_lo = QVBoxLayout(conn_wrap)
+        conn_lo.setContentsMargins(0, 0, 0, 0)
+        conn_lo.setSpacing(4)
+        conn_lbl = TechLabel("CONNECTION STATUS")
+        conn_lo.addWidget(conn_lbl)
+        conn_lo.addWidget(self.rep_status_lbl)
+        lo.addWidget(conn_wrap)
 
         priv = QLabel(
             "Privacy: Your public IP is SHA-256 hashed locally before being sent. "
@@ -694,71 +710,288 @@ class SettingsTab(QWidget):
         card = GlassCard(title="DATA PATHS")
         lo = QVBoxLayout()
         lo.setContentsMargins(0, 2, 0, 2)
-        lo.setSpacing(2)
+        lo.setSpacing(4)
 
-        for label, path in [
-            ("Config", str(self.paths.config_dir)),
-            ("Logs", str(self.paths.logs_dir)),
-            ("Temp Cache", str(self.paths.temp_root)),
-            ("Archived", str(self.paths.archived_root)),
-        ]:
-            pl = QLabel(path)
-            pl.setFont(font_inter(9))
-            pl.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
-            pl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            lo.addWidget(self._row(label.upper(), pl, f"Storage path for {label.lower()}"))
+        paths = [
+            ("CONFIG", str(self.paths.config_dir)),
+            ("LOGS", str(self.paths.logs_dir)),
+            ("TEMP CACHE", str(self.paths.temp_root)),
+            ("ARCHIVED", str(self.paths.archived_root)),
+        ]
+
+        for label, path in paths:
+            btn = QPushButton(label)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(self._btn_style())
+            btn.setToolTip(path)
+            btn.clicked.connect(
+                lambda _checked, p=path: QDesktopServices.openUrl(QUrl.fromLocalFile(p))
+            )
+            lo.addWidget(btn)
 
         card.content_layout.addLayout(lo)
         return card
+
+    # ------------------------------------------------------------------
+    # About card (redesigned)
+    # ------------------------------------------------------------------
+
+    def _fetch_github_contributors(self) -> str:
+        """Fetch contributor logins from the GitHub repo. Returns comma-separated names."""
+        try:
+            import requests as _req
+            resp = _req.get(
+                "https://api.github.com/repos/PINKgeekPDX/SCDossier/contributors",
+                timeout=5,
+            )
+            if resp.ok:
+                data = resp.json()
+                names = [c["login"] for c in data if c.get("login")]
+                return ", ".join(names) if names else "PINKgeekPDX"
+        except Exception:
+            pass
+        return "PINKgeekPDX"
+
+    def _make_link_label(self, text: str, url: str, font: QFont | None = None) -> QLabel:
+        """Create a clickable QLabel that opens *url* in the default browser."""
+        lbl = QLabel(f'<a href="{url}" style="color:{P.PRIMARY};text-decoration:none;">{text}</a>')
+        lbl.setFont(font or font_inter(10))
+        lbl.setStyleSheet("background:transparent;border:none;")
+        lbl.setTextFormat(Qt.TextFormat.RichText)
+        lbl.setOpenExternalLinks(True)
+        lbl.setCursor(Qt.CursorShape.PointingHandCursor)
+        return lbl
+
+    def _make_about_link_btn(self, label: str, url: str) -> QPushButton:
+        """Standard themed link button for the About section."""
+        btn = QPushButton(label)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet(self._btn_style())
+        btn.clicked.connect(lambda _checked, u=url: QDesktopServices.openUrl(QUrl(u)))
+        return btn
+
+    def _make_bmc_button(self) -> QPushButton:
+        """Buy Me a Coffee button with custom idle/hover/click assets."""
+        btn = QPushButton()
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setToolTip("Buy PINKgeekPDX a coffee!")
+        btn.setStyleSheet(self._btn_style())
+
+        idle_path = get_asset_path("assets/buttons/bmc-idle.png").replace("\\", "/")
+        hover_path = get_asset_path("assets/buttons/bmc-onhover.png").replace("\\", "/")
+        click_path = get_asset_path("assets/buttons/bmc-onclick.png").replace("\\", "/")
+
+        pm_idle = QPixmap(idle_path)
+        pm_hover = QPixmap(hover_path)
+        pm_click = QPixmap(click_path)
+
+        target_h = 24
+        idle_sz = pm_idle.size()
+        hover_sz = pm_hover.size()
+        click_sz = pm_click.size()
+        pm_idle = pm_idle.scaled(
+            int(idle_sz.width() * target_h / idle_sz.height()), target_h,
+            Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+        )
+        pm_hover = pm_hover.scaled(
+            int(hover_sz.width() * target_h / hover_sz.height()), target_h,
+            Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+        )
+        pm_click = pm_click.scaled(
+            int(click_sz.width() * target_h / click_sz.height()), target_h,
+            Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+        )
+
+        btn.setIcon(QIcon(pm_idle))
+        btn.setIconSize(pm_idle.size())
+        btn.setFixedSize(pm_idle.size().width() + 16, target_h + 8)
+
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                border: none;
+                background: transparent;
+                padding: 2px 8px;
+            }}
+            QPushButton:hover {{
+                background: {P.rgba(P.ON_SURFACE, 0.05)};
+                border-radius: 4px;
+            }}
+            QPushButton:pressed {{
+                background: {P.rgba(P.ON_SURFACE, 0.10)};
+                border-radius: 4px;
+            }}
+        """)
+
+        btn._bmc_idle = QIcon(pm_idle)
+        btn._bmc_hover = QIcon(pm_hover)
+        btn._bmc_click = QIcon(pm_click)
+
+        original_enter = btn.enterEvent
+        original_leave = btn.leaveEvent
+        original_press = btn.mousePressEvent
+        original_release = btn.mouseReleaseEvent
+
+        def _enter(e):
+            btn.setIcon(btn._bmc_hover)
+            original_enter(e)
+        def _leave(e):
+            btn.setIcon(btn._bmc_idle)
+            original_leave(e)
+        def _press(e):
+            btn.setIcon(btn._bmc_click)
+            original_press(e)
+        def _release(e):
+            btn.setIcon(btn._bmc_hover)
+            original_release(e)
+
+        btn.enterEvent = _enter
+        btn.leaveEvent = _leave
+        btn.mousePressEvent = _press
+        btn.mouseReleaseEvent = _release
+
+        btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://www.buymeacoffee.com/pinkgeekpdx"))
+        )
+        return btn
 
     def _build_about_card(self) -> GlassCard:
         card = GlassCard(title="ABOUT")
         lo = QVBoxLayout()
         lo.setContentsMargins(0, 2, 0, 2)
-        lo.setSpacing(2)
+        lo.setSpacing(4)
 
+        # -- Application version --
         lo.addWidget(self._about_row("APPLICATION", f"{APP_NAME} v{APP_VERSION}"))
-        lo.addWidget(self._about_row("DEVELOPER", "PINKgeekPDX"))
-        lo.addWidget(self._about_row("FRAMEWORK", "PyQt6"))
-        lo.addWidget(self._about_row("LICENSE", "MIT License"))
 
-        ghv = QLabel(f'<a href="https://github.com/pinkgeekpdx" style="color:{P.PRIMARY};">github.com/pinkgeekpdx</a>')
-        ghv.setFont(font_inter(10))
-        ghv.setStyleSheet("background:transparent;border:none;")
-        ghv.setTextFormat(Qt.TextFormat.RichText)
-        ghv.setOpenExternalLinks(True)
-        gh_wrap = QWidget()
-        gh_lo = QHBoxLayout(gh_wrap)
-        gh_lo.setContentsMargins(0, 0, 0, 0)
-        gh_lo.addWidget(ghv)
-        gh_lo.addStretch()
-        lo.addWidget(self._row("GITHUB", gh_wrap, "View the project on GitHub"))
-
-        bio = QLabel(
-            f'Developed by <a href="https://github.com/pinkgeekpdx" style="color:{P.PRIMARY};">PINKgeekPDX</a> '
-            "- a community fan project for Star Citizen players. Not affiliated with Cloud Imperium Games."
+        # -- Developer (clickable link) --
+        dev_row = QWidget()
+        dev_lo = QHBoxLayout(dev_row)
+        dev_lo.setContentsMargins(0, 0, 0, 0)
+        dev_lo.setSpacing(6)
+        dev_lbl = TechLabel("DEVELOPER")
+        dev_lbl.setFixedWidth(135)
+        dev_link = self._make_link_label(
+            "PINKgeekPDX", "https://github.com/PINKgeekPDX",
+            font_sora(11, QFont.Weight.Bold),
         )
-        bio.setFont(font_inter(9))
-        bio.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
-        bio.setWordWrap(True)
-        bio.setTextFormat(Qt.TextFormat.RichText)
-        bio.setOpenExternalLinks(True)
-        lo.addWidget(bio)
+        dev_lo.addWidget(dev_lbl)
+        dev_lo.addWidget(dev_link)
+        dev_lo.addStretch()
+        lo.addWidget(dev_row)
 
-        lic = QLabel("LICENSE: MIT License - Open Source. See LICENSE file for full terms.")
-        lic.setFont(font_inter(8))
-        lic.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;")
-        lic.setWordWrap(True)
-        lo.addWidget(lic)
+        # -- Contributors (from GitHub API) --
+        contrib_row = QWidget()
+        contrib_lo = QHBoxLayout(contrib_row)
+        contrib_lo.setContentsMargins(0, 0, 0, 0)
+        contrib_lo.setSpacing(6)
+        contrib_lbl = TechLabel("CONTRIBUTORS")
+        contrib_lbl.setFixedWidth(135)
+        contrib_names = self._fetch_github_contributors()
+        contrib_val = QLabel(contrib_names)
+        contrib_val.setFont(font_inter(10))
+        contrib_val.setStyleSheet(f"color:{P.ON_SURFACE};background:transparent;border:none;")
+        contrib_lo.addWidget(contrib_lbl)
+        contrib_lo.addWidget(contrib_val)
+        contrib_lo.addStretch()
+        lo.addWidget(contrib_row)
+
+        # -- Framework & Dependencies --
+        dep_row = QWidget()
+        dep_lo = QHBoxLayout(dep_row)
+        dep_lo.setContentsMargins(0, 0, 0, 0)
+        dep_lo.setSpacing(6)
+        dep_lbl = TechLabel("DEPENDENCIES")
+        dep_lbl.setFixedWidth(135)
+        dep_wrap = QWidget()
+        dep_flow = QHBoxLayout(dep_wrap)
+        dep_flow.setContentsMargins(0, 0, 0, 0)
+        dep_flow.setSpacing(8)
+        dependencies = [
+            ("PyQt6", "https://www.riverbankcomputing.com/software/pyqt/"),
+            ("requests", "https://requests.readthedocs.io/"),
+            ("BeautifulSoup4", "https://www.crummy.com/software/BeautifulSoup/"),
+            ("lxml", "https://lxml.de/"),
+            ("Pillow", "https://python-pillow.org/"),
+            ("RapidOCR", "https://github.com/RapidAI/RapidOCR"),
+            ("Supabase", "https://supabase.com/"),
+            ("Keyboard", "https://github.com/boppreh/keyboard"),
+        ]
+        for i, (name, url) in enumerate(dependencies):
+            dep_flow.addWidget(self._make_link_label(name, url, font_inter(9)))
+            if i < len(dependencies) - 1:
+                sep = QLabel("\u00b7")
+                sep.setFont(font_inter(9))
+                sep.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
+                dep_flow.addWidget(sep)
+        dep_flow.addStretch()
+        dep_lo.addWidget(dep_lbl)
+        dep_lo.addWidget(dep_wrap, 1)
+        lo.addWidget(dep_row)
+
+        # -- Separator --
+        sep1 = QFrame()
+        sep1.setFrameShape(QFrame.Shape.HLine)
+        sep1.setStyleSheet(f"color:{P.OUTLINE_VARIANT};background:transparent;")
+        sep1.setFixedHeight(1)
+        lo.addWidget(sep1)
+
+        # -- License --
+        lic_row = QWidget()
+        lic_lo = QHBoxLayout(lic_row)
+        lic_lo.setContentsMargins(0, 0, 0, 0)
+        lic_lo.setSpacing(6)
+        lic_lbl = TechLabel("LICENSE")
+        lic_lbl.setFixedWidth(135)
+        lic_val = QLabel("MIT License \u2014 Open Source. See LICENSE file for full terms.")
+        lic_val.setFont(font_inter(10))
+        lic_val.setStyleSheet(f"color:{P.ON_SURFACE};background:transparent;border:none;")
+        lic_lo.addWidget(lic_lbl)
+        lic_lo.addWidget(lic_val, 1)
+        lo.addWidget(lic_row)
 
         disc = QLabel(
             "DISCLAIMER: This is an unofficial tool and is not affiliated with the "
             "Cloud Imperium group of companies."
         )
-        disc.setFont(font_inter(8))
-        disc.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;")
+        disc.setFont(font_inter(9))
+        disc.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
         disc.setWordWrap(True)
         lo.addWidget(disc)
+
+        # -- Separator --
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet(f"color:{P.OUTLINE_VARIANT};background:transparent;")
+        sep2.setFixedHeight(1)
+        lo.addWidget(sep2)
+
+        # -- Link Buttons Row --
+        btn_row = QWidget()
+        btn_lo = QHBoxLayout(btn_row)
+        btn_lo.setContentsMargins(0, 0, 0, 0)
+        btn_lo.setSpacing(6)
+        btn_lo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        btn_lo.addWidget(self._make_about_link_btn("GITHUB", "https://github.com/PINKgeekPDX/SCDossier"))
+        btn_lo.addWidget(self._make_about_link_btn("RELEASES", "https://github.com/PINKgeekPDX/SCDossier/releases"))
+        btn_lo.addWidget(self._make_about_link_btn("ISSUES", "https://github.com/PINKgeekPDX/SCDossier/issues"))
+        btn_lo.addWidget(self._make_about_link_btn("WIKI", "https://github.com/PINKgeekPDX/SCDossier/wiki"))
+        btn_lo.addWidget(self._make_about_link_btn("FORK", "https://github.com/PINKgeekPDX/SCDossier/fork"))
+
+        discord_btn = self._make_about_link_btn("DISCORD", "https://discord.gg/placeholder")
+        discord_btn.clicked.disconnect()
+        discord_btn.clicked.connect(
+            lambda: EventBus.instance().status_message.emit(
+                "Official project discord coming soon!", "info"
+            )
+        )
+        btn_lo.addWidget(discord_btn)
+
+        btn_lo.addWidget(self._make_about_link_btn("WEBSITE", "http://www.scdossier.com"))
+
+        btn_lo.addWidget(self._make_bmc_button())
+
+        lo.addWidget(btn_row)
 
         card.content_layout.addLayout(lo)
         return card
@@ -784,14 +1017,17 @@ class SettingsTab(QWidget):
 
     @pyqtSlot()
     def _on_reset_all(self) -> None:
-        reply = QMessageBox.question(
-            self,
-            "Reset All Settings",
-            "This will revert ALL preferences, appearance, scraper, and cache settings to factory defaults.\n\nThis cannot be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+        from PyQt6.QtWidgets import QDialog
+        from src.ui.widgets.confirm_dialog import ConfirmDialog
+        dlg = ConfirmDialog(
+            title="RESET ALL SETTINGS",
+            message="This will revert ALL preferences, appearance, scraper, and cache settings to factory defaults.\n\nThis cannot be undone.",
+            confirm_text="RESET ALL",
+            cancel_text="CANCEL",
+            danger=True,
+            parent=self,
         )
-        if reply != QMessageBox.StandardButton.Yes:
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         # Use the public reset API — no direct _data access
@@ -802,10 +1038,20 @@ class SettingsTab(QWidget):
 
         self._load_values()
         EventBus.instance().settings_changed.emit("font_size_scaling", self.sm.font_size_scaling)
-        EventBus.instance().settings_changed.emit("theme_accent_override", self.sm.theme_accent_override)
         EventBus.instance().settings_changed.emit("theme_palette_overrides", {})
+        EventBus.instance().settings_changed.emit("reputation_enabled", self.sm.reputation_enabled)
 
-        QMessageBox.information(self, "Settings Reset", "All settings have been restored to factory defaults.")
+        from PyQt6.QtWidgets import QDialog
+        from src.ui.widgets.confirm_dialog import ConfirmDialog
+        dlg = ConfirmDialog(
+            title="SETTINGS RESET",
+            message="All settings have been restored to factory defaults.",
+            confirm_text="OK",
+            cancel_text="",
+            danger=False,
+            parent=self,
+        )
+        dlg.exec()
 
     # ------------------------------------------------------------------
     # Load values
@@ -912,6 +1158,90 @@ class SettingsTab(QWidget):
 
         EventBus.instance().reputation_system_status.connect(self._on_reputation_status)
 
+    def _refresh_styles(self) -> None:
+        """Re-apply inline styles that depend on palette colors after a theme change."""
+        # Header
+        self._hdr.setStyleSheet(f"background:{P.SURFACE_CONTAINER_LOW};border-bottom:1px solid {P.OUTLINE_VARIANT};")
+        self._hdr_lbl.setStyleSheet(f"color:{P.PRIMARY};letter-spacing:0.15em;background:transparent;border:none;")
+        # Reset button
+        self._reset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {P.rgba(P.HAZARD_RED, 0.12)};
+                color: {P.HAZARD_RED};
+                border: 1px solid {P.HAZARD_RED};
+                border-radius: 4px;
+                padding: 6px 10px;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                min-height: 28px;
+            }}
+            QPushButton:hover {{ background: {P.rgba(P.HAZARD_RED, 0.25)}; }}
+            QPushButton:pressed {{ background: {P.rgba(P.HAZARD_RED, 0.35)}; }}
+        """)
+        # Reset description
+        self._reset_desc.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
+        # Progress bar
+        self.update_progress.setStyleSheet(f"""
+            QProgressBar {{
+                background: {P.rgba(P.SPACE_VOID, 0.85)}; border:1px solid {P.OUTLINE_VARIANT};
+                border-radius:3px; text-align:center; font-size:10px; color:{P.ON_SURFACE};
+            }}
+            QProgressBar::chunk {{ background:{P.PRIMARY}; border-radius:2px; }}
+        """)
+        # Version installer toggle
+        self._toggle_vi_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {P.PRIMARY};
+                border: 1px solid {P.OUTLINE_VARIANT};
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 10px;
+                font-weight: 600;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.08)};
+                border-color: {P.PRIMARY};
+            }}
+        """)
+        # Version list
+        self.version_list.setStyleSheet(f"""
+            QListWidget {{
+                background: {P.rgba(P.SPACE_VOID, 0.85)};
+                color: {P.ON_SURFACE};
+                border: 1px solid {P.OUTLINE_VARIANT};
+                border-radius: 4px;
+                font-size: 11px;
+                outline: none;
+            }}
+            QListWidget::item {{
+                padding: 4px 8px;
+                border-bottom: 1px solid {P.rgba(P.OUTLINE_VARIANT, 0.3)};
+            }}
+            QListWidget::item:selected {{
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
+                color: {P.PRIMARY};
+            }}
+            QListWidget::item:hover {{
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.08)};
+            }}
+        """)
+        # Version description
+        self.version_desc.setStyleSheet(f"""
+            QTextBrowser {{
+                background: {P.rgba(P.SPACE_VOID, 0.85)};
+                color: {P.TEXT_DIM};
+                border: 1px solid {P.OUTLINE_VARIANT};
+                border-radius: 4px;
+                font-size: 10px;
+                padding: 4px 8px;
+            }}
+        """)
+        # About section link
+        self._about_github_lbl.setStyleSheet("background:transparent;border:none;")
+
     # ------------------------------------------------------------------
     # Slots
     # ------------------------------------------------------------------
@@ -975,7 +1305,6 @@ class SettingsTab(QWidget):
         app = QApplication.instance()
         if app:
             app.setStyleSheet(build_stylesheet(
-                accent_override=self.sm.theme_accent_override,
                 font_scale=self.sm.font_size_scaling,
                 app_font_family=self.sm.app_font_family
             ))
@@ -1275,33 +1604,70 @@ class SettingsTab(QWidget):
         self.rep_prefetch_cb.setEnabled(enabled)
         if not enabled:
             self._update_rep_status_lbl("DISABLED", P.TEXT_DIM)
+            EventBus.instance().reputation_system_status.emit("disabled")
         else:
             self._update_rep_status_lbl("CHECKING...", P.TEXT_DIM)
             from src.services.reputation_service import ReputationService
             if not ReputationService.is_initialized():
                 from src.app.constants import REP_SUPABASE_URL, REP_ANON_KEY
-                url = self.sm.get("reputation_supabase_url") or REP_SUPABASE_URL
-                key = self.sm.get("reputation_anon_key") or REP_ANON_KEY
+                url = REP_SUPABASE_URL
+                key = REP_ANON_KEY
                 if url and key:
                     try:
                         ReputationService.initialize(url, key)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        log.error("Failed to initialize ReputationService: %s", e)
+                        self._update_rep_status_lbl("ERROR", _STATUS_WARNING)
+                        EventBus.instance().reputation_system_status.emit("error")
+                        return
+                else:
+                    self._update_rep_status_lbl("ERROR", P.HAZARD_RED)
+                    EventBus.instance().reputation_system_status.emit("error")
+                    return
             if ReputationService.is_initialized():
                 from src.services.reputation_worker import ReputationStartupWorker
                 self._rep_startup = ReputationStartupWorker()
                 self._rep_startup.start()
+            else:
+                self._update_rep_status_lbl("ERROR", P.HAZARD_RED)
+                EventBus.instance().reputation_system_status.emit("error")
 
     def _update_rep_status_lbl(self, text: str, color: str | None = None) -> None:
+        self._update_rep_status_pill(text, color or P.TEXT_DIM)
+
+    def _update_rep_status_pill(self, text: str, color: str) -> None:
         self.rep_status_lbl.setText(text)
-        if color:
-            self.rep_status_lbl.setStyleSheet(f"color:{color};background:transparent;border:none;")
+        c = QColor(color)
+        bg = f"rgba({c.red()}, {c.green()}, {c.blue()}, 0.12)"
+        border = f"rgba({c.red()}, {c.green()}, {c.blue()}, 0.35)"
+        self.rep_status_lbl.setStyleSheet(f"""
+            QLabel {{
+                color: {color};
+                background-color: {bg};
+                border: 1px solid {border};
+                border-radius: 3px;
+                padding: 2px 8px;
+            }}
+        """)
 
     @pyqtSlot(str)
     def _on_reputation_status(self, status: str) -> None:
         if status == "online":
-            self._update_rep_status_lbl("CONNECTED", P.PRIMARY)
+            self._update_rep_status_lbl("CONNECTED", _STATUS_SUCCESS)
+            self.rep_status_lbl.setToolTip("Successfully connected to the reputation network.")
         elif status == "offline":
             self._update_rep_status_lbl("OFFLINE", P.HAZARD_RED)
+            self.rep_status_lbl.setToolTip(
+                "Reputation server is offline or unreachable.\n"
+                "The Supabase free-tier may be sleeping. Try again in a few minutes."
+            )
+        elif status == "error":
+            self._update_rep_status_lbl("ERROR", _STATUS_WARNING)
+            self.rep_status_lbl.setToolTip(
+                "Connected to the server but authorization failed.\n"
+                "Check that REP_SUPABASE_URL and REP_ANON_KEY are valid.\n"
+                "See logs for detailed error information."
+            )
         elif status == "disabled":
             self._update_rep_status_lbl("DISABLED", P.TEXT_DIM)
+            self.rep_status_lbl.setToolTip("Reputation system is disabled. Enable it in the toggle above.")

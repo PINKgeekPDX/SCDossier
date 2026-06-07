@@ -168,7 +168,7 @@ class KeybindDetectDialog(QDialog):
             f"font-size: 14px; margin: 4px 0; "
             f"border: 1px solid {P.OUTLINE_VARIANT}; "
             f"border-radius: 4px; padding: 6px 10px; "
-            f"background: rgba(5, 11, 15, 0.85); "
+            f"background: {P.rgba(P.SPACE_VOID, 0.85)}; "
             f"color: {P.ON_SURFACE};"
         )
         layout.addWidget(self.keybind_label)
@@ -178,7 +178,7 @@ class KeybindDetectDialog(QDialog):
 
         _btn_style = f"""
             QPushButton {{
-                background: rgba(0, 170, 255, 0.12);
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.12)};
                 color: {P.ON_SURFACE};
                 border: 1px solid {P.PRIMARY_CONTAINER};
                 border-radius: 4px;
@@ -187,8 +187,8 @@ class KeybindDetectDialog(QDialog):
                 font-weight: 600;
                 min-height: 26px;
             }}
-            QPushButton:hover {{ background: rgba(0, 170, 255, 0.25); }}
-            QPushButton:pressed {{ background: rgba(0, 170, 255, 0.35); }}
+            QPushButton:hover {{ background: {P.rgba(P.PRIMARY_CONTAINER, 0.25)}; }}
+            QPushButton:pressed {{ background: {P.rgba(P.PRIMARY_CONTAINER, 0.35)}; }}
             QPushButton:disabled {{ color: {P.TEXT_DIM}; border-color: {P.OUTLINE_VARIANT}; background: transparent; }}
         """
 

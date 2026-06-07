@@ -28,16 +28,17 @@ CHAMFER          = 9
 _PAD             = 6
 _SPACING         = 4
 
-_BG          = QColor(2,  11,  19, 238)
-_BORDER_DIM  = QColor(0, 160, 220,  45)
-_BORDER_HOT  = QColor(0, 200, 255, 110)
-_SPINE_CORE  = QColor(0, 220, 255, 220)
-_SPINE_GLOW  = QColor(0, 180, 255,  55)
-_SHEEN_START = QColor(0, 170, 255,  22)
-_SEP         = QColor(0, 170, 255,  38)
-_TICK        = QColor(0, 210, 255,  80)
-_STRIPE      = QColor(0, 170, 255,   6)
-_BRAK        = QColor(0, 220, 255, 150)
+
+def _bg():          return P.qcolor(P.SPACE_VOID, 238)
+def _border_dim():  c = P.qcolor(P.PRIMARY_CONTAINER); c.setAlpha(45); return c
+def _border_hot():  c = P.qcolor(P.PRIMARY_CONTAINER); c.setAlpha(110); return c
+def _spine_core():  c = P.qcolor(P.PRIMARY_CONTAINER); c.setAlpha(220); return c
+def _spine_glow():  c = P.qcolor(P.PRIMARY_CONTAINER); c.setAlpha(55); return c
+def _sheen_start(): return P.qcolor(P.PRIMARY_CONTAINER, 22)
+def _sep():         return P.qcolor(P.PRIMARY_CONTAINER, 38)
+def _tick():        c = P.qcolor(P.PRIMARY_CONTAINER); c.setAlpha(80); return c
+def _stripe():      return P.qcolor(P.PRIMARY_CONTAINER, 6)
+def _brak():        c = P.qcolor(P.PRIMARY_CONTAINER); c.setAlpha(150); return c
 
 from src.core.paths import get_asset_path
 
@@ -156,26 +157,26 @@ class ToolbarButton(QWidget):
         hp = _hex_path(cx, cy, r)
 
         if self._pressed:
-            fill = QColor(0, 210, 255, 120)
+            fill = P.qcolor(P.PRIMARY_CONTAINER, 120)
         else:
-            fill = QColor(3, 16, 28, int(195 + 45 * g))
+            fill = P.qcolor(P.SPACE_VOID, int(195 + 45 * g))
         p.fillPath(hp, fill)
 
         if g > 0.01:
             rg = QRadialGradient(cx, cy, r)
-            rg.setColorAt(0.0, QColor(0, 160, 255, int(80 * g)))
-            rg.setColorAt(0.55, QColor(0, 110, 200, int(35 * g)))
-            rg.setColorAt(1.0,  QColor(0,   0,   0,   0))
+            rg.setColorAt(0.0, P.qcolor(P.PRIMARY, int(80 * g)))
+            rg.setColorAt(0.55, P.qcolor(P.PRIMARY_CONTAINER, int(35 * g)))
+            rg.setColorAt(1.0, P.qcolor(P.PRIMARY_CONTAINER, 0))
             p.fillPath(hp, QBrush(rg))
 
         if self._pressed:
-            ring_c = QColor(0, 240, 255, 255)
+            ring_c = P.qcolor(P.PRIMARY_CONTAINER, 255)
             ring_w = 2.0
         elif g > 0.01:
-            ring_c = QColor(0, int(175 + 65 * g), 255, int(95 + 155 * g))
+            ring_c = P.qcolor(P.PRIMARY_CONTAINER, int(95 + 155 * g))
             ring_w = 1.2 + 0.8 * g
         else:
-            ring_c = QColor(0, 170, 255, 55)
+            ring_c = P.qcolor(P.PRIMARY_CONTAINER, 55)
             ring_w = 1.0
 
         p.setPen(QPen(ring_c, ring_w))
@@ -184,14 +185,14 @@ class ToolbarButton(QWidget):
 
         if g > 0.15:
             ghost = _hex_path(cx, cy, r + 2.5 * g)
-            p.setPen(QPen(QColor(0, 190, 255, int(38 * g)), 1.2))
+            p.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, int(38 * g)), 1.2))
             p.drawPath(ghost)
 
         off = int((self.width() - BTN_ICON_SIZE) / 2)
         if self._icon:
             self._icon.paint(p, off, off, BTN_ICON_SIZE, BTN_ICON_SIZE)
         else:
-            p.setPen(QPen(QColor(0, 210, 255, 200)))
+            p.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, 200)))
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "\u25C8")
 
         p.end()
@@ -560,11 +561,11 @@ class OverlayToolbar(QWidget):
         body = _chamfer_path(1.0, 1.0, w - 2.0, h - 2.0, float(CHAMFER))
 
         ag = QRadialGradient(w / 2, h / 2, max(w, h) * 0.85)
-        ag.setColorAt(0.0, QColor(0, 140, 255, 10))
-        ag.setColorAt(1.0, QColor(0,   0,   0,  0))
+        ag.setColorAt(0.0, P.qcolor(P.PRIMARY_CONTAINER, 10))
+        ag.setColorAt(1.0, P.qcolor(P.PRIMARY_CONTAINER, 0))
         p.fillRect(QRectF(0, 0, w, h), QBrush(ag))
 
-        p.fillPath(body, _BG)
+        p.fillPath(body, _bg())
 
         if edge == ScreenEdge.LEFT:
             sheen = QLinearGradient(0, 0, w, 0)
@@ -575,20 +576,20 @@ class OverlayToolbar(QWidget):
         else:
             sheen = QLinearGradient(0, h, 0, 0)
 
-        sheen.setColorAt(0.00, _SHEEN_START)
-        sheen.setColorAt(0.45, QColor(0, 100, 160, 7))
-        sheen.setColorAt(1.00, QColor(0,   0,   0, 0))
+        sheen.setColorAt(0.00, _sheen_start())
+        sheen.setColorAt(0.45, P.qcolor(P.PRIMARY, 7))
+        sheen.setColorAt(1.00, P.qcolor(P.PRIMARY, 0))
         p.fillPath(body, QBrush(sheen))
 
         p.save()
         p.setClipPath(body)
         y_t = 0.0
         while y_t < h:
-            p.fillRect(QRectF(0, y_t, w, 1.0), _STRIPE)
+            p.fillRect(QRectF(0, y_t, w, 1.0), _stripe())
             y_t += 3.0
         p.restore()
 
-        border_col = QColor(0, int(160 + 40 * (pulse / 72.0)), 230, int(pulse))
+        border_col = P.qcolor(P.PRIMARY_CONTAINER, int(pulse))
         if self._drag_held:
             border_col = QColor(255, 255, 0, 255)
             
@@ -597,9 +598,9 @@ class OverlayToolbar(QWidget):
         p.drawPath(body)
 
         spine_alpha = int(min(255, pulse * 2.8))
-        spine_pen   = QPen(QColor(0, 220, 255, spine_alpha), 2,
+        spine_pen   = QPen(P.qcolor(P.PRIMARY_CONTAINER, spine_alpha), 2,
                            Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap)
-        halo_pen    = QPen(QColor(0, 180, 255, int(pulse * 0.7)), 6,
+        halo_pen    = QPen(P.qcolor(P.PRIMARY_CONTAINER, int(pulse * 0.7)), 6,
                            Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap)
         s = 2.5
 
@@ -621,18 +622,18 @@ class OverlayToolbar(QWidget):
         p.setPen(spine_pen)
         p.drawLine(p1, p2)
 
-        p.setPen(QPen(_SEP, 1.0))
+        p.setPen(QPen(_sep(), 1.0))
         if edge in (ScreenEdge.TOP, ScreenEdge.BOTTOM):
             mx = w / 2
             p.drawLine(QPointF(mx, _PAD + 4), QPointF(mx, h - _PAD - 4))
-            p.setPen(QPen(_TICK, 1.0))
+            p.setPen(QPen(_tick(), 1.0))
             for offset in (-5.0, 0.0, 5.0):
                 ty = h / 2 + offset
                 p.drawLine(QPointF(mx - 2.5, ty), QPointF(mx + 2.5, ty))
         else:
             my = h / 2
             p.drawLine(QPointF(_PAD + 4, my), QPointF(w - _PAD - 4, my))
-            p.setPen(QPen(_TICK, 1.0))
+            p.setPen(QPen(_tick(), 1.0))
             for offset in (-5.0, 0.0, 5.0):
                 tx = w / 2 + offset
                 p.drawLine(QPointF(tx, my - 2.5), QPointF(tx, my + 2.5))
@@ -643,7 +644,7 @@ class OverlayToolbar(QWidget):
     def _draw_brackets(self, p: QPainter, w: float, h: float, pulse: float) -> None:
         c   = float(CHAMFER)
         arm = 6.0
-        col = QColor(0, 225, 255, int(min(255, pulse + 95)))
+        col = P.qcolor(P.PRIMARY_CONTAINER, int(min(255, pulse + 95)))
         pen = QPen(col, 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.SquareCap)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)

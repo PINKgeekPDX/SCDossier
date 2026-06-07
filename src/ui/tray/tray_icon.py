@@ -4,6 +4,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from src.core.settings import SettingsManager
 from src.core.paths import get_asset_path
+from src.ui.theme import palette as P
 
 
 class TrayIcon(QSystemTrayIcon):
@@ -21,29 +22,29 @@ class TrayIcon(QSystemTrayIcon):
         self.setToolTip("SC Dossier - Right-click for options")
 
         self.menu = QMenu()
-        self.menu.setStyleSheet("""
-            QMenu {
-                background-color: rgba(10, 20, 30, 0.95);
-                border: 1px solid #00AAFF;
+        self.menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {P.rgba(P.SURFACE_CONTAINER_LOW, 0.95)};
+                border: 1px solid {P.PRIMARY_CONTAINER};
                 border-radius: 4px;
                 padding: 4px;
-            }
-            QMenu::item {
-                color: #E0E0E0;
+            }}
+            QMenu::item {{
+                color: {P.ON_SURFACE_VARIANT};
                 padding: 6px 12px;
                 border-radius: 2px;
                 font-family: "Inter", "Segoe UI", Arial, sans-serif;
                 font-size: 12px;
-            }
-            QMenu::item:selected {
-                background-color: rgba(0, 170, 255, 0.2);
-                color: #FFFFFF;
-            }
-            QMenu::separator {
+            }}
+            QMenu::item:selected {{
+                background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.2)};
+                color: {P.ON_PRIMARY};
+            }}
+            QMenu::separator {{
                 height: 1px;
-                background: #00AAFF;
+                background: {P.PRIMARY_CONTAINER};
                 margin: 4px 8px;
-            }
+            }}
         """)
 
         self.action_open_dossier = QAction("Show SC Dossier", self)

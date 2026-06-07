@@ -6,8 +6,7 @@ def _scale(sizes: list[int], factor: int) -> list[int]:
     return [max(1, int(s * f)) for s in sizes]
 
 
-def build_stylesheet(accent_override: str | None = None, font_scale: int = 100, app_font_family: str | None = None) -> str:
-    accent = accent_override or P.PRIMARY_CONTAINER
+def build_stylesheet(font_scale: int = 100, app_font_family: str | None = None) -> str:
 
     fs = _scale([12, 10, 9, 11, 18, 8, 7], font_scale)
     fs_body, fs_caps, fs_caps_sm, fs_data, fs_head, fs_tiny, fs_micro = fs
@@ -40,7 +39,7 @@ QMainWindow, QDialog {{
 }}
 
 QPushButton[class="primary"] {{
-    background-color: {accent};
+    background-color: {P.PRIMARY_CONTAINER};
     color: #FFFFFF;
     font-family: "JetBrains Mono", "Consolas", monospace;
     font-size: {fs_caps}px;
@@ -70,25 +69,25 @@ QPushButton[class="primary"]:disabled {{
 
 QPushButton[class="ghost"] {{
     background-color: transparent;
-    color: {accent};
+    color: {P.PRIMARY_CONTAINER};
     font-family: "JetBrains Mono", "Consolas", monospace;
     font-size: {fs_caps}px;
     font-weight: 700;
     letter-spacing: 0.12em;
-    border: 1px solid {accent};
+    border: 1px solid {P.PRIMARY_CONTAINER};
     border-radius: 3px;
     padding: 4px 12px;
     min-height: 26px;
 }}
 
 QPushButton[class="ghost"]:hover {{
-    background-color: rgba(0, 170, 255, 0.10);
+    background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.10)};
     border-color: {P.PRIMARY};
     color: {P.PRIMARY};
 }}
 
 QPushButton[class="ghost"]:pressed {{
-    background-color: rgba(0, 170, 255, 0.20);
+    background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.20)};
 }}
 
 QPushButton[class="ghost"]:disabled {{
@@ -104,16 +103,16 @@ QPushButton[class="icon"] {{
 }}
 
 QPushButton[class="icon"]:hover {{
-    background-color: rgba(0, 170, 255, 0.15);
+    background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
 }}
 
 QPushButton[class="icon"]:pressed {{
-    background-color: rgba(0, 170, 255, 0.30);
+    background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.30)};
 }}
 
 QPushButton[class="icon"][checked="true"] {{
-    background-color: rgba(0, 170, 255, 0.20);
-    border: 1px solid rgba(0, 170, 255, 0.40);
+    background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.20)};
+    border: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.40)};
 }}
 
 QPushButton[class="danger"] {{
@@ -148,13 +147,13 @@ QPushButton[class="danger-ghost"] {{
 }}
 
 QPushButton[class="danger-ghost"]:hover {{
-    background-color: rgba(255, 68, 68, 0.10);
+    background-color: {P.rgba(P.HAZARD_RED, 0.10)};
     border-color: {P.ERROR_CONTAINER};
     color: {P.ERROR_CONTAINER};
 }}
 
 QPushButton[class="danger-ghost"]:pressed {{
-    background-color: rgba(255, 68, 68, 0.20);
+    background-color: {P.rgba(P.HAZARD_RED, 0.20)};
 }}
 
 QPushButton[class="danger-ghost"]:disabled {{
@@ -163,14 +162,14 @@ QPushButton[class="danger-ghost"]:disabled {{
 }}
 
 QLineEdit {{
-    background-color: rgba(5, 11, 15, 0.85);
+    background-color: {P.rgba(P.SPACE_VOID, 0.85)};
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
     font-size: {fs_body}px;
     border: 1px solid {P.OUTLINE_VARIANT};
     border-radius: 4px;
     padding: 5px 10px;
-    selection-background-color: {accent};
+    selection-background-color: {P.PRIMARY_CONTAINER};
     selection-color: #FFFFFF;
 }}
 
@@ -179,8 +178,8 @@ QLineEdit:hover {{
 }}
 
 QLineEdit:focus {{
-    border-color: {accent};
-    background-color: rgba(0, 10, 20, 0.90);
+    border-color: {P.PRIMARY_CONTAINER};
+    background-color: {P.rgba(P.SURFACE_DIM, 0.90)};
 }}
 
 QLineEdit:disabled {{
@@ -195,18 +194,18 @@ QLineEdit[readOnly="true"] {{
 }}
 
 QTextEdit, QPlainTextEdit {{
-    background-color: rgba(5, 11, 15, 0.85);
+    background-color: {P.rgba(P.SPACE_VOID, 0.85)};
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
     font-size: {fs_body}px;
     border: 1px solid {P.OUTLINE_VARIANT};
     border-radius: 4px;
     padding: 6px;
-    selection-background-color: {accent};
+    selection-background-color: {P.PRIMARY_CONTAINER};
 }}
 
 QTextEdit:focus, QPlainTextEdit:focus {{
-    border-color: {accent};
+    border-color: {P.PRIMARY_CONTAINER};
 }}
 
 QScrollBar:vertical {{
@@ -216,13 +215,13 @@ QScrollBar:vertical {{
 }}
 
 QScrollBar::handle:vertical {{
-    background: rgba(0, 170, 255, 0.18);
+    background: {P.rgba(P.PRIMARY_CONTAINER, 0.18)};
     border-radius: 3px;
     min-height: 20px;
 }}
 
 QScrollBar::handle:vertical:hover {{
-    background: rgba(0, 170, 255, 0.38);
+    background: {P.rgba(P.PRIMARY_CONTAINER, 0.38)};
 }}
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
@@ -242,13 +241,13 @@ QScrollBar:horizontal {{
 }}
 
 QScrollBar::handle:horizontal {{
-    background: rgba(0, 170, 255, 0.18);
+    background: {P.rgba(P.PRIMARY_CONTAINER, 0.18)};
     border-radius: 3px;
     min-width: 20px;
 }}
 
 QScrollBar::handle:horizontal:hover {{
-    background: rgba(0, 170, 255, 0.38);
+    background: {P.rgba(P.PRIMARY_CONTAINER, 0.38)};
 }}
 
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
@@ -277,20 +276,20 @@ QListWidget::item {{
 QListWidget::item:hover {{
     background: qlineargradient(
         x1:0, y1:0, x2:1, y2:0,
-        stop:0 rgba(79, 142, 255, 0.18),
-        stop:1 rgba(79, 142, 255, 0.00)
+        stop:0 {P.rgba(P.SECONDARY_CONTAINER, 0.18)},
+        stop:1 {P.rgba(P.SECONDARY_CONTAINER, 0.00)}
     );
 }}
 
 QListWidget::item:selected {{
-    background: rgba(0, 170, 255, 0.14);
+    background: {P.rgba(P.PRIMARY_CONTAINER, 0.14)};
     color: {P.PRIMARY};
-    border-left: 2px solid {accent};
+    border-left: 2px solid {P.PRIMARY_CONTAINER};
     padding-left: 8px;
 }}
 
 QComboBox {{
-    background-color: rgba(5, 11, 15, 0.85);
+    background-color: {P.rgba(P.SPACE_VOID, 0.85)};
     color: {P.ON_SURFACE};
     font-family: "Inter", "Segoe UI", Arial, sans-serif;
     font-size: {fs_caps_sm}px;
@@ -305,7 +304,7 @@ QComboBox:hover {{
 }}
 
 QComboBox:focus {{
-    border-color: {accent};
+    border-color: {P.PRIMARY_CONTAINER};
 }}
 
 QComboBox::drop-down {{
@@ -321,9 +320,9 @@ QComboBox::down-arrow {{
 QComboBox QAbstractItemView {{
     background-color: {P.SURFACE_CONTAINER};
     color: {P.ON_SURFACE};
-    border: 1px solid {P.GLASS_BORDER};
+    border: 1px solid {P.GLASS_BORDER()};
     border-radius: 3px;
-    selection-background-color: rgba(0, 170, 255, 0.20);
+    selection-background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.20)};
     selection-color: {P.PRIMARY};
     padding: 2px;
     outline: none;
@@ -336,7 +335,7 @@ QSlider::groove:horizontal {{
 }}
 
 QSlider::handle:horizontal {{
-    background: {accent};
+    background: {P.PRIMARY_CONTAINER};
     width: 13px;
     height: 13px;
     border-radius: 6px;
@@ -348,7 +347,7 @@ QSlider::handle:horizontal:hover {{
 }}
 
 QSlider::sub-page:horizontal {{
-    background: {accent};
+    background: {P.PRIMARY_CONTAINER};
     border-radius: 1px;
 }}
 
@@ -364,12 +363,12 @@ QCheckBox::indicator {{
     height: 14px;
     border-radius: 2px;
     border: 1px solid {P.OUTLINE_VARIANT};
-    background-color: rgba(5, 11, 15, 0.85);
+    background-color: {P.rgba(P.SPACE_VOID, 0.85)};
 }}
 
 QCheckBox::indicator:checked {{
-    background-color: {accent};
-    border-color: {accent};
+    background-color: {P.PRIMARY_CONTAINER};
+    border-color: {P.PRIMARY_CONTAINER};
 }}
 
 QCheckBox::indicator:hover {{
@@ -424,13 +423,13 @@ QSplitter::handle {{
 }}
 
 QSplitter::handle:hover {{
-    background-color: {accent};
+    background-color: {P.PRIMARY_CONTAINER};
 }}
 
 QToolTip {{
     background-color: {P.SURFACE_CONTAINER_HIGH};
     color: {P.ON_SURFACE};
-    border: 1px solid rgba(0, 170, 255, 0.25);
+    border: 1px solid {P.rgba(P.PRIMARY_CONTAINER, 0.25)};
     border-radius: 3px;
     font-family: "JetBrains Mono", monospace;
     font-size: {fs_caps_sm}px;
@@ -451,12 +450,12 @@ QTabBar::tab {{
 
 QTabBar::tab:selected {{
     color: {P.PRIMARY};
-    border-bottom: 2px solid {accent};
+    border-bottom: 2px solid {P.PRIMARY_CONTAINER};
 }}
 
 QTabBar::tab:hover {{
     color: {P.ON_SURFACE};
-    background-color: rgba(0, 170, 255, 0.08);
+    background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.08)};
 }}
 
 QFrame[frameShape="4"], QFrame[frameShape="5"] {{
@@ -487,7 +486,7 @@ QProgressBar::chunk {{
     background: qlineargradient(
         x1:0, y1:0, x2:1, y2:0,
         stop:0 {P.SECONDARY_CONTAINER},
-        stop:1 {accent}
+        stop:1 {P.PRIMARY_CONTAINER}
     );
     border-radius: 2px;
 }}

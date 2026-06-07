@@ -12,6 +12,10 @@ from src.core.settings import SettingsManager
 from src.core.events import EventBus
 
 
+def _glow_color() -> QColor:
+    return P.qcolor(P.PRIMARY_CONTAINER, 180)
+
+
 class SearchInput(QLineEdit):
     """
     Styled search/input field with:
@@ -39,13 +43,22 @@ class SearchInput(QLineEdit):
         self.update_history_completer()
         # Dynamically refresh autocomplete suggestions when history changes
         EventBus.instance().settings_changed.connect(self._on_settings_changed)
+        EventBus.instance().theme_changed.connect(self._refresh_glow_color)
+
+    def _refresh_glow_color(self) -> None:
+        """Update glow shadow color from current palette."""
+        self._shadow.setColor(_glow_color())
+        if self._focused:
+            self._apply_style(True)
+        else:
+            self._apply_style(False)
 
     def _apply_style(self, focused: bool) -> None:
         """Apply QSS based on focus state."""
         if focused:
             self.setStyleSheet(f"""
                 QLineEdit {{
-                    background-color: rgba(0, 10, 20, 0.95);
+                    background-color: {P.rgba(P.SPACE_VOID, 0.95)};
                     color: {P.ON_SURFACE};
                     border: 1px solid {P.PRIMARY_CONTAINER};
                     border-radius: 4px;
@@ -53,13 +66,13 @@ class SearchInput(QLineEdit):
                     font-family: "Inter", "Segoe UI", Arial, sans-serif;
                     font-size: 12px;
                     selection-background-color: {P.PRIMARY_CONTAINER};
-                    selection-color: #FFFFFF;
+                    selection-color: {P.ON_PRIMARY};
                 }}
             """)
         else:
             self.setStyleSheet(f"""
                 QLineEdit {{
-                    background-color: rgba(5, 11, 15, 0.90);
+                    background-color: {P.rgba(P.SPACE_VOID, 0.90)};
                     color: {P.ON_SURFACE};
                     border: 1px solid {P.OUTLINE_VARIANT};
                     border-radius: 4px;
@@ -67,7 +80,7 @@ class SearchInput(QLineEdit):
                     font-family: "Inter", "Segoe UI", Arial, sans-serif;
                     font-size: 12px;
                     selection-background-color: {P.PRIMARY_CONTAINER};
-                    selection-color: #FFFFFF;
+                    selection-color: {P.ON_PRIMARY};
                 }}
                 QLineEdit:hover {{
                     border-color: {P.OUTLINE};
@@ -78,7 +91,7 @@ class SearchInput(QLineEdit):
         """Set up the drop shadow used for focus glow animation."""
         self._shadow = QGraphicsDropShadowEffect(self)
         self._shadow.setBlurRadius(0)
-        self._shadow.setColor(QColor(0, 170, 255, 180))
+        self._shadow.setColor(_glow_color())
         self._shadow.setOffset(0, 0)
         self.setGraphicsEffect(self._shadow)
 
@@ -165,7 +178,7 @@ class SearchInput(QLineEdit):
         popup = completer.popup()
         popup.setStyleSheet(f"""
             QListView {{
-                background-color: rgba(10, 20, 30, 0.95);
+                background-color: {P.rgba(P.SURFACE_CONTAINER_LOW, 0.95)};
                 color: {P.ON_SURFACE};
                 border: 1px solid {P.PRIMARY_CONTAINER};
                 border-radius: 6px;
@@ -179,8 +192,8 @@ class SearchInput(QLineEdit):
                 border-radius: 4px;
             }}
             QListView::item:hover, QListView::item:selected {{
-                background-color: rgba(0, 170, 255, 0.25);
-                color: #FFFFFF;
+                background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.25)};
+                color: {P.ON_PRIMARY};
             }}
         """)
         

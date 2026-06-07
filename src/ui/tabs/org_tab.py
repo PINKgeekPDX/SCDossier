@@ -883,7 +883,7 @@ class OrgTab(QWidget):
         list_widget.setFixedHeight(180)
         list_widget.setStyleSheet(f"""
             QListWidget {{
-                background: rgba(5, 11, 15, 0.85);
+                background: {P.rgba(P.SPACE_VOID, 0.85)};
                 color: {P.ON_SURFACE};
                 border: 1px solid {P.OUTLINE_VARIANT};
                 border-radius: 3px;

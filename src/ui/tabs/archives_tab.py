@@ -74,20 +74,20 @@ class StyledFilterInput(QLineEdit):
 
         # Background
         if self._focused:
-            bg = QColor(15, 30, 45, 230)
+            bg = P.qcolor(P.SURFACE_CONTAINER_LOW, 230)
         elif self._hovered:
-            bg = QColor(12, 25, 38, 210)
+            bg = P.qcolor(P.SURFACE_CONTAINER_LOW, 210)
         else:
-            bg = QColor(10, 20, 30, 200)
+            bg = P.qcolor(P.SURFACE_CONTAINER, 200)
         painter.setBrush(bg)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect, 4, 4)
 
         # Border
         if self._focused:
-            painter.setPen(QPen(QColor(0, 170, 255, 200), 2))
+            painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, 200), 2))
         elif self._hovered:
-            painter.setPen(QPen(QColor(0, 170, 255, 120), 1))
+            painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, 120), 1))
         else:
             painter.setPen(QPen(QColor(P.OUTLINE), 1))
         painter.drawRoundedRect(rect, 4, 4)
@@ -190,11 +190,11 @@ class StyledArchiveButton(QPushButton):
 
         if self._hovered:
             if self._danger:
-                painter.setBrush(QColor(255, 59, 59, 30))
-                painter.setPen(QPen(QColor(255, 59, 59, 120), 1))
+                painter.setBrush(P.qcolor(P.HAZARD_RED, 30))
+                painter.setPen(QPen(P.qcolor(P.HAZARD_RED, 120), 1))
             else:
-                painter.setBrush(QColor(0, 170, 255, 30))
-                painter.setPen(QPen(QColor(0, 170, 255, 100), 1))
+                painter.setBrush(P.qcolor(P.PRIMARY_CONTAINER, 30))
+                painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, 100), 1))
         else:
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QPen(QColor(P.OUTLINE_VARIANT), 1))
@@ -225,8 +225,8 @@ class ArchiveItemWidget(QWidget):
                 border-radius: 6px;
             }}
             ArchiveItemWidget:hover {{
-                border-color: {P.GLASS_BORDER_SUBTLE};
-                background-color: rgba(0, 170, 255, 0.05);
+                border-color: {P.GLASS_BORDER_SUBTLE()};
+                background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.05)};
             }}
         """)
 

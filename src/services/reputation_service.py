@@ -315,7 +315,7 @@ class ReputationService:
         """
         Fetch all player handles that have reputation data.
         Used for startup pre-fetch / autocomplete.
-        Returns empty list on failure.
+        Raises RuntimeError on failure so callers can distinguish errors from empty DB.
         """
         try:
             resp = (
@@ -331,7 +331,7 @@ class ReputationService:
 
         except Exception as e:
             log.warning("fetch_known_handles() failed: %s", e)
-            return []
+            raise RuntimeError(f"Failed to fetch known handles: {e}") from e
 
     def ping(self) -> bool:
         """

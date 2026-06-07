@@ -293,9 +293,9 @@ class BaseWindow(QWidget):
         radius = max(rect.width(), rect.height()) * 0.8
 
         gradient = QRadialGradient(center_x, center_y, radius)
-        gradient.setColorAt(0.0, QColor("#0A1E2E"))
-        gradient.setColorAt(0.5, QColor("#041219"))
-        gradient.setColorAt(1.0, QColor(P.SPACE_VOID))
+        gradient.setColorAt(0.0, P.qcolor(P.SURFACE_CONTAINER))
+        gradient.setColorAt(0.5, P.qcolor(P.SURFACE_DIM))
+        gradient.setColorAt(1.0, P.qcolor(P.SPACE_VOID))
 
         painter.fillRect(rect, gradient)
         painter.end()

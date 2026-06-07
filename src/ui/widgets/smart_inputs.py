@@ -2,6 +2,8 @@ from PyQt6.QtWidgets import QSpinBox, QDoubleSpinBox, QSlider, QPushButton, QCol
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QColor
 
+from src.ui.theme import palette as P
+
 
 class NoScrollSpinBox(QSpinBox):
     def __init__(self, parent=None):
@@ -56,7 +58,7 @@ class ColorPickerButton(QPushButton):
 
     def __init__(self, color_hex: str, parent=None):
         super().__init__(parent)
-        self._color = color_hex or "#00AAFF"
+        self._color = color_hex or P.PRIMARY_CONTAINER
         self.setFixedSize(60, 24)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.clicked.connect(self._pick_color)
@@ -66,7 +68,7 @@ class ColorPickerButton(QPushButton):
         return self._color
 
     def setColor(self, color_hex: str):
-        self._color = color_hex or "#00AAFF"
+        self._color = color_hex or P.PRIMARY_CONTAINER
         self.update_style()
 
     def _parse_color(self, c: str) -> QColor:
@@ -92,10 +94,10 @@ class ColorPickerButton(QPushButton):
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self._color};
-                border: 1px solid #3E4851;
+                border: 1px solid {P.OUTLINE_VARIANT};
                 border-radius: 4px;
             }}
             QPushButton:hover {{
-                border: 1px solid #00AAFF;
+                border: 1px solid {P.PRIMARY_CONTAINER};
             }}
         """)

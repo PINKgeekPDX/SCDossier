@@ -66,7 +66,7 @@ class StyledToggleButton(QPushButton):
             painter.drawRoundedRect(rect, 4, 4)
 
             # Draw text
-            painter.setPen(QColor("#FFFFFF"))
+            painter.setPen(QColor(P.ON_PRIMARY))
             painter.setFont(self.font())
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
         elif self._hovered:
@@ -148,11 +148,11 @@ class AnimatedSearchInput(SearchInput):
 
         # Background
         if self._focused:
-            bg = QColor(15, 30, 45, 230)
+            bg = P.qcolor(P.SURFACE_CONTAINER, 230)
         elif self._hovered:
-            bg = QColor(12, 25, 38, 210)
+            bg = P.qcolor(P.SURFACE_CONTAINER_LOW, 210)
         else:
-            bg = QColor(10, 20, 30, 200)
+            bg = P.qcolor(P.SURFACE_CONTAINER_LOW, 200)
 
         painter.setBrush(bg)
         painter.setPen(Qt.PenStyle.NoPen)
@@ -278,7 +278,7 @@ class RecentSearchChip(QPushButton):
             QPushButton:hover {{
                 background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
                 border-color: {P.PRIMARY};
-                color: #FFFFFF;
+                color: {P.ON_PRIMARY};
             }}
             QPushButton:pressed {{
                 background-color: {P.rgba(P.PRIMARY_CONTAINER, 0.25)};
@@ -303,31 +303,30 @@ class SearchTab(QWidget):
         layout.setSpacing(18)   # was 32
 
         # --- App Logo ---
-        logo_lbl = QLabel()
-        logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._logo_lbl = QLabel()
+        self._logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         _app_icon_path = get_asset_path("assets/appicon.png")
         if os.path.exists(_app_icon_path):
             logo_pix = QPixmap(_app_icon_path)
-            # Compact logo — smaller than before
-            target_width = 200  # was 300
+            target_width = 200
             scaled_pix = logo_pix.scaled(
                 target_width, target_width,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
-            logo_lbl.setPixmap(scaled_pix)
-            logo_lbl.setFixedSize(scaled_pix.size())
-            
-            # Add faint glowing border
-            logo_glow = QGraphicsDropShadowEffect()
-            logo_glow.setBlurRadius(35)
-            logo_glow.setColor(QColor(P.rgba(P.PRIMARY_CONTAINER, 0.3)))
-            logo_glow.setOffset(0, 0)
-            logo_lbl.setGraphicsEffect(logo_glow)
+            self._logo_lbl.setPixmap(scaled_pix)
+            self._logo_lbl.setFixedSize(scaled_pix.size())
+
+            self._logo_glow = QGraphicsDropShadowEffect()
+            self._logo_glow.setBlurRadius(40)
+            self._logo_glow.setOffset(0, 0)
+            self._logo_glow.setColor(P.qcolor(P.PRIMARY_CONTAINER, 80))
+            self._logo_lbl.setGraphicsEffect(self._logo_glow)
         else:
-            logo_lbl.setText("SC DOSSIER")
-            logo_lbl.setFont(font_inter(32))
-            logo_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent;")
+            self._logo_glow = None
+            self._logo_lbl.setText("SC DOSSIER")
+            self._logo_lbl.setFont(font_inter(32))
+            self._logo_lbl.setStyleSheet(f"color: {P.PRIMARY}; background: transparent;")
 
         # --- Mode Toggle ---
         mode_widget = QWidget()
@@ -389,7 +388,7 @@ class SearchTab(QWidget):
 
         # Assembly
         layout.addStretch(1)
-        layout.addWidget(logo_lbl, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._logo_lbl, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(mode_widget, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(search_container, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.recent_widget, 0, Qt.AlignmentFlag.AlignCenter)
@@ -458,6 +457,12 @@ class SearchTab(QWidget):
     def _on_settings_changed(self, key: str, value: object) -> None:
         if key == "search_history":
             self._update_recents()
+        elif key == "theme_palette_overrides":
+            self._refresh_logo_glow()
+
+    def _refresh_logo_glow(self) -> None:
+        if self._logo_glow is not None:
+            self._logo_glow.setColor(P.qcolor(P.PRIMARY_CONTAINER, 80))
 
     def _on_recent_clicked(self, query: str) -> None:
         self.search_input.setText(query)

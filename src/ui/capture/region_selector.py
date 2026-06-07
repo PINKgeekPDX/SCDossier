@@ -7,6 +7,7 @@ from PyQt6.QtGui import QPainter, QColor, QPen, QPixmap, QScreen, QFont, QFontMe
 from PyQt6.QtWidgets import QWidget, QApplication, QRubberBand
 
 from src.core.paths import PathManager
+from src.ui.theme import palette as P
 
 log = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ class RegionSelector(QWidget):
                 painter.drawPixmap(self._current_rect, self._full_screen_pixmap, physical_rect)
 
             # Draw sleek glowing border
-            pen = QPen(QColor(0, 170, 255, 230), 1)
+            pen = QPen(P.qcolor(P.PRIMARY_CONTAINER, 230), 1)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(self._current_rect)
@@ -159,16 +160,16 @@ class RegionSelector(QWidget):
             if hud_rect.bottom() > self.height():
                 hud_rect.moveBottom(y0 - 5)
             
-            painter.fillRect(hud_rect, QColor(20, 25, 30, 220))
+            painter.fillRect(hud_rect, P.qcolor(P.SURFACE_DIM, 220))
             painter.setPen(QColor(255, 255, 255))
             painter.drawText(hud_rect, Qt.AlignmentFlag.AlignCenter, hud_text)
-            painter.setPen(QPen(QColor(0, 170, 255), 1))
+            painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER), 1))
             painter.drawRect(hud_rect)
 
         # Draw full-screen crosshairs if mouse is on screen
         if self._mouse_pos.x() >= 0 and self._mouse_pos.y() >= 0:
             mx, my = self._mouse_pos.x(), self._mouse_pos.y()
-            painter.setPen(QPen(QColor(0, 170, 255, 120), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER, 120), 1, Qt.PenStyle.DashLine))
             painter.drawLine(0, my, self.width(), my)
             painter.drawLine(mx, 0, mx, self.height())
 
@@ -202,7 +203,7 @@ class RegionSelector(QWidget):
                 painter.drawPixmap(dst_rect, mag_img, mag_img.rect())
                 
                 # Draw magnifier border and center cross
-                painter.setPen(QPen(QColor(0, 170, 255), 2))
+                painter.setPen(QPen(P.qcolor(P.PRIMARY_CONTAINER), 2))
                 painter.drawRect(dst_rect)
                 
                 cx, cy = dst_rect.center().x(), dst_rect.center().y()

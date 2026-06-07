@@ -85,28 +85,28 @@ SURFACE_VARIANT = "#253744"
 # ---------------------------------------------------------------------------
 # Glass Effect Colors (rgba strings for QSS / QPainter)
 # ---------------------------------------------------------------------------
-GLASS_BORDER = "rgba(0, 170, 255, 0.3)"         # Standard glass card border
-GLASS_BORDER_SUBTLE = "rgba(0, 170, 255, 0.15)" # Subtle border (title bar, etc.)
-GLASS_BG = "rgba(10, 29, 41, 0.4)"              # Glass card background
-GLASS_BG_DARK = "rgba(2, 13, 20, 0.85)"         # Status bar, toolbar bg
-GLOW_BLUE = "rgba(0, 170, 255, 0.2)"            # Hover glow / nav highlight
-GLOW_BLUE_STRONG = "rgba(0, 170, 255, 0.4)"     # Focus glow / active state
-SCANLINE_OVERLAY = "rgba(0, 170, 255, 0.06)"    # Subtle scanline texture
+def GLASS_BORDER():         return rgba(PRIMARY_CONTAINER, 0.3)
+def GLASS_BORDER_SUBTLE():  return rgba(PRIMARY_CONTAINER, 0.15)
+def GLASS_BG():             return rgba(SURFACE_CONTAINER_LOW, 0.4)
+def GLASS_BG_DARK():        return rgba(SPACE_VOID, 0.85)
+def GLOW_BLUE():            return rgba(PRIMARY_CONTAINER, 0.2)
+def GLOW_BLUE_STRONG():     return rgba(PRIMARY_CONTAINER, 0.4)
+def SCANLINE_OVERLAY():     return rgba(PRIMARY_CONTAINER, 0.06)
 
 # ---------------------------------------------------------------------------
 # Navigation Sidebar
 # ---------------------------------------------------------------------------
-NAV_ACTIVE_BG = "rgba(0, 170, 255, 0.1)"
-NAV_ACTIVE_BORDER = "rgba(0, 170, 255, 0.2)"
-NAV_HOVER_GRADIENT_START = "rgba(79, 142, 255, 0.2)"
-NAV_HOVER_GRADIENT_END = "rgba(79, 142, 255, 0.0)"
+def NAV_ACTIVE_BG():        return rgba(PRIMARY_CONTAINER, 0.1)
+def NAV_ACTIVE_BORDER():    return rgba(PRIMARY_CONTAINER, 0.2)
+def NAV_HOVER_GRADIENT_START(): return rgba(SECONDARY_CONTAINER, 0.2)
+def NAV_HOVER_GRADIENT_END():   return rgba(SECONDARY_CONTAINER, 0.0)
 
 # ---------------------------------------------------------------------------
 # Scrollbar
 # ---------------------------------------------------------------------------
-SCROLLBAR_TRACK = "rgba(0, 0, 0, 0.0)"
-SCROLLBAR_THUMB = "rgba(0, 170, 255, 0.2)"
-SCROLLBAR_THUMB_HOVER = "rgba(0, 170, 255, 0.4)"
+def SCROLLBAR_TRACK():           return rgba(SPACE_VOID, 0.0)
+def SCROLLBAR_THUMB():           return rgba(PRIMARY_CONTAINER, 0.2)
+def SCROLLBAR_THUMB_HOVER():     return rgba(PRIMARY_CONTAINER, 0.4)
 
 # ---------------------------------------------------------------------------
 # Corner Bracket Ornament
@@ -126,11 +126,34 @@ def rgba(hex_color: str, alpha: float) -> str:
     b = int(hex_color[4:6], 16)
     return f"rgba({r}, {g}, {b}, {alpha:.2f})"
 
+
+def qcolor(hex_color: str, alpha: int = 255):
+    """Convert a hex color string to a QColor for QPainter use.
+
+    Alpha is 0-255 (Qt convention). Call without alpha for fully opaque.
+    Import QColor at the call site: from PyQt6.QtGui import QColor
+    """
+    from PyQt6.QtGui import QColor
+    c = QColor(hex_color)
+    if alpha != 255:
+        c.setAlpha(alpha)
+    return c
+
 _DEFAULTS = {}
+_THEME_EDITABLE_KEYS = frozenset({
+    "SPACE_VOID", "SURFACE", "SURFACE_DIM", "SURFACE_CONTAINER_LOWEST",
+    "SURFACE_CONTAINER_LOW", "SURFACE_CONTAINER", "SURFACE_CONTAINER_HIGH",
+    "ON_SURFACE", "ON_SURFACE_VARIANT", "TEXT_DIM",
+    "PRIMARY", "ON_PRIMARY", "PRIMARY_CONTAINER",
+    "SECONDARY", "SECONDARY_CONTAINER",
+    "ERROR", "ON_ERROR", "ERROR_CONTAINER", "ON_ERROR_CONTAINER", "HAZARD_RED",
+    "OUTLINE", "OUTLINE_VARIANT",
+})
+
 def _store_defaults():
     g = globals()
     for k, v in list(g.items()):
-        if isinstance(v, str) and k.isupper() and k != "BRACKET_COLOR":
+        if isinstance(v, str) and k.isupper() and k in _THEME_EDITABLE_KEYS:
             _DEFAULTS[k] = v
 
 _store_defaults()

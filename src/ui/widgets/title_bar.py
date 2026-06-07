@@ -15,6 +15,8 @@ from src.app.constants import APP_NAME, TITLEBAR_HEIGHT
 
 log = logging.getLogger(__name__)
 
+_CLEAR_BTN_COLOR = "#FFFF00"
+
 # Shared button base style
 _BTN_BASE = (
     "QPushButton {{ color: {color}; font-size: 14px; border: none; "
@@ -65,12 +67,14 @@ class CustomTitleBar(QWidget):
 
         self._build_ui()
 
+        from src.core.events import EventBus
+        EventBus.instance().theme_changed.connect(self._refresh_theme)
+
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 8, 0)   # was 16,0,12,0
+        layout.setContentsMargins(12, 0, 8, 0)
         layout.setSpacing(0)
 
-        # App Icon — compact 22×22
         icon_lbl = QLabel()
         if os.path.exists(_APP_ICON):
             pix = QPixmap(_APP_ICON).scaled(22, 22, Qt.AspectRatioMode.KeepAspectRatio,
@@ -79,9 +83,8 @@ class CustomTitleBar(QWidget):
         else:
             icon_lbl.setText("🚀")
         layout.addWidget(icon_lbl)
-        layout.addSpacing(8)   # was 12
+        layout.addSpacing(8)
 
-        # Animated Title Label
         self._title_lbl = QLabel("Star Citizen Dossier")
         font = label_caps()
         font.setPointSize(9)
@@ -95,10 +98,8 @@ class CustomTitleBar(QWidget):
 
         layout.addStretch(1)
 
-        # --- Control buttons: compact 32×32 ---
-        btn_size = 32   # was 28
+        btn_size = 32
 
-        # Pin button
         self._pin_btn = QPushButton()
         self._pin_btn.setProperty("class", "icon")
         self._pin_btn.setFixedSize(btn_size, btn_size)
@@ -107,7 +108,6 @@ class CustomTitleBar(QWidget):
         self._pin_btn.clicked.connect(self._on_pin_clicked)
         self._update_pin_style()
 
-        # Hide button
         self._hide_btn = QPushButton()
         self._hide_btn.setProperty("class", "icon")
         self._hide_btn.setFixedSize(btn_size, btn_size)
@@ -115,7 +115,6 @@ class CustomTitleBar(QWidget):
         self._hide_btn.clicked.connect(self.hide_requested.emit)
         self._update_hide_style()
 
-        # Clear results button
         self._clear_btn = QPushButton()
         self._clear_btn.setProperty("class", "icon")
         self._clear_btn.setFixedSize(btn_size, btn_size)
@@ -123,12 +122,19 @@ class CustomTitleBar(QWidget):
         self._clear_btn.clicked.connect(self.clear_results_requested.emit)
         self._update_clear_style()
 
-        # Layout order: Clear, Pin, Hide — with tighter spacing
         layout.addWidget(self._clear_btn)
-        layout.addSpacing(2)   # was 4
+        layout.addSpacing(2)
         layout.addWidget(self._pin_btn)
         layout.addSpacing(2)
         layout.addWidget(self._hide_btn)
+
+    def _refresh_theme(self) -> None:
+        self._title_lbl.setStyleSheet(
+            f"color: {P.PRIMARY}; background: transparent; letter-spacing: 0.14em;"
+        )
+        self._update_pin_style()
+        self._update_hide_style()
+        self._update_clear_style()
 
     def _update_animation(self):
         self._anim_step = (self._anim_step + 4) % 360
@@ -155,31 +161,31 @@ class CustomTitleBar(QWidget):
         self._load_button_icon(self._pin_btn, icon_path, "◈" if self._pinned else "◇")
         if self._pinned:
             self._pin_btn.setStyleSheet(_BTN_BASE.format(
-                color=P.PRIMARY_CONTAINER, bg="rgba(0,170,255,0.20)",
-                hover_bg="rgba(0,170,255,0.30)", hover_color=P.PRIMARY,
-                pressed_bg="rgba(0,170,255,0.40)",
+                color=P.PRIMARY_CONTAINER, bg=P.rgba(P.PRIMARY_CONTAINER, 0.20),
+                hover_bg=P.rgba(P.PRIMARY_CONTAINER, 0.30), hover_color=P.PRIMARY,
+                pressed_bg=P.rgba(P.PRIMARY_CONTAINER, 0.40),
             ))
         else:
             self._pin_btn.setStyleSheet(_BTN_BASE.format(
                 color=P.TEXT_DIM, bg="transparent",
-                hover_bg="rgba(0,170,255,0.15)", hover_color=P.PRIMARY,
-                pressed_bg="rgba(0,170,255,0.25)",
+                hover_bg=P.rgba(P.PRIMARY_CONTAINER, 0.15), hover_color=P.PRIMARY,
+                pressed_bg=P.rgba(P.PRIMARY_CONTAINER, 0.25),
             ))
 
     def _update_hide_style(self) -> None:
         self._load_button_icon(self._hide_btn, _HIDE_ICON, "⊟")
         self._hide_btn.setStyleSheet(_BTN_BASE.format(
             color=P.TEXT_DIM, bg="transparent",
-            hover_bg="rgba(255,59,59,0.15)", hover_color=P.HAZARD_RED,
-            pressed_bg="rgba(255,59,59,0.25)",
+            hover_bg=P.rgba(P.HAZARD_RED, 0.15), hover_color=P.HAZARD_RED,
+            pressed_bg=P.rgba(P.HAZARD_RED, 0.25),
         ))
 
     def _update_clear_style(self) -> None:
         self._load_button_icon(self._clear_btn, _CLEAR_ICON, "✕")
         self._clear_btn.setStyleSheet(_CLEAR_BTN_BASE.format(
             color=P.TEXT_DIM, bg="transparent",
-            hover_bg="rgba(255,255,0,0.18)", hover_color="#FFFF00",
-            pressed_bg="rgba(255,255,0,0.28)",
+            hover_bg=P.rgba(_CLEAR_BTN_COLOR, 0.18), hover_color=_CLEAR_BTN_COLOR,
+            pressed_bg=P.rgba(_CLEAR_BTN_COLOR, 0.28),
         ))
 
     @property
@@ -219,13 +225,13 @@ class CustomTitleBar(QWidget):
 
         # Darker gradient — more pronounced depth
         grad = QLinearGradient(0, 0, self.width(), 0)
-        grad.setColorAt(0, QColor(3, 14, 24, 245))   # deep navy
-        grad.setColorAt(0.6, QColor(8, 20, 30, 240))
-        grad.setColorAt(1, QColor(28, 34, 40, 240))   # dark grey
+        grad.setColorAt(0, P.qcolor(P.SPACE_VOID, 245))
+        grad.setColorAt(0.6, P.qcolor(P.SURFACE_DIM, 240))
+        grad.setColorAt(1, P.qcolor(P.SURFACE_CONTAINER_HIGH, 240))
         painter.fillRect(self.rect(), grad)
 
         # Bottom border glow line
-        pen = QPen(QColor(0, 170, 255, 42), 1)
+        pen = QPen(P.qcolor(P.PRIMARY_CONTAINER, 42), 1)
         painter.setPen(pen)
         painter.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
 
