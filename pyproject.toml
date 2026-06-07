@@ -1,6 +1,6 @@
 [project]
 name = "sc-dossier"
-version = "0.4.0"
+version = "0.4.1"
 description = "A high-fidelity Star Citizen companion app for player and organization dossiers."
 authors = [
     {name = "PINK"}
@@ -15,7 +15,9 @@ dependencies = [
     "Pillow>=10.2.0",
     "rapidocr-onnxruntime>=1.3.0",
     "pyinstaller>=6.4.0",
-    "colorama>=0.4.6"
+    "colorama>=0.4.6",
+    "supabase>=2.4.0",
+    "keyboard>=0.13.5"
 ]
 
 [tool.pytest.ini_options]

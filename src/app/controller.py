@@ -33,7 +33,8 @@ class AppController(QObject):
         if getattr(SettingsManager.instance(), "auto_check_updates", True):
             from src.services.updater_service import UpdaterService
             self.updater = UpdaterService()
-            self.updater.check_for_updates()
+            channel = getattr(SettingsManager.instance(), "updater_channel", "live")
+            self.updater.check_for_updates(channel=channel)
 
     def _connect_bus(self) -> None:
         bus = EventBus.instance()

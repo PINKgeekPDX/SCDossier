@@ -23,3 +23,6 @@ Output/
 .vscode/
 .gitignore
 tests/
+src/settings.json
+sign_config.json
+sign_config.json.example

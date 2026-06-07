@@ -71,6 +71,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "theme_palette_overrides": {},
     "auto_check_updates": True,
     "auto_download_updates": False,
+    "updater_channel": "live",  # "live" or "beta"
     "font_size_scaling": 100,
     "app_font_family": "Default",
     # Archive & Export Preferences
@@ -515,6 +516,16 @@ class SettingsManager(QObject):
     @auto_download_updates.setter
     def auto_download_updates(self, v: bool) -> None:
         self.set("auto_download_updates", v)
+
+    @property
+    def updater_channel(self) -> str:
+        return str(self.get("updater_channel", "live"))
+
+    @updater_channel.setter
+    def updater_channel(self, v: str) -> None:
+        if v not in ("live", "beta"):
+            v = "live"
+        self.set("updater_channel", v)
 
     # Archive & Export Preferences
     @property

@@ -84,6 +84,16 @@ SC Dossier is designed to be plug-and-play. **No complex setups. No external dep
 ### // <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/sync.svg" width="22" align="top"> Auto-Updater //
 - Update check and download service built in, enable/disable this in the **Settings** tab (<img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/icon_settings.svg" width="18" align="top">) inside **SCD**. 
 - If a new version drops, the app will automatically download the new installer and apply the patch for you, or notify you to do it manually when ready.
+
+>## <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/icons/misc/shield.svg" width="26" align="top"> IMPORTANT: ADMIN PERMISSIONS (UAC)
+### If Star Citizen is running with admin privileges, SC Dossier must also be run as Administrator.
+If you launch Star Citizen with **"Run as administrator"** (UAC elevation), SC Dossier **must also be launched with administrator privileges** for the global hotkey system to function correctly. Windows prevents non-elevated applications from sending input to elevated applications (a security feature called UIPI — User Interface Privilege Isolation). Without matching elevation levels, the **3 critical hotkeys** (Snipping Tool, Interact, Drag) **will not detect or respond** when Star Citizen is in the foreground.
+
+**To run SC Dossier as administrator:**
+- Right-click `SCDossier.exe` or its shortcut → **Run as administrator**
+- Or: Right-click → **Properties** → **Compatibility** → Check **"Run this program as an administrator"**
+
+**Note:** If you launch Star Citizen normally (without admin), SC Dossier works perfectly without elevation.
 <br><br>
 ---
 

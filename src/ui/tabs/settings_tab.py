@@ -5,7 +5,8 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QSpinBox,
     QCheckBox, QPushButton, QComboBox, QLineEdit, QScrollArea, QFrame,
-    QGridLayout, QProgressBar, QFileDialog, QApplication, QMessageBox
+    QGridLayout, QProgressBar, QFileDialog, QApplication, QMessageBox,
+    QListWidget, QListWidgetItem, QSplitter, QTextBrowser
 )
 
 from src.core.settings import SettingsManager
@@ -18,7 +19,7 @@ from src.ui.widgets.tech_label import TechLabel
 from src.ui.widgets.smart_inputs import NoScrollSpinBox, NoScrollSlider, ColorPickerButton, NoScrollComboBox  # noqa: F401 (NoScrollComboBox re-used below)
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.keybind_dialog import KeybindDetectDialog
-from src.services.updater_service import UpdaterService
+from src.services.updater_service import UpdaterService, _parse_version_parts
 from src.app.constants import APP_NAME, APP_VERSION
 
 
@@ -30,6 +31,8 @@ class SettingsTab(QWidget):
         self.paths = PathManager.instance()
         self._updater = None
         self._staged_update_path = ""
+        self._releases: list = []
+        self._version_installer_expanded = False
         self._build_ui()
         self._load_values()
         self._init_updater()
@@ -400,23 +403,53 @@ class SettingsTab(QWidget):
         card = GlassCard(title="UPDATE BEHAVIOR")
         lo = QVBoxLayout()
         lo.setContentsMargins(0, 2, 0, 2)
-        lo.setSpacing(2)
+        lo.setSpacing(4)
 
+        # --- Build Channel Selector ---
+        ch_row = QWidget()
+        ch_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        ch_lo = QHBoxLayout(ch_row)
+        ch_lo.setContentsMargins(0, 1, 0, 1)
+        ch_lo.setSpacing(6)
+        ch_lbl = TechLabel("BUILD CHANNEL")
+        ch_lbl.setFixedWidth(135)
+        ch_lbl.setToolTip("Select which release channel to track for updates")
+        ch_lo.addWidget(ch_lbl)
+
+        self.channel_combo = NoScrollComboBox()
+        self.channel_combo.addItems(["Live Release", "Beta Release"])
+        self.channel_combo.setStyleSheet(self._input_style())
+        self.channel_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.channel_combo.setToolTip("Live = stable releases | Beta = pre-release / in-development builds")
+        ch_lo.addWidget(self.channel_combo, 1)
+        lo.addWidget(ch_row)
+
+        # --- Version Info ---
+        self.version_info_lbl = QLabel(f"Current: v{APP_VERSION}")
+        self.version_info_lbl.setFont(font_inter(10))
+        self.version_info_lbl.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
+        lo.addWidget(self.version_info_lbl)
+
+        # --- Auto-check / Auto-download ---
+        cb_row = QHBoxLayout()
+        cb_row.setSpacing(16)
         self.auto_check_cb = QCheckBox()
         self.auto_check_cb.setStyleSheet(self._cb_style())
-        lo.addWidget(self._cb_row("AUTO-CHECK", self.auto_check_cb,
+        cb_row.addWidget(self._cb_row("AUTO-CHECK", self.auto_check_cb,
             "Check GitHub for a newer version when the app launches"))
-
         self.auto_download_cb = QCheckBox()
         self.auto_download_cb.setStyleSheet(self._cb_style())
-        lo.addWidget(self._cb_row("AUTO-DOWNLOAD", self.auto_download_cb,
+        cb_row.addWidget(self._cb_row("AUTO-DOWNLOAD", self.auto_download_cb,
             "Download newly detected updates automatically in the background"))
+        lo.addLayout(cb_row)
 
+        # --- Status ---
         self.update_status_lbl = QLabel("Ready")
         self.update_status_lbl.setFont(font_inter(10))
         self.update_status_lbl.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
         lo.addWidget(self._row("STATUS", self.update_status_lbl, "Current update status"))
 
+        # --- Progress Bar ---
         self.update_progress = QProgressBar()
         self.update_progress.setVisible(False)
         self.update_progress.setFixedHeight(12)
@@ -429,6 +462,7 @@ class SettingsTab(QWidget):
         """)
         lo.addWidget(self.update_progress)
 
+        # --- Action Buttons ---
         btns = QHBoxLayout()
         btns.setSpacing(6)
         self.check_update_btn = QPushButton("CHECK")
@@ -453,6 +487,111 @@ class SettingsTab(QWidget):
 
         btns.addStretch()
         lo.addLayout(btns)
+
+        # --- Install Specific Version (expandable) ---
+        self._version_installer_frame = QFrame()
+        self._version_installer_frame.setFrameShape(QFrame.Shape.NoFrame)
+        self._version_installer_frame.setStyleSheet("background:transparent;border:none;")
+        self._version_installer_frame.setVisible(False)
+        vi_lo = QVBoxLayout(self._version_installer_frame)
+        vi_lo.setContentsMargins(0, 4, 0, 0)
+        vi_lo.setSpacing(4)
+
+        # Version list
+        self.version_list = QListWidget()
+        self.version_list.setFixedHeight(140)
+        self.version_list.setStyleSheet(f"""
+            QListWidget {{
+                background: rgba(5, 11, 15, 0.85);
+                color: {P.ON_SURFACE};
+                border: 1px solid {P.OUTLINE_VARIANT};
+                border-radius: 4px;
+                font-size: 11px;
+                outline: none;
+            }}
+            QListWidget::item {{
+                padding: 4px 8px;
+                border-bottom: 1px solid rgba(62, 72, 81, 0.3);
+            }}
+            QListWidget::item:selected {{
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.15)};
+                color: {P.PRIMARY};
+            }}
+            QListWidget::item:hover {{
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.08)};
+            }}
+        """)
+        vi_lo.addWidget(self.version_list)
+
+        # Description area
+        self.version_desc = QTextBrowser()
+        self.version_desc.setFixedHeight(80)
+        self.version_desc.setOpenExternalLinks(True)
+        self.version_desc.setStyleSheet(f"""
+            QTextBrowser {{
+                background: rgba(5, 11, 15, 0.85);
+                color: {P.TEXT_DIM};
+                border: 1px solid {P.OUTLINE_VARIANT};
+                border-radius: 4px;
+                font-size: 10px;
+                padding: 4px 8px;
+            }}
+        """)
+        vi_lo.addWidget(self.version_desc)
+
+        # Download & Install for specific version
+        sv_btns = QHBoxLayout()
+        sv_btns.setSpacing(6)
+        self.sv_download_btn = QPushButton("DOWNLOAD")
+        self.sv_download_btn.setStyleSheet(self._btn_style())
+        self.sv_download_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sv_download_btn.setEnabled(False)
+        self.sv_download_btn.clicked.connect(self._on_download_specific_version)
+        sv_btns.addWidget(self.sv_download_btn)
+
+        self.sv_install_btn = QPushButton("INSTALL")
+        self.sv_install_btn.setStyleSheet(self._btn_style(accent=True))
+        self.sv_install_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sv_install_btn.setEnabled(False)
+        self.sv_install_btn.clicked.connect(self._on_install_specific_version)
+        sv_btns.addWidget(self.sv_install_btn)
+
+        self.sv_retry_btn = QPushButton("RETRY")
+        self.sv_retry_btn.setStyleSheet(self._btn_style())
+        self.sv_retry_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sv_retry_btn.setEnabled(False)
+        self.sv_retry_btn.clicked.connect(self._load_releases)
+        sv_btns.addWidget(self.sv_retry_btn)
+
+        self.sv_status_lbl = QLabel("")
+        self.sv_status_lbl.setFont(font_inter(9))
+        self.sv_status_lbl.setStyleSheet(f"color:{P.TEXT_DIM};background:transparent;border:none;")
+        sv_btns.addWidget(self.sv_status_lbl, 1)
+        vi_lo.addLayout(sv_btns)
+
+        lo.addWidget(self._version_installer_frame)
+
+        # Toggle button for version installer
+        self._toggle_vi_btn = QPushButton("▼ INSTALL SPECIFIC VERSION")
+        self._toggle_vi_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: {P.PRIMARY};
+                border: 1px solid {P.OUTLINE_VARIANT};
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 10px;
+                font-weight: 600;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background: {P.rgba(P.PRIMARY_CONTAINER, 0.08)};
+                border-color: {P.PRIMARY};
+            }}
+        """)
+        self._toggle_vi_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._toggle_vi_btn.clicked.connect(self._on_toggle_version_installer)
+        lo.addWidget(self._toggle_vi_btn)
 
         card.content_layout.addLayout(lo)
         return card
@@ -707,6 +846,12 @@ class SettingsTab(QWidget):
         self.auto_check_cb.setChecked(self.sm.auto_check_updates)
         self.auto_download_cb.setChecked(self.sm.auto_download_updates)
 
+        ch_idx = self.channel_combo.findText(
+            "Beta Release" if self.sm.updater_channel == "beta" else "Live Release"
+        )
+        if ch_idx >= 0:
+            self.channel_combo.setCurrentIndex(ch_idx)
+
 
         idx = self.log_level_combo.findData(self.sm.log_level)
         if idx >= 0:
@@ -751,6 +896,8 @@ class SettingsTab(QWidget):
         # Updater
         self.auto_check_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_check_updates', v))
         self.auto_download_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_download_updates', v))
+        self.channel_combo.currentTextChanged.connect(self._on_channel_changed)
+        self.version_list.currentRowChanged.connect(self._on_version_selected)
 
         # Diagnostics
         self.log_level_combo.currentIndexChanged.connect(
@@ -839,11 +986,13 @@ class SettingsTab(QWidget):
         self._updater.update_checked.connect(self._on_update_checked)
         self._updater.update_ready_to_install.connect(self._on_update_ready)
         if self.auto_check_cb.isChecked():
-            self._updater.check_for_updates(silent=True)
+            channel = self.sm.updater_channel
+            self._updater.check_for_updates(channel=channel, silent=True)
 
     def _on_check_updates(self) -> None:
         if self._updater:
-            self._updater.check_for_updates(silent=False)
+            channel = self.sm.updater_channel
+            self._updater.check_for_updates(channel=channel, silent=False)
 
     def _on_download_update(self) -> None:
         if self._updater and hasattr(self._updater, '_asset_url') and self._updater._asset_url:
@@ -884,6 +1033,191 @@ class SettingsTab(QWidget):
         self._staged_update_path = staged_path
         self.install_update_btn.setEnabled(True)
         self.check_update_btn.setEnabled(True)
+        # Also enable the specific version install button if visible
+        if self._version_installer_expanded and self.version_list.currentRow() >= 0:
+            self.sv_install_btn.setEnabled(True)
+            self.sv_status_lbl.setText("Ready to install")
+
+    # ------------------------------------------------------------------
+    # Channel & Version Installer Slots
+    # ------------------------------------------------------------------
+
+    def _on_channel_changed(self, text: str) -> None:
+        channel = "beta" if "Beta" in text else "live"
+        if channel == self.sm.updater_channel:
+            return
+
+        if channel == "beta":
+            if not self._show_beta_warning_dialog():
+                # Revert combo selection
+                self.channel_combo.blockSignals(True)
+                self.channel_combo.setCurrentText("Live Release")
+                self.channel_combo.blockSignals(False)
+                return
+
+        self.sm.updater_channel = channel
+        self._staged_update_path = ""
+        self._releases = []
+
+        if self._version_installer_expanded:
+            self._load_releases()
+
+    def _show_beta_warning_dialog(self) -> bool:
+        from src.ui.widgets.confirm_dialog import ConfirmDialog
+        from PyQt6.QtWidgets import QDialog
+        dlg = ConfirmDialog(
+            title="SWITCH TO BETA BUILDS",
+            message=(
+                "You are about to switch to the Beta release channel.\n\n"
+                "Beta builds are active in-development versions used for testing "
+                "new upcoming features. They may contain bugs, instability, or "
+                "incomplete features that are not indicative of the final release.\n\n"
+                "Are you sure you want to switch to Beta builds?"
+            ),
+            confirm_text="YES, I ACKNOWLEDGE",
+            cancel_text="NEVERMIND",
+            danger=True,
+            parent=self,
+        )
+        return dlg.exec() == QDialog.DialogCode.Accepted
+
+    def _on_toggle_version_installer(self) -> None:
+        self._version_installer_expanded = not self._version_installer_expanded
+        self._version_installer_frame.setVisible(self._version_installer_expanded)
+        if self._version_installer_expanded:
+            self._toggle_vi_btn.setText("▲ HIDE SPECIFIC VERSION")
+            self._load_releases()
+        else:
+            self._toggle_vi_btn.setText("▼ INSTALL SPECIFIC VERSION")
+
+    def _load_releases(self) -> None:
+        if not self._updater:
+            return
+        channel = self.sm.updater_channel
+        self.sv_status_lbl.setText("Loading releases...")
+        self.version_list.clear()
+        self.version_desc.clear()
+        self.sv_download_btn.setEnabled(False)
+        self.sv_install_btn.setEnabled(False)
+        # Disconnect old connections to avoid duplicates
+        try:
+            self._updater.releases_loaded.disconnect(self._on_releases_loaded)
+        except (TypeError, RuntimeError):
+            pass
+        try:
+            self._updater.release_list_error.disconnect(self._on_release_list_error)
+        except (TypeError, RuntimeError):
+            pass
+        self._updater.releases_loaded.connect(self._on_releases_loaded)
+        self._updater.release_list_error.connect(self._on_release_list_error)
+        self._updater.fetch_all_releases(channel=channel)
+
+    @pyqtSlot(list)
+    def _on_releases_loaded(self, releases: list) -> None:
+        self._releases = releases
+        self.version_list.clear()
+        self.sv_status_lbl.setText("")
+        self.sv_retry_btn.setEnabled(False)
+
+        current_clean = APP_VERSION.lstrip("bv")
+        for ri in releases:
+            label = ri.tag
+            ri_clean = ri.version.lstrip("b")
+            if ri_clean == current_clean:
+                label += "  (current)"
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, ri)
+            self.version_list.addItem(item)
+
+        if not releases:
+            self.sv_status_lbl.setText("No releases found for this channel.")
+            self.sv_retry_btn.setEnabled(True)
+        else:
+            self.sv_status_lbl.setText(f"{len(releases)} release(s) loaded")
+
+    @pyqtSlot(str)
+    def _on_release_list_error(self, error_msg: str) -> None:
+        self.sv_status_lbl.setText("Load failed")
+        self.sv_retry_btn.setEnabled(True)
+        self.version_desc.setPlainText(f"Error: {error_msg}")
+
+    def _on_version_selected(self, row: int) -> None:
+        if row < 0 or row >= len(self._releases):
+            self.version_desc.clear()
+            self.sv_download_btn.setEnabled(False)
+            self.sv_install_btn.setEnabled(False)
+            return
+
+        ri = self._releases[row]
+        self.version_desc.setPlainText(
+            f"Version: {ri.version}\n"
+            f"Tag: {ri.tag}\n"
+            f"Published: {ri.published_at[:10] if ri.published_at else 'N/A'}\n\n"
+            f"{ri.body[:500] if ri.body else 'No release notes.'}"
+        )
+
+        has_asset = ri.asset_url is not None and ri.asset_url != ""
+        self.sv_download_btn.setEnabled(has_asset)
+        self.sv_install_btn.setEnabled(False)
+        self.sv_status_lbl.setText("")
+        self._staged_update_path = ""
+
+    def _on_download_specific_version(self) -> None:
+        row = self.version_list.currentRow()
+        if row < 0 or row >= len(self._releases):
+            return
+
+        ri = self._releases[row]
+        if not ri.asset_url:
+            return
+
+        # Check if this is a rollback (older version)
+        current_clean = APP_VERSION.lstrip("bv")
+        selected_clean = ri.version.lstrip("b")
+        if not self._version_is_newer_or_equal(selected_clean, current_clean):
+            if not self._show_rollback_dialog(ri.version):
+                return
+
+        self.sv_download_btn.setEnabled(False)
+        self.sv_status_lbl.setText("Downloading...")
+        if self._updater:
+            self._updater.download_update(ri.asset_url)
+
+    def _version_is_newer_or_equal(self, v1: str, v2: str) -> bool:
+        """Return True if v1 >= v2."""
+        parts1 = _parse_version_parts(v1)
+        parts2 = _parse_version_parts(v2)
+        for a, b in zip(parts1, parts2):
+            if a > b:
+                return True
+            elif a < b:
+                return False
+        return len(parts1) >= len(parts2)
+
+    def _show_rollback_dialog(self, target_version: str) -> bool:
+        from src.ui.widgets.confirm_dialog import ConfirmDialog
+        from PyQt6.QtWidgets import QDialog
+        dlg = ConfirmDialog(
+            title="INSTALL OLDER VERSION",
+            message=(
+                f"You are about to install v{target_version}, which is older than "
+                f"the current version (v{APP_VERSION}).\n\n"
+                "Rolling back to an older version may cause you to lose features "
+                "or fixes included in newer releases.\n\n"
+                "Are you sure you want to rollback?"
+            ),
+            confirm_text="YES, ROLLBACK",
+            cancel_text="CANCEL",
+            danger=True,
+            parent=self,
+        )
+        return dlg.exec() == QDialog.DialogCode.Accepted
+
+    def _on_install_specific_version(self) -> None:
+        if self._updater and self._staged_update_path:
+            self._updater.install_update(self._staged_update_path)
+            self.sv_install_btn.setEnabled(False)
+            self.sv_status_lbl.setText("Installing...")
 
     def _on_detect_hotkey(self) -> None:
         dlg = KeybindDetectDialog(self, current_keybind=self.sm.ocr_hotkey)
@@ -925,7 +1259,8 @@ class SettingsTab(QWidget):
             f"SC Dossier version: {APP_VERSION}",
             f"Python version: {sys.version}",
             f"OS: {platform.system()} {platform.release()}",
-            f"Update channel: {'Auto' if self.sm.auto_check_updates else 'Manual'}",
+            f"Update channel: {self.sm.updater_channel}",
+            f"Auto-check: {'Enabled' if self.sm.auto_check_updates else 'Disabled'}",
         ]
         if self.debug_diag_cb.isChecked():
             diag.append("--- DEBUG INFO ---")

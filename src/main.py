@@ -8,6 +8,7 @@ Application Entry Point.
 import os
 import sys
 import logging
+import subprocess
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QRect, QSharedMemory, Qt
 
@@ -274,7 +275,6 @@ def main():
             for widget in QApplication.topLevelWidgets():
                 widget.update()
         elif key == "auto_hide_toolbar_without_game":
-            import subprocess
             sc_running = False
             try:
                 output = subprocess.check_output(

@@ -4,8 +4,13 @@ PyInstaller build script for SC Dossier.
 
 Usage:
     python build.py
+
+Code Signing (optional):
+    Copy sign_config.json.example to sign_config.json and fill in your cert details.
+    If sign_config.json is missing or "enabled" is false, signing is skipped entirely.
 """
 
+import json
 import os
 import sys
 import shutil
@@ -20,6 +25,82 @@ try:
 except ImportError:
     APP_VERSION = "unknown"
 
+SIGN_CONFIG_PATH = Path("sign_config.json")
+
+
+def load_sign_config():
+    """Load code signing config from sign_config.json if present and enabled.
+    
+    Returns a dict with signing params, or None if signing is disabled/missing.
+    """
+    if not SIGN_CONFIG_PATH.exists():
+        return None
+
+    try:
+        with open(SIGN_CONFIG_PATH, "r") as f:
+            cfg = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[Signing] Warning: Could not read {SIGN_CONFIG_PATH}: {e}")
+        return None
+
+    if not cfg.get("enabled", False):
+        print("[Signing] Disabled (enabled=false in sign_config.json). Skipping.")
+        return None
+
+    pfx_path = cfg.get("pfx_path", "")
+    if not pfx_path or not Path(pfx_path).exists():
+        print(f"[Signing] Warning: PFX file not found at '{pfx_path}'. Skipping signing.")
+        return None
+
+    return {
+        "pfx_path": pfx_path,
+        "pfx_password": cfg.get("pfx_password", ""),
+        "timestamp_url": cfg.get("timestamp_url", "http://timestamp.digicert.com"),
+        "description": cfg.get("description", "SC Dossier"),
+    }
+
+
+def sign_file(file_path, sign_cfg):
+    """Sign a file using signtool.exe with the provided config.
+    
+    Returns True on success, False on failure. Never raises.
+    """
+    if sign_cfg is None:
+        return True  # No signing configured, nothing to do
+
+    if not Path(file_path).exists():
+        print(f"[Signing] Warning: File not found, cannot sign: {file_path}")
+        return False
+
+    cmd = [
+        "signtool", "sign",
+        "/fd", "SHA256",
+        "/tr", sign_cfg["timestamp_url"],
+        "/td", "SHA256",
+        "/d", sign_cfg["description"],
+        "/f", sign_cfg["pfx_path"],
+    ]
+
+    if sign_cfg["pfx_password"]:
+        cmd.extend(["/p", sign_cfg["pfx_password"]])
+
+    cmd.append(str(file_path))
+
+    print(f"[Signing] Signing {Path(file_path).name}...")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode == 0:
+        print(f"[Signing] Successfully signed: {Path(file_path).name}")
+        return True
+    else:
+        print(f"[Signing] FAILED to sign {Path(file_path).name}:")
+        if result.stdout:
+            print(f"  stdout: {result.stdout.strip()}")
+        if result.stderr:
+            print(f"  stderr: {result.stderr.strip()}")
+        return False
+
+
 def clean_build_dirs():
     """Remove existing build/dist directories to ensure a clean build."""
     for d in ["build", "dist"]:
@@ -30,7 +111,10 @@ def clean_build_dirs():
 
 def build_executable():
     """Run PyInstaller with the required configuration."""
-    
+
+    # Load signing config (returns None if disabled/missing — no impact on build)
+    sign_cfg = load_sign_config()
+
     # Base command
     cmd = [
         "pyinstaller",
@@ -52,11 +136,11 @@ def build_executable():
     # Handle assets/fonts data inclusion
     # Syntax is 'source_path;destination_folder' on Windows, ':' on Linux/Mac
     sep = ";" if platform.system() == "Windows" else ":"
-    
+
     assets_dir = Path("src/assets")
     if assets_dir.exists():
         cmd.append(f"--add-data=src/assets{sep}src/assets")
-        
+
     # Hidden imports required by dynamic loaders (rapidocr, bs4, lxml, supabase)
     hidden_imports = [
         "rapidocr_onnxruntime",
@@ -78,7 +162,7 @@ def build_executable():
         "h2",
         "hpack",
     ]
-    
+
     for imp in hidden_imports:
         cmd.append(f"--hidden-import={imp}")
 
@@ -96,21 +180,26 @@ def build_executable():
     cmd.append("src/main.py")
 
     print(f"Running PyInstaller: {' '.join(cmd)}")
-    
+
     # Execute
     result = subprocess.run(cmd, capture_output=False, text=True)
-    
+
     if result.returncode == 0:
         print("\nBuild completed successfully!")
-        
+
+        # --- Sign the built executable ---
+        built_exe = Path("dist") / "SCDossier.exe"
+        if sign_cfg:
+            sign_file(built_exe, sign_cfg)
+
         import zipfile
         sys_name = platform.system().lower()
         if sys_name == "darwin":
             sys_name = "mac"
-            
+
         zip_name = f"SCDossier-{sys_name}-v{APP_VERSION}.zip"
         zip_path = Path("dist") / zip_name
-        
+
         if sys_name == "windows":
             # Check for Inno Setup
             inno_paths = [
@@ -118,14 +207,26 @@ def build_executable():
                 r"C:\Program Files\Inno Setup 6\ISCC.exe"
             ]
             iscc_exe = next((p for p in inno_paths if os.path.exists(p)), None)
-            
+
             if iscc_exe:
                 print(f"Found Inno Setup at {iscc_exe}. Compiling installer...")
-                iscc_cmd = [iscc_exe, f"/dMyAppVersion={APP_VERSION}", "installer.iss"]
+                iscc_cmd = [iscc_exe, f"/dMyAppVersion={APP_VERSION}"]
+
+                # Pass signing params to Inno Setup via preprocessor defines
+                # If sign_cfg is present, installer.iss will use SignTool automatically
+                if sign_cfg:
+                    iscc_cmd.append("/dENABLE_SIGNING=1")
+
+                iscc_cmd.append("installer.iss")
                 iscc_result = subprocess.run(iscc_cmd, capture_output=False, text=True)
-                
+
                 if iscc_result.returncode == 0:
                     setup_exe = Path("Output") / "SCDossier-Setup.exe"
+
+                    # --- Sign the installer ---
+                    if sign_cfg:
+                        sign_file(setup_exe, sign_cfg)
+
                     if setup_exe.exists():
                         print(f"Zipping installer to {zip_path} ...")
                         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
