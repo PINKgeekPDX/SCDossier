@@ -138,6 +138,9 @@ class SplashScreen(QWidget):
         self.anim.finished.connect(self._on_anim_finished)
         self._fading_out = False
 
+        self.adjustSize()
+        QApplication.processEvents()
+
     def update_progress(self, text: str, value: int):
         self.status_lbl.setText(text)
         self.progress_bar.setValue(value)
@@ -145,9 +148,14 @@ class SplashScreen(QWidget):
 
     def fade_in(self):
         self._fading_out = False
+        self.setWindowOpacity(0.0)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        self.adjustSize()
+        QApplication.processEvents()
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
-        self.show()
         self.anim.start()
         self.wait_for_animation()
 
