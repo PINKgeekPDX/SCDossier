@@ -479,14 +479,14 @@ class UpdaterService(QObject):
         self.update_checked.emit(True, version)
 
         from src.core.events import EventBus
-        EventBus.instance().status_message.emit(f"UPDATE AVAILABLE: v{version}", "info")
+        EventBus.instance().status_push.emit(f"UPDATE AVAILABLE: v{version}", "", "#93CCFF", 30000)
 
     def _on_up_to_date(self) -> None:
         self.update_status.emit(f"SC Dossier v{APP_VERSION} is up to date")
         self.update_checked.emit(False, APP_VERSION)
 
         from src.core.events import EventBus
-        EventBus.instance().status_message.emit("APP IS UP TO DATE", "success")
+        EventBus.instance().status_push.emit("APP IS UP TO DATE", "", "#00FF88", 30000)
 
     def _on_update_error(self, error_msg: str) -> None:
         self.update_status.emit("UPDATE CHECK FAILED")

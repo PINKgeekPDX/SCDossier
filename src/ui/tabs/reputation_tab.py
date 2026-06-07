@@ -435,6 +435,7 @@ _STATE_LOADING  = 2
 _STATE_NO_DATA  = 3
 _STATE_LOADED   = 4
 _STATE_OFFLINE  = 5
+_STATE_SELF     = 6
 
 
 class ReputationTab(QWidget):
@@ -491,6 +492,7 @@ class ReputationTab(QWidget):
         self._stack.addWidget(self._build_no_data_page())    # 3
         self._stack.addWidget(self._build_loaded_page())     # 4
         self._stack.addWidget(self._build_offline_page())    # 5
+        self._stack.addWidget(self._build_self_page())       # 6
 
         main_layout.addWidget(self._stack)
 
@@ -729,6 +731,16 @@ class ReputationTab(QWidget):
         self._offline_retry_btn.clicked.connect(self._on_retry_clicked)
         return r["page"]
 
+    def _build_self_page(self) -> QWidget:
+        r = self._centered_card_page(
+            "👤",
+            "SELF-REPORT RESTRICTED",
+            "You cannot create an interaction report for your own player profile. "
+            "Community reputation reports are submitted by other citizens who have interacted with you in-game.",
+            None,
+        )
+        return r["page"]
+
     # ------------------------------------------------------------------
     # Signal connections
     # ------------------------------------------------------------------
@@ -755,6 +767,7 @@ class ReputationTab(QWidget):
             "no_data":  _STATE_NO_DATA,
             "loaded":   _STATE_LOADED,
             "offline":  _STATE_OFFLINE,
+            "self":     _STATE_SELF,
         }
         idx = state_map.get(state, _STATE_EMPTY)
         self._stack.setCurrentIndex(idx)
@@ -781,6 +794,27 @@ class ReputationTab(QWidget):
             return
 
         self._current_handle = handle
+
+        # Check self-report restriction — show dedicated card instead of loading
+        from src.services.reputation_service import ReputationService
+        is_self = False
+        try:
+            if ReputationService.is_initialized():
+                svc = ReputationService.instance()
+                local_handle = svc.local_player_handle
+                # If startup worker hasn't detected it yet, try synchronously
+                if not local_handle:
+                    svc.detect_local_player_handle()
+                    local_handle = svc.local_player_handle
+                if local_handle and handle.lower() == local_handle.lower():
+                    is_self = True
+        except Exception:
+            pass
+
+        if is_self:
+            self._set_state("self")
+            return
+
         self._set_state("loading")
         # Update handle label in case we arrive at 'loaded' state
         self._loaded_handle_lbl.setText(f"@{handle.upper()}")
@@ -789,24 +823,8 @@ class ReputationTab(QWidget):
         self._cooldown_timer.stop()
         self._cooldown_end_time = 0.0
 
-        # Check self-report restriction
-        from src.services.reputation_service import ReputationService
-        is_self = False
-        try:
-            if ReputationService.is_initialized():
-                local_handle = ReputationService.instance().local_player_handle
-                if local_handle and handle.lower() == local_handle.lower():
-                    is_self = True
-        except Exception:
-            pass
-
-        if is_self:
-            self._set_report_buttons_disabled(
-                False, "You cannot submit a reputation report for yourself."
-            )
-        else:
-            # Check rate limit server-side
-            self._check_rate_limit_server(handle)
+        # Check rate limit server-side
+        self._check_rate_limit_server(handle)
 
     def _check_rate_limit_server(self, handle: str) -> None:
         """Check rate limit via server-side Edge Function in background."""
@@ -1094,10 +1112,13 @@ class ReputationTab(QWidget):
         # Safeguard: prevent submitting report if it's the local user
         from src.services.reputation_service import ReputationService
         if ReputationService.is_initialized():
-            local_handle = ReputationService.instance().local_player_handle
+            svc = ReputationService.instance()
+            local_handle = svc.local_player_handle
+            if not local_handle:
+                svc.detect_local_player_handle()
+                local_handle = svc.local_player_handle
             if local_handle and self._current_handle.lower() == local_handle.lower():
-                from src.ui.widgets.confirm_dialog import show_error_dialog
-                show_error_dialog("REPORT RESTRICTED", "You cannot submit a reputation report for yourself.", parent=self.window())
+                self._set_state("self")
                 return
 
         dialog = ReportDialog(self._current_handle, self)

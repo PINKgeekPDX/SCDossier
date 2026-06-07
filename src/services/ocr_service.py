@@ -133,7 +133,7 @@ class OCRService:
         self._worker.finished_error.connect(self._on_error)
         
         bus = EventBus.instance()
-        bus.status_message.emit("INITIALIZING OCR ENGINE...", "info")
+        bus.status_push.emit("INITIALIZING OCR ENGINE...", "", "#93CCFF", 30000)
         
         self._worker.start()
 

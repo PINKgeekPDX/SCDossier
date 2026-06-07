@@ -127,7 +127,7 @@ class _PreviewBracketCard(QFrame):
         header_rect = QRect(rect.x(), rect.y(), rect.width(), 22)
         header_bg = QColor(P.PRIMARY_CONTAINER)
         header_bg.setAlpha(14)
-        painter.fillRect(header_bg, header_bg)
+        painter.fillRect(header_rect, header_bg)
         header_line = QColor(P.PRIMARY_CONTAINER)
         header_line.setAlpha(20)
         painter.setPen(QPen(header_line, 1))
@@ -302,7 +302,7 @@ class ThemeEditorDialog(QDialog):
         # Data fields row
         fields_row = QHBoxLayout()
         fields_row.setSpacing(4)
-        for label_text, val_text in [("ORG", "THEKVLT"), ("RANK", "CITIZEN")]:
+        for label_text, val_text in [("ORG", "ORGNAME"), ("RANK", "CITIZEN")]:
             field_frame = QFrame()
             field_frame.setObjectName("pv_data_field")
             fl = QVBoxLayout(field_frame)

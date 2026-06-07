@@ -101,7 +101,13 @@ class EventBus(QObject):
     # ------------------------------------------------------------------
 
     # General status message for the status bar (message, level: StatusLevel.value)
+    # Existing callers use this — maps level to a preset color.
     status_message = pyqtSignal(str, str)
+
+    # Queue-based status push: (message, tooltip, color_hex, duration_ms)
+    # Use this for full control over pill appearance. Pass "" for tooltip to skip.
+    # Pass "" for color_hex to fall back to the default "info" color.
+    status_push = pyqtSignal(str, str, str, int)
 
     # ------------------------------------------------------------------
     # Settings Signals

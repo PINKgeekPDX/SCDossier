@@ -981,8 +981,8 @@ class SettingsTab(QWidget):
         discord_btn = self._make_about_link_btn("DISCORD", "https://discord.gg/placeholder")
         discord_btn.clicked.disconnect()
         discord_btn.clicked.connect(
-            lambda: EventBus.instance().status_message.emit(
-                "Official project discord coming soon!", "info"
+            lambda: EventBus.instance().status_push.emit(
+                "Official project discord coming soon!", "", "#93CCFF", 30000
             )
         )
         btn_lo.addWidget(discord_btn)

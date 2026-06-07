@@ -72,53 +72,114 @@ class ReputationService:
         """Set the local player handle."""
         self._local_player_handle = val
 
+    @staticmethod
+    def _find_sc_install_paths() -> list[str]:
+        """
+        Return a list of candidate Star Citizen installation directories.
+        Checks the Windows registry first (RSI Launcher stores the path there),
+        then falls back to well-known default locations.
+        """
+        import os
+        paths: list[str] = []
+
+        # --- Registry lookup (RSI Launcher) ---
+        try:
+            import winreg
+            reg_hives = [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]
+            reg_keys = [
+                r"SOFTWARE\Roberts Space Industries\StarCitizen",
+                r"SOFTWARE\WOW6432Node\Roberts Space Industries\StarCitizen",
+            ]
+            for hive in reg_hives:
+                for key_path in reg_keys:
+                    try:
+                        with winreg.OpenKey(hive, key_path) as key:
+                            # The launcher stores "InstallPath" or "LibraryFolders"
+                            for value_name in ("InstallPath", "LibraryFolders", "ProductInstallPath"):
+                                try:
+                                    val, _ = winreg.QueryValueEx(key, value_name)
+                                    if val and isinstance(val, str) and os.path.isdir(val):
+                                        paths.append(val)
+                                except (FileNotFoundError, OSError):
+                                    pass
+                    except (FileNotFoundError, OSError):
+                        pass
+        except ImportError:
+            pass  # winreg not available (non-Windows or stripped build)
+
+        # --- Well-known default paths ---
+        defaults = [
+            r"C:\Program Files\Roberts Space Industries\StarCitizen",
+            r"C:\Program Files (x86)\Roberts Space Industries\StarCitizen",
+            r"D:\Roberts Space Industries\StarCitizen",
+            r"E:\Roberts Space Industries\StarCitizen",
+        ]
+        for d in defaults:
+            if d not in paths and os.path.isdir(d):
+                paths.append(d)
+
+        # --- Also check drives C-Z for the RSI folder (edge cases) ---
+        import string
+        for letter in string.ascii_uppercase:
+            candidate = f"{letter}:\\Roberts Space Industries\\StarCitizen"
+            if candidate not in paths and os.path.isdir(candidate):
+                paths.append(candidate)
+
+        return paths
+
+    @staticmethod
+    def _parse_handle_from_log(log_path: str) -> str:
+        """Try to extract the player handle from a Game.log file. Returns '' on failure."""
+        import re
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+
+            # Pattern 1: AccountLoginCharacterStatus_Character Character: ... - name NAME - state STATE_CURRENT
+            match = re.search(r"Character:.*?-\s*name\s+(\w+)\s+-\s*state\s+STATE_CURRENT", content)
+            if match:
+                return match.group(1)
+
+            # Pattern 2: Legacy login response user success: User Login Success - Handle[NAME]
+            match = re.search(r"User Login Success\s+-\s+Handle\[(\w+)\]", content)
+            if match:
+                return match.group(1)
+
+            # Pattern 3: Expect Incoming Connection ... nickname="NAME"
+            match = re.search(r"Expect Incoming Connection>.*?nickname=\"(\w+)\"", content)
+            if match:
+                return match.group(1)
+
+        except Exception as e:
+            log.warning("_parse_handle_from_log: Failed to read %s: %s", log_path, e)
+        return ""
+
     def detect_local_player_handle(self) -> str:
         """
         Locate the Star Citizen installation and check the game.log.
         Extract the local player handle using regex matching.
+        Tries registry-detected paths first, then well-known defaults.
+        Searches LIVE channel before PTU.
         """
         import os
-        import re
-
-        default_path = r"C:\Program Files\Roberts Space Industries\StarCitizen"
         channels = ["LIVE", "PTU"]
-        
-        for channel in channels:
-            log_path = os.path.join(default_path, channel, "Game.log")
-            if os.path.exists(log_path):
+        install_paths = self._find_sc_install_paths()
+
+        log.info("detect_local_player_handle: Searching %d candidate install paths", len(install_paths))
+
+        for base_path in install_paths:
+            for channel in channels:
+                log_path = os.path.join(base_path, channel, "Game.log")
+                if not os.path.exists(log_path):
+                    continue
+
                 log.info("detect_local_player_handle: Found game log at %s", log_path)
-                try:
-                    # Read the log file
-                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                        content = f.read()
+                handle = self._parse_handle_from_log(log_path)
+                if handle:
+                    self._local_player_handle = handle
+                    log.info("detect_local_player_handle: Detected handle: %s", handle)
+                    return handle
 
-                    # Pattern 1: AccountLoginCharacterStatus_Character Character: ... - name NAME - state STATE_CURRENT
-                    match = re.search(r"Character:.*?-\s*name\s+(\w+)\s+-\s*state\s+STATE_CURRENT", content)
-                    if match:
-                        handle = match.group(1)
-                        self._local_player_handle = handle
-                        log.info("detect_local_player_handle: Detected handle from Character Status: %s", handle)
-                        return handle
-
-                    # Pattern 2: Legacy login response user success: User Login Success - Handle[NAME]
-                    match = re.search(r"User Login Success\s+-\s+Handle\[(\w+)\]", content)
-                    if match:
-                        handle = match.group(1)
-                        self._local_player_handle = handle
-                        log.info("detect_local_player_handle: Detected handle from Legacy Login: %s", handle)
-                        return handle
-
-                    # Pattern 3: Expect Incoming Connection ... nickname="NAME"
-                    match = re.search(r"Expect Incoming Connection>.*?nickname=\"(\w+)\"", content)
-                    if match:
-                        handle = match.group(1)
-                        self._local_player_handle = handle
-                        log.info("detect_local_player_handle: Detected handle from Incoming Connection: %s", handle)
-                        return handle
-
-                except Exception as e:
-                    log.warning("detect_local_player_handle: Failed to read %s: %s", log_path, e)
-        
         log.warning("detect_local_player_handle: Could not detect username from Star Citizen log.")
         return ""
 

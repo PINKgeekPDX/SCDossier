@@ -11,6 +11,12 @@ from src.services.image_downloader import ImageDownloader
 from src.services.scraper_player import PlayerScraperWorker
 from src.services.scraper_org import OrgScraperWorker
 
+# Pill color presets (matching status_bar.py)
+_BLUE   = "#93CCFF"
+_GREEN  = "#00FF88"
+_AMBER  = "#FFAA00"
+_RED    = "#FF4444"
+
 log = logging.getLogger(__name__)
 
 
@@ -87,11 +93,11 @@ class AppController(QObject):
         elif len(candidates) > 1:
             EventBus.instance().org_candidates_found.emit(candidates)
         else:
-            EventBus.instance().status_message.emit("NO ORG FOUND FOR QUERY", "warning")
+            EventBus.instance().status_push.emit("NO ORG FOUND FOR QUERY", "", _AMBER, 30000)
 
     @pyqtSlot(str)
     def _on_org_search_error(self, error_msg: str) -> None:
-        EventBus.instance().status_message.emit(f"ORG SEARCH ERROR: {error_msg}", "error")
+        EventBus.instance().status_push.emit(f"ORG SEARCH ERROR: {error_msg}", "", _RED, 30000)
 
     @pyqtSlot(str)
     def _on_capture_completed(self, handle_or_path: str) -> None:
@@ -110,7 +116,7 @@ class AppController(QObject):
 
     @pyqtSlot(str)
     def _on_capture_failed(self, error_msg: str) -> None:
-        EventBus.instance().status_message.emit(f"OCR ERROR: {error_msg}", "error")
+        EventBus.instance().status_push.emit(f"OCR ERROR: {error_msg}", "", _RED, 30000)
 
     def _start_player_scrape(self, handle: str) -> None:
         if self._active_scraper and self._active_scraper.isRunning():
@@ -121,7 +127,7 @@ class AppController(QObject):
 
         sm = SettingsManager.instance()
 
-        EventBus.instance().status_message.emit(f"RETRIEVING DOSSIER: {handle}", "info")
+        EventBus.instance().status_push.emit(f"RETRIEVING DOSSIER: {handle}", "", _BLUE, 30000)
 
         self._active_scraper = PlayerScraperWorker(
             handle, sm.user_agent, sm.scraper_delay_ms,
@@ -146,7 +152,7 @@ class AppController(QObject):
 
         self._queue_downloads(data, temp_dir)
 
-        EventBus.instance().status_message.emit("DATA RETRIEVED SUCCESSFULLY", "success")
+        EventBus.instance().status_push.emit("DATA RETRIEVED SUCCESSFULLY", "", _GREEN, 30000)
         EventBus.instance().scrape_completed.emit(data)
 
         # Auto-check reputation if enabled
@@ -158,7 +164,7 @@ class AppController(QObject):
 
     @pyqtSlot(str)
     def _on_scrape_error(self, error_msg: str) -> None:
-        EventBus.instance().status_message.emit(f"SCRAPE ERROR: {error_msg}", "error")
+        EventBus.instance().status_push.emit(f"SCRAPE ERROR: {error_msg}", "", _RED, 30000)
 
     def _queue_downloads(self, data: dict, base_dir: "Path") -> None:
         avatar_url = data.get("avatar_url")
@@ -196,15 +202,15 @@ class AppController(QObject):
         if self.cache_mgr.is_archived(handle):
             self._start_player_scrape(handle)
         elif self.cache_mgr.promote_to_archive(handle):
-            EventBus.instance().status_message.emit("PROFILE ARCHIVED", "success")
+            EventBus.instance().status_push.emit("PROFILE ARCHIVED", "", _GREEN, 30000)
             EventBus.instance().archive_updated.emit()
         else:
-            EventBus.instance().status_message.emit("FAILED TO ARCHIVE", "error")
+            EventBus.instance().status_push.emit("FAILED TO ARCHIVE", "", _RED, 30000)
 
     @pyqtSlot(str)
     def _on_request_sync(self, handle: str) -> None:
         if not self.cache_mgr.is_archived(handle):
-            EventBus.instance().status_message.emit("PROFILE NOT ARCHIVED", "warning")
+            EventBus.instance().status_push.emit("PROFILE NOT ARCHIVED", "", _AMBER, 30000)
             return
         self._start_player_scrape(handle)
 
@@ -224,9 +230,9 @@ class AppController(QObject):
         from pathlib import Path
         path = self.archive_mgr.export_profile(handle, Path(out_dir))
         if path:
-            EventBus.instance().status_message.emit("EXPORT COMPLETE", "success")
+            EventBus.instance().status_push.emit("EXPORT COMPLETE", "", _GREEN, 30000)
         else:
-            EventBus.instance().status_message.emit("EXPORT FAILED", "error")
+            EventBus.instance().status_push.emit("EXPORT FAILED", "", _RED, 30000)
 
     @pyqtSlot(str)
     def _on_request_org_scrape(self, sid: str) -> None:
@@ -238,7 +244,7 @@ class AppController(QObject):
 
         sm = SettingsManager.instance()
 
-        EventBus.instance().status_message.emit(f"RETRIEVING ORG: {sid}", "info")
+        EventBus.instance().status_push.emit(f"RETRIEVING ORG: {sid}", "", _BLUE, 30000)
 
         self._active_scraper = OrgScraperWorker(
             sid, sm.user_agent,
@@ -251,7 +257,7 @@ class AppController(QObject):
 
     @pyqtSlot(dict)
     def _on_org_scrape_success(self, data: dict) -> None:
-        EventBus.instance().status_message.emit("ORG DATA RETRIEVED", "success")
+        EventBus.instance().status_push.emit("ORG DATA RETRIEVED", "", _GREEN, 30000)
         sid = data.get("sid", "UNKNOWN")
         from src.core.paths import PathManager
         import json as _json
@@ -272,7 +278,7 @@ class AppController(QObject):
 
     @pyqtSlot(str)
     def _on_org_scrape_error(self, error_msg: str) -> None:
-        EventBus.instance().status_message.emit(f"ORG SCRAPE ERROR: {error_msg}", "error")
+        EventBus.instance().status_push.emit(f"ORG SCRAPE ERROR: {error_msg}", "", _RED, 30000)
 
     def _queue_org_downloads(self, data: dict, base_dir: "Path") -> None:
         url = data.get("logo_url")
@@ -356,7 +362,7 @@ class AppController(QObject):
 
         def _on_error(err):
             EventBus.instance().reputation_report_failed.emit(handle, err)
-            EventBus.instance().status_message.emit(f"REPORT SUBMISSION FAILED: {err}", "error")
+            EventBus.instance().status_push.emit(f"REPORT SUBMISSION FAILED: {err}", "", _RED, 30000)
 
         self._active_rep_submitter.finished_success.connect(_on_success)
         self._active_rep_submitter.finished_error.connect(_on_error)

@@ -23,10 +23,12 @@ from src.app.controller import AppController
 class MainWindow(BaseWindow):
 
     window_hidden = pyqtSignal()
+    window_shown = pyqtSignal()
 
     def __init__(self, controller: AppController, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.controller = controller
+        self._welcome_sent = False
 
         from src.core.paths import get_asset_path
         _ico_path = get_asset_path("assets/appicon.ico")
@@ -105,6 +107,45 @@ class MainWindow(BaseWindow):
         self.window_hidden.emit()
         self.hide()
 
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self.status_bar.pause_queue()
+        self.window_hidden.emit()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.status_bar.resume_queue()
+        self.window_shown.emit()
+
+        if not self._welcome_sent:
+            self._welcome_sent = True
+            self._send_welcome_message()
+
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(50, self._pop_to_top)
+
+    def _send_welcome_message(self) -> None:
+        """Send WELCOME: PLAYERNAME as the first queue message in white."""
+        handle = ""
+        try:
+            from src.services.reputation_service import ReputationService
+            if ReputationService.is_initialized():
+                svc = ReputationService.instance()
+                local_handle = svc.local_player_handle
+                if not local_handle:
+                    svc.detect_local_player_handle()
+                    local_handle = svc.local_player_handle
+                handle = local_handle
+        except Exception:
+            pass
+
+        if handle:
+            text = f"WELCOME: {handle}"
+        else:
+            text = "WELCOME: PILOT"
+
+        self.status_bar.push_message(text, "", "#FFFFFF", 5000)
+
     def _on_tab_selected(self, tab_id: str) -> None:
         if tab_id == "search":
             self.stack.setCurrentWidget(self.tab_search)
@@ -144,11 +185,6 @@ class MainWindow(BaseWindow):
         else:
             self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
         self.show()
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(50, self._pop_to_top)
 
     def _pop_to_top(self) -> None:
         import sys
