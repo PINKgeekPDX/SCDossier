@@ -301,6 +301,8 @@ def MemoryIsValidPtr(addr: str) -> bool:
         True if valid, False otherwise
     """
     result = safe_get("Memory/IsValidPtr", {"addr": addr})
+    if isinstance(result, bool):
+        return result
     if isinstance(result, str):
         return result.lower() == "true"
     return False

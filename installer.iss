@@ -1,12 +1,11 @@
 #define MyAppName "SC Dossier"
-#define MyAppVersion "0.4.2" ; Will be dynamically replaced by build.py
+#define MyAppVersion "1.0.0" ; Will be dynamically replaced by build.py
 #define MyAppPublisher "PINKgeekPDX"
 #define MyAppURL "https://github.com/PINKgeekPDX/SCDossier"
 #define MyAppExeName "SCDossier.exe"
 #define MyAppDataDir "{userdocs}\PINK\SCDossier"
 
 [Setup]
-; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 AppId={{5C0A7B9B-D5A4-4A3C-9F8C-4B7E7A1C2D3B}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
@@ -22,13 +21,16 @@ SetupIconFile=src\assets\appicon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 ; Allow user to choose install directory
 DisableDirPage=no
 ; Show info page after install with UAC reminder
-InfoAfterMessage=SC Dossier has been installed successfully.{#crlf}{#crlf}IMPORTANT: If Star Citizen is running with Administrator privileges (UAC elevated),{#crlf}you MUST also run SC Dossier as Administrator for the global hotkeys to work.{#crlf}{#crlf}Right-click SCDossier.exe and select "Run as administrator", or set it{#crlf}permanently in Properties > Compatibility > "Run this program as an administrator".
+InfoAfterFile=infoafter.txt
 ; Code signing via signtool — only active when build.py passes /dENABLE_SIGNING=1
 #ifdef ENABLE_SIGNING
-SignTool=signtool /fd SHA256 /tr http://timestamp.digicert.com /td SHA256
+SignTool=signtool $f
+SignedUninstaller=yes
 #endif
 
 [Languages]
@@ -38,7 +40,6 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "dist\SCDossier\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\SCDossier\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 

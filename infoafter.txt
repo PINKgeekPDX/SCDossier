@@ -1,0 +1,7 @@
+SC Dossier has been installed successfully.
+
+IMPORTANT: If Star Citizen is running with Administrator privileges (UAC elevated),
+you MUST also run SC Dossier as Administrator for the global hotkeys to work.
+
+Right-click SCDossier.exe and select "Run as administrator", or set it
+permanently in Properties > Compatibility > "Run this program as an administrator".

@@ -132,10 +132,10 @@ class KeybindDetectDialog(QDialog):
     keyReleaseEvent) — no third-party keyboard library required.
     """
 
-    def __init__(self, parent=None, current_keybind: str = ""):
+    def __init__(self, parent=None, current_keybind: str = "", existing_binds: dict[str, str] | None = None):
         super().__init__(parent)
         self.setWindowTitle("Detect Hotkey")
-        self.setFixedSize(340, 165)
+        self.setFixedSize(340, 185)
         self.setWindowFlags(
             self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
         )
@@ -143,6 +143,8 @@ class KeybindDetectDialog(QDialog):
         self.detected_keybind = ""
         self._is_listening = True
         self._pressed_names: list[str] = []
+        self._existing_binds = existing_binds or {}
+        self._conflict_name = ""
 
         # ---- layout ----
         layout = QVBoxLayout(self)
@@ -172,6 +174,15 @@ class KeybindDetectDialog(QDialog):
             f"color: {P.ON_SURFACE};"
         )
         layout.addWidget(self.keybind_label)
+
+        self.conflict_label = QLabel("")
+        self.conflict_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.conflict_label.setFont(font_inter(9))
+        self.conflict_label.setMinimumHeight(18)
+        self.conflict_label.setStyleSheet(
+            f"color: {P.ERROR}; font-weight: bold; background: transparent; border: none;"
+        )
+        layout.addWidget(self.conflict_label)
 
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
@@ -269,7 +280,18 @@ class KeybindDetectDialog(QDialog):
             self._is_listening = False
             self._current_combo = ""
             self.releaseKeyboard()
-            self.set_btn.setEnabled(True)
+            # Check for conflicts
+            self._conflict_name = ""
+            for name, bound_combo in self._existing_binds.items():
+                if bound_combo == combo:
+                    self._conflict_name = name
+                    break
+            if self._conflict_name:
+                self.conflict_label.setText(f"Conflict: already bound to \"{self._conflict_name}\"")
+                self.set_btn.setEnabled(False)
+            else:
+                self.conflict_label.setText("")
+                self.set_btn.setEnabled(True)
             self.retry_btn.setEnabled(True)
 
         event.accept()
@@ -281,8 +303,14 @@ class KeybindDetectDialog(QDialog):
         super().reject()
 
     def accept(self) -> None:
+        if self._conflict_name:
+            return  # Don't accept while there's a conflict
         self.releaseKeyboard()
         super().accept()
+
+    def has_conflict(self) -> bool:
+        """True if the detected keybind conflicts with an existing binding."""
+        return bool(self._conflict_name)
 
     def get_keybind(self) -> str:
         """Return the detected keybind string, or empty string if none."""

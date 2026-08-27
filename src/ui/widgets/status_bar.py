@@ -1,54 +1,261 @@
 """
 src/ui/widgets/status_bar.py
-CustomStatusBar — thin bottom strip with queued status pill notifications.
+CustomStatusBar — bottom strip displaying stacked status pill notifications.
 
-Messages are pushed via EventBus.status_message (legacy) or EventBus.status_push (full control).
-They queue up and display one at a time, each visible for a configurable duration.
+Messages are pushed via EventBus.status_message or EventBus.status_push.
+They stack left-to-right up to the available width. Clicking a pill expands
+it into a popup and pauses the display timers.
 """
 
 import math
+import time
 from collections import deque
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
+from PyQt6.QtCore import Qt, QTimer, QPoint
+from PyQt6.QtGui import QColor, QGuiApplication
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QApplication
 
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps
-from src.app.constants import STATUSBAR_HEIGHT
+from src.app.constants import (
+    STATUSBAR_HEIGHT,
+    STATUS_COLOR_PRESETS as _COLOR_PRESETS,
+    STATUS_DEFAULT_PILL_COLOR as _DEFAULT_PILL_COLOR,
+    STATUS_DEFAULT_PILL_DURATION_MS as _DEFAULT_PILL_DURATION_MS,
+    STATUS_STAGGER_CREATE_DELAY_MS as _STAGGER_CREATE_DELAY_MS,
+    STATUS_STAGGER_DISPOSE_DELAY_MS as _STAGGER_DISPOSE_DELAY_MS,
+    STATUS_PULSE_TIMER_INTERVAL_MS
+)
 from src.core.events import EventBus
 
-# ---------------------------------------------------------------------------
-# Preset pill colors (matched to the 4 pill styles: INFO / ONLINE / COOLDOWN / ERROR)
-# ---------------------------------------------------------------------------
-_COLOR_PRESETS = {
-    "info":    "#93CCFF",
-    "success": "#00FF88",
-    "warning": "#FFAA00",
-    "error":   "#FF4444",
-}
 
-_DEFAULT_PILL_COLOR = _COLOR_PRESETS["info"]
-_DEFAULT_PILL_DURATION_MS = 30000
+class PopupMessageBox(QWidget):
+    """
+    Frameless popup that displays the full verbose details when a status badge is clicked.
+    Shows full message + tooltip with word wrap. Pauses all disposal timers while open.
+    Clicking anywhere outside the popup collapses it and resumes timers.
+    """
+
+    def __init__(self, text: str, color_hex: str, parent_badge: QWidget, status_bar: "CustomStatusBar") -> None:
+        super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self._text = text
+        self._color_hex = color_hex
+        self._parent_badge = parent_badge
+        self._status_bar = status_bar
+        # Retrieve verbose tooltip from badge if available
+        badge_tooltip = getattr(parent_badge, '_tooltip', '')
+        verbose_text = text
+        if badge_tooltip and badge_tooltip != text:
+            verbose_text = f"{text}\n\n{badge_tooltip}"
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Re-use status bar font
+        font = label_caps()
+        font.setLetterSpacing(font.SpacingType.AbsoluteSpacing, 1.0)
+        font.setBold(True)
+
+        # Preserve original casing for readability in expanded view
+        self.lbl = QLabel(verbose_text)
+        self.lbl.setFont(font)
+        self.lbl.setWordWrap(True)
+        self.lbl.setMinimumWidth(200)
+        self.lbl.setMaximumWidth(480)
+
+        c = QColor(color_hex)
+        bg = f"rgba({c.red()}, {c.green()}, {c.blue()}, 0.92)"
+        border = f"rgba({c.red()}, {c.green()}, {c.blue()}, 1.0)"
+        self.lbl.setStyleSheet(f"""
+            QLabel {{
+                color: #FFFFFF;
+                background-color: {bg};
+                border: 2px solid {border};
+                border-radius: 6px;
+                padding: 12px 16px;
+                font-size: 12px;
+                font-weight: bold;
+            }}
+        """)
+        layout.addWidget(self.lbl)
+        self.adjustSize()
+
+        # Position popup slightly above the badge, centered horizontally
+        global_pos = parent_badge.mapToGlobal(QPoint(0, 0))
+        x = global_pos.x() + (parent_badge.width() - self.width()) // 2
+        y = global_pos.y() - self.height() - 8
+
+        # Bound check within screen
+        screen = QGuiApplication.primaryScreen().geometry()
+        x = max(screen.left() + 10, min(x, screen.right() - self.width() - 10))
+        y = max(screen.top() + 10, y)
+        self.move(x, y)
+
+        QApplication.instance().installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() == event.Type.MouseButtonPress:
+            # Close if the click occurs outside this popup and not on the originating badge
+            click_pos = event.globalPosition().toPoint()
+            if not self.geometry().contains(click_pos):
+                # Also check if click is on the parent badge itself — allow badge clicks to pass through but still close popup
+                try:
+                    if not self._parent_badge or not getattr(self._parent_badge, 'isVisible', lambda: False)():
+                        self.close_popup()
+                        return True
+                    badge_geo = self._parent_badge.mapToGlobal(QPoint(0, 0))
+                    badge_rect = self._parent_badge.rect()
+                    badge_rect.moveTopLeft(badge_geo)
+                except Exception:
+                    self.close_popup()
+                    return True
+                # Close popup regardless, but don't consume badge clicks
+                self.close_popup()
+                # If click was on badge, let it propagate so badge can handle it
+                if badge_rect.contains(click_pos):
+                    return False
+                return True
+        return super().eventFilter(obj, event)
+
+    def close_popup(self) -> None:
+        try:
+            QApplication.instance().removeEventFilter(self)
+        except Exception:
+            pass
+        self.close()
+        self._status_bar.resume_from_popup()
+
+
+FLASH_THRESHOLD_MS = 3000
+FLASH_INTERVAL_MS = 350
+FLASH_COLOR = "#FFFF00"
+
+
+class StatusBadgeWidget(QLabel):
+    """
+    A single status notification badge shown in the status bar.
+    Handles its own click expansion, hover tooltip, expiration timer, and expiry flashing.
+    """
+
+    def __init__(self, text: str, tooltip: str, color_hex: str, duration_ms: int, parent_bar: "CustomStatusBar") -> None:
+        super().__init__()
+        self._parent_bar = parent_bar
+        self._full_text = text
+        self._tooltip = tooltip
+        self._color_hex = color_hex
+        self._original_color = color_hex
+        self._duration_ms = duration_ms
+        self._remaining_ms = duration_ms
+        self._is_flashing = False
+        self._flash_on = False
+
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self._on_timeout)
+
+        # Flash timer — checks every FLASH_INTERVAL_MS once in the final threshold
+        self._flash_timer = QTimer(self)
+        self._flash_timer.setInterval(FLASH_INTERVAL_MS)
+        self._flash_timer.timeout.connect(self._on_flash_tick)
+
+        # Truncate text if exceeds length limit
+        display_text = text
+        if len(text) > 35:
+            display_text = text[:32] + "..."
+
+        self.setText(display_text.upper())
+        self.setFixedHeight(14)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Styling
+        self.setStyleSheet(parent_bar._pill_style(color_hex))
+
+        # Tooltip — verbose on hover
+        tip = tooltip if tooltip else text
+        # Show full text plus tooltip if different
+        if tooltip and tooltip != text:
+            tip = f"{text}\n\n{tooltip}"
+        self.setToolTip(tip)
+
+        self._start_time = time.time()
+        self.timer.start(duration_ms)
+        # Schedule flash check if duration allows flashing
+        if duration_ms > FLASH_THRESHOLD_MS:
+            QTimer.singleShot(duration_ms - FLASH_THRESHOLD_MS, self._start_flashing)
+        else:
+            # Short-lived pill: start flashing immediately after a brief delay
+            QTimer.singleShot(200, self._start_flashing)
+
+    def _start_flashing(self) -> None:
+        if self._is_flashing or not self.timer.isActive():
+            return
+        self._is_flashing = True
+        self._flash_timer.start()
+
+    def _stop_flashing(self) -> None:
+        self._is_flashing = False
+        self._flash_timer.stop()
+        self._flash_on = False
+        # Restore original color
+        self.setStyleSheet(self._parent_bar._pill_style(self._original_color))
+
+    def _on_flash_tick(self) -> None:
+        # Stop flashing if timer already expired or paused
+        if not self.timer.isActive():
+            self._stop_flashing()
+            return
+        self._flash_on = not self._flash_on
+        flash_color = FLASH_COLOR if self._flash_on else self._original_color
+        self.setStyleSheet(self._parent_bar._pill_style(flash_color))
+
+    def _on_timeout(self) -> None:
+        self._stop_flashing()
+        self._parent_bar.request_dispose(self)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._parent_bar.show_expanded_badge(self)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def pause(self) -> None:
+        # Only pause if timer is active
+        if self.timer.isActive():
+            elapsed = int((time.time() - self._start_time) * 1000)
+            self._remaining_ms = max(0, self._remaining_ms - elapsed)
+            self.timer.stop()
+        if self._flash_timer.isActive():
+            self._flash_timer.stop()
+
+    def resume(self) -> None:
+        if self._remaining_ms > 0:
+            self._start_time = time.time()
+            self.timer.start(self._remaining_ms)
+            # Resume flashing if in threshold window
+            if self._remaining_ms <= FLASH_THRESHOLD_MS and not self._is_flashing:
+                self._start_flashing()
+            elif self._is_flashing:
+                self._flash_timer.start()
+        else:
+            self._stop_flashing()
+            self._parent_bar.request_dispose(self)
 
 
 class CustomStatusBar(QWidget):
-    """Ultra-thin status bar at the bottom of the main window.
-
-    Message queue behavior:
-        1. A message is enqueued with (text, tooltip, color, duration).
-        2. If the pill is idle the message is shown immediately.
-        3. Otherwise it waits in the deque until the current message's
-           disposal timer fires.
-        4. After disposal the next queued message is shown automatically.
-    """
+    """Ultra-thin status bar at the bottom of the main window."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFixedHeight(26)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
-        # Queue of pending messages: deque of (text, tooltip, color_hex, duration_ms)
         self._msg_queue: deque[tuple[str, str, str, int]] = deque()
+        self._pending_disposals: deque[StatusBadgeWidget] = deque()
+        self._active_badges: list[StatusBadgeWidget] = []
+        self._popup_active = False
+        self._last_create_time = 0.0
+        self._last_dispose_time = 0.0
 
         self._current_rep_color = P.TEXT_DIM
         self._pulse_step = 0
@@ -56,13 +263,18 @@ class CustomStatusBar(QWidget):
 
         self._pulse_timer = QTimer(self)
         self._pulse_timer.timeout.connect(self._on_pulse)
-        self._pulse_timer.setInterval(50)
+        self._pulse_timer.setInterval(STATUS_PULSE_TIMER_INTERVAL_MS)
 
-        self._hide_status_timer = QTimer(self)
-        self._hide_status_timer.setSingleShot(True)
-        self._hide_status_timer.timeout.connect(self._on_disposal_timer)
+        # Staggered timers
+        self._stagger_create_timer = QTimer(self)
+        self._stagger_create_timer.setInterval(_STAGGER_CREATE_DELAY_MS)
+        self._stagger_create_timer.setSingleShot(True)
+        self._stagger_create_timer.timeout.connect(self._deploy_one_badge)
 
-        self._fade_anim: QPropertyAnimation | None = None
+        self._stagger_dispose_timer = QTimer(self)
+        self._stagger_dispose_timer.setInterval(_STAGGER_DISPOSE_DELAY_MS)
+        self._stagger_dispose_timer.setSingleShot(True)
+        self._stagger_dispose_timer.timeout.connect(self._dispose_one_badge)
 
         self._queue_paused = False
 
@@ -72,51 +284,58 @@ class CustomStatusBar(QWidget):
 
         EventBus.instance().theme_changed.connect(self._refresh_bar_style)
 
+        # Sync initial rep status with settings (avoid showing DISABLED when enabled)
+        try:
+            from src.core.settings import SettingsManager
+            sm = SettingsManager.instance()
+            if not sm.reputation_enabled:
+                self._on_rep_status("disabled")
+            else:
+                # Show offline until startup ping confirms online
+                self._on_rep_status("offline")
+        except Exception:
+            pass
+
     # ------------------------------------------------------------------
     # UI Construction
     # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 3, 8, 3)
-        layout.setSpacing(8)
+        self._main_layout = QHBoxLayout(self)
+        self._main_layout.setContentsMargins(8, 3, 8, 3)
+        self._main_layout.setSpacing(8)
 
         font = label_caps()
         font.setLetterSpacing(font.SpacingType.AbsoluteSpacing, 1.0)
         font.setBold(True)
+        self.setFont(font)
 
-        # Left: Main Status Badge
-        self._status_lbl = QLabel("IDLE")
-        self._status_lbl.setFont(font)
-        self._status_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._status_lbl.setFixedHeight(14)
+        # Left: Container/Layout for multiple stacked badges
+        self._status_layout = QHBoxLayout()
+        self._status_layout.setContentsMargins(0, 0, 0, 0)
+        self._status_layout.setSpacing(6)
+        self._main_layout.addLayout(self._status_layout)
 
-        layout.addWidget(self._status_lbl)
-        layout.addStretch(1)
+        # Middle: Stretch to push badges left and reputation right
+        self._main_layout.addStretch(1)
 
         # Right: Reputation Indicator Badge
         self._rep_lbl = QLabel("REP: DISABLED")
         self._rep_lbl.setFont(font)
         self._rep_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._rep_lbl.setFixedHeight(14)
+        self._main_layout.addWidget(self._rep_lbl)
 
-        layout.addWidget(self._rep_lbl)
-
-        self._status_lbl.hide()
         self._update_rep_style()
 
     def _connect_signals(self) -> None:
         bus = EventBus.instance()
-        # Legacy signal — maps level to preset color
         bus.status_message.connect(self._on_status_message)
-        # New queue-based push with full control
         bus.status_push.connect(self._on_status_push)
-
         bus.reputation_system_status.connect(self._on_rep_status)
 
         bus.scrape_completed.connect(lambda _: self._start_pulse())
-        bus.reputation_report_requested.connect(lambda _, __: self._start_pulse())
-
+        bus.reputation_report_requested.connect(lambda _, __, ___: self._start_pulse())
         bus.reputation_loaded.connect(lambda _, __: self._stop_pulse())
         bus.reputation_load_failed.connect(lambda _, __: self._stop_pulse())
         bus.reputation_report_submitted.connect(lambda _: self._stop_pulse())
@@ -154,7 +373,6 @@ class CustomStatusBar(QWidget):
 
     @staticmethod
     def _pill_style(color_hex: str) -> str:
-        """Return the full stylesheet for the status pill at a given color."""
         c = QColor(color_hex)
         bg = f"rgba({c.red()}, {c.green()}, {c.blue()}, 0.1)"
         border = f"rgba({c.red()}, {c.green()}, {c.blue()}, 0.3)"
@@ -166,6 +384,7 @@ class CustomStatusBar(QWidget):
                 border-radius: 3px;
                 padding: 0px 6px;
                 font-size: 9px;
+                font-weight: bold;
             }}
         """
 
@@ -217,12 +436,10 @@ class CustomStatusBar(QWidget):
     # ------------------------------------------------------------------
 
     def _on_status_message(self, text: str, level: str = "info") -> None:
-        """Slot for legacy EventBus.status_message — maps level to preset color."""
         color = _COLOR_PRESETS.get(level, _DEFAULT_PILL_COLOR)
         self.push_message(text, "", color, _DEFAULT_PILL_DURATION_MS)
 
     def _on_status_push(self, text: str, tooltip: str, color_hex: str, duration_ms: int) -> None:
-        """Slot for EventBus.status_push — full control over pill appearance."""
         if not color_hex:
             color_hex = _DEFAULT_PILL_COLOR
         if duration_ms <= 0:
@@ -236,112 +453,192 @@ class CustomStatusBar(QWidget):
         color_hex: str = "",
         duration_ms: int = _DEFAULT_PILL_DURATION_MS,
     ) -> None:
-        """Public API — enqueue a status pill message for display.
-
-        Args:
-            text:        Message body shown in the pill (uppercased automatically).
-            tooltip:     Optional tooltip text shown on hover.
-            color_hex:   Hex color string for the pill (e.g. "#00FF88").
-                         Falls back to the default info blue if empty.
-            duration_ms: How long the pill stays visible before disposal.
-        """
         if not color_hex:
             color_hex = _DEFAULT_PILL_COLOR
         if duration_ms <= 0:
             duration_ms = _DEFAULT_PILL_DURATION_MS
 
+        # Deduplicate: suppress identical text already visible or queued
+        # (prevents double WELCOME and other rapid duplicate pushes)
+        for badge in self._active_badges:
+            if getattr(badge, "_full_text", None) == text:
+                return
+        for queued_text, _, _, _ in self._msg_queue:
+            if queued_text == text:
+                return
+
         self._msg_queue.append((text, tooltip, color_hex, duration_ms))
+        self._trigger_creation()
 
-        # If the pill is currently idle, show immediately
-        if not self._queue_paused and not self._hide_status_timer.isActive() and not self._status_lbl.isVisible():
-            self._show_next()
+    def _trigger_creation(self) -> None:
+        if self._stagger_create_timer.isActive():
+            return
+        
+        elapsed = (time.time() - self._last_create_time) * 1000.0
+        if elapsed < _STAGGER_CREATE_DELAY_MS:
+            remaining = max(1, int(_STAGGER_CREATE_DELAY_MS - elapsed))
+            self._stagger_create_timer.start(remaining)
+        else:
+            self._deploy_one_badge()
 
-    def _show_next(self) -> None:
-        """Pop the next message from the queue and display it."""
+    def _deploy_one_badge(self) -> None:
+        """Process queue and display badges left-to-right up to available width.
+        
+        When popup is active (timers paused), we still allow new badges to appear
+        up to the width cap — they queue and display, but their timers are immediately
+        paused. Any beyond the cap remain in _msg_queue until popup closes.
+        """
         if self._queue_paused:
             return
+
         if not self._msg_queue:
-            self._status_lbl.hide()
             return
 
-        # Cancel any running fade-out (should not happen)
-        if self._fade_anim and self._fade_anim.state() == QPropertyAnimation.State.Running:
-            self._fade_anim.stop()
-        self._fade_anim = None
+        # Calculate max width available for badges
+        rep_width = self._rep_lbl.width() if self._rep_lbl.isVisible() else 0
+        max_width = self.width() - rep_width - 32
 
-        text, tooltip, color_hex, duration_ms = self._msg_queue.popleft()
+        # Compute current total width of visible badges
+        from PyQt6.QtGui import QFontMetrics
+        fm = QFontMetrics(self.font())
+        
+        current_width = 0
+        for badge in self._active_badges:
+            display_text = badge.text()
+            current_width += fm.horizontalAdvance(display_text) + 20
 
-        self._status_lbl.setText(text.upper())
-        self._status_lbl.setStyleSheet(self._pill_style(color_hex))
-        if tooltip:
-            self._status_lbl.setToolTip(tooltip)
+        # Deploy exactly one badge if it fits
+        text, tooltip, color_hex, duration_ms = self._msg_queue[0]
+        display_text = text
+        if len(text) > 35:
+            display_text = text[:32] + "..."
+        
+        badge_width = fm.horizontalAdvance(display_text) + 20
+        
+        if current_width + badge_width <= max_width:
+            self._msg_queue.popleft()
+            badge = StatusBadgeWidget(text, tooltip, color_hex, duration_ms, self)
+            self._active_badges.append(badge)
+            self._status_layout.addWidget(badge)
+            self._last_create_time = time.time()
+            # If popup is active, immediately pause the new badge's timers
+            if self._popup_active:
+                badge.pause()
+            
+            # Start timer for the next enqueued badge
+            if self._msg_queue:
+                self._stagger_create_timer.start()
         else:
-            self._status_lbl.setToolTip("")
-        self._status_lbl.show()
-        # Ensure label is invisible before fade-in
-        self._status_lbl.setWindowOpacity(0.0)
+            # Badge does not fit, stop deploying for now
+            pass
 
-        # Create fade-in animation
-        self._fade_anim = QPropertyAnimation(self._status_lbl, b"windowOpacity")
-        self._fade_anim.setDuration(300)  # 300ms fade-in
-        self._fade_anim.setStartValue(0.0)
-        self._fade_anim.setEndValue(1.0)
-        self._fade_anim.finished.connect(self._on_fade_in_complete)
-        self._current_duration_ms = duration_ms
-        self._fade_anim.start()
+    def request_dispose(self, badge: StatusBadgeWidget) -> None:
+        """Enqueue a badge for staggered disposal."""
+        if badge not in self._pending_disposals:
+            self._pending_disposals.append(badge)
+            self._trigger_disposal()
 
-    def _on_fade_in_complete(self) -> None:
-        """Fade-in complete → start disposal timer."""
-        if self._fade_anim:
-            self._fade_anim.finished.disconnect(self._on_fade_in_complete)
-            self._fade_anim = None
-        # Start disposal timer now that pill is fully visible
-        self._hide_status_timer.start(self._current_duration_ms)
+    def _trigger_disposal(self) -> None:
+        if self._stagger_dispose_timer.isActive():
+            return
+        
+        elapsed = (time.time() - self._last_dispose_time) * 1000.0
+        if elapsed < _STAGGER_DISPOSE_DELAY_MS:
+            remaining = max(1, int(_STAGGER_DISPOSE_DELAY_MS - elapsed))
+            self._stagger_dispose_timer.start(remaining)
+        else:
+            self._dispose_one_badge()
 
-    def _on_disposal_timer(self) -> None:
-        """Current message's duration expired — start fade-out animation."""
-        # Start fade-out
-        self._fade_anim = QPropertyAnimation(self._status_lbl, b"windowOpacity")
-        self._fade_anim.setDuration(300)  # 300ms fade-out
-        self._fade_anim.setStartValue(1.0)
-        self._fade_anim.setEndValue(0.0)
-        self._fade_anim.finished.connect(self._on_fade_out_complete)
-        self._fade_anim.start()
+    def _dispose_one_badge(self) -> None:
+        """Dispose exactly one expired badge and queue next one."""
+        if self._queue_paused or self._popup_active:
+            return
 
-    def _on_fade_out_complete(self) -> None:
-        """Fade-out complete — hide and process next."""
-        if self._fade_anim:
-            self._fade_anim.finished.disconnect(self._on_fade_out_complete)
-            self._fade_anim = None
-        self._status_lbl.hide()
-        # After brief pause, show next message
-        if self._msg_queue:
-            QTimer.singleShot(300, self._show_next)
+        if not self._pending_disposals:
+            return
+
+        badge = self._pending_disposals.popleft()
+        if badge in self._active_badges:
+            self._active_badges.remove(badge)
+            self._status_layout.removeWidget(badge)
+            # Ensure flashing stopped before deletion
+            try:
+                badge._stop_flashing()
+            except Exception:
+                pass
+            badge.setToolTip("")
+            badge.deleteLater()
+            self._last_dispose_time = time.time()
+
+        # Trigger disposal timer for the next expired badge
+        if self._pending_disposals:
+            self._stagger_dispose_timer.start()
+        
+        # Check if more enqueued items can fit now
+        self._trigger_creation()
+
+    def show_expanded_badge(self, badge: StatusBadgeWidget) -> None:
+        """Pause all timers and show the expanded popup message."""
+        self._popup_active = True
+        
+        # Pause all active badges
+        for b in self._active_badges:
+            b.pause()
+            
+        # Stop staggered timers
+        self._stagger_create_timer.stop()
+        self._stagger_dispose_timer.stop()
+            
+        # Create popup
+        self._popup = PopupMessageBox(badge._full_text, badge._color_hex, badge, self)
+        self._popup.show()
+
+    def resume_from_popup(self) -> None:
+        """Resume active timers when the expanded popup is closed."""
+        self._popup_active = False
+        self._popup = None
+        
+        # Resume active badges
+        for b in self._active_badges:
+            b.resume()
+            
+        self._trigger_creation()
+        self._trigger_disposal()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._trigger_creation()
 
     def clear_queue(self) -> None:
-        """Discard all pending messages and hide the pill immediately."""
+        """Discard all pending messages and hide all active badges immediately."""
         self._msg_queue.clear()
-        self._hide_status_timer.stop()
-        self._status_lbl.hide()
+        self._pending_disposals.clear()
+        self._stagger_create_timer.stop()
+        self._stagger_dispose_timer.stop()
+        
+        for b in self._active_badges:
+            self._status_layout.removeWidget(b)
+            b.deleteLater()
+        self._active_badges.clear()
 
     def set_status(self, text: str, level: str = "info") -> None:
-        """Legacy API — maps (text, level) to queue with preset color."""
         color = _COLOR_PRESETS.get(level, _DEFAULT_PILL_COLOR)
         self.push_message(text, "", color, _DEFAULT_PILL_DURATION_MS)
 
     def pause_queue(self) -> None:
-        """Pause queue processing — messages still enqueue but won't display."""
+        """Pause queue processing — active badges are paused and hidden."""
         self._queue_paused = True
-        # Stop any running animations and timers
-        if self._fade_anim and self._fade_anim.state() == QPropertyAnimation.State.Running:
-            self._fade_anim.stop()
-            self._fade_anim = None
-        if self._hide_status_timer.isActive():
-            self._hide_status_timer.stop()
-            self._status_lbl.hide()
+        self._stagger_create_timer.stop()
+        self._stagger_dispose_timer.stop()
+        for b in self._active_badges:
+            b.pause()
+            b.hide()
 
     def resume_queue(self) -> None:
-        """Resume queue processing and show next message if any."""
+        """Resume queue processing and restore badge states."""
         self._queue_paused = False
-        if self._msg_queue and not self._status_lbl.isVisible():
-            self._show_next()
+        for b in self._active_badges:
+            b.show()
+            b.resume()
+        self._trigger_creation()
+        self._trigger_disposal()

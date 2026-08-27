@@ -10,13 +10,13 @@ import base64
 import shutil
 import zipfile
 import logging
+import threading
 from pathlib import Path
 from datetime import datetime
 from PyQt6.QtCore import QObject
 
 from src.core.paths import PathManager
 from src.core.events import EventBus
-from src.ui.theme import palette as P
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +29,41 @@ class ArchiveManager(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.paths = PathManager.instance()
+        self._lock = threading.RLock()
+
+    def is_archived(self, handle: str) -> bool:
+        """Check if a player profile exists in the archived directory."""
+        return (self.paths.archived_dir(handle) / "profile.json").exists()
+
+    def get_profile(self, handle: str) -> dict | None:
+        """Load an archived profile. Alias for load_archived_profile()."""
+        return self.load_archived_profile(handle)
+
+    def add_to_global_history(self, name: str, kind: str = "player") -> None:
+        """Record a lookup in the global history file (non-critical, best-effort)."""
+        try:
+            history_path = self.paths.config_dir / "lookup_history.json"
+            history = []
+            if history_path.exists():
+                import json as _json
+                with open(history_path, "r", encoding="utf-8") as f:
+                    history = _json.load(f)
+            from datetime import datetime as _dt, timezone as _tz
+            entry = {
+                "name": name,
+                "kind": kind,
+                "ts": _dt.now(_tz.utc).isoformat(),
+            }
+            # Deduplicate — remove older entry for same name+kind if present
+            history = [h for h in history if not (h.get("name") == name and h.get("kind") == kind)]
+            history.insert(0, entry)
+            # Keep last 500 entries
+            history = history[:500]
+            import json as _json2
+            with open(history_path, "w", encoding="utf-8") as f:
+                _json2.dump(history, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            log.debug("add_to_global_history failed (non-critical): %s", e)
 
     def list_archived_profiles(self) -> list[dict]:
         """
@@ -70,16 +105,17 @@ class ArchiveManager(QObject):
 
     def delete_profile(self, handle: str) -> bool:
         """Permanently delete an archived profile and its folder."""
-        arch_dir = self.paths.archived_dir(handle)
-        if arch_dir.exists():
-            try:
-                shutil.rmtree(arch_dir)
-                log.info("Deleted archived profile: %s", handle)
-                EventBus.instance().archive_updated.emit()
-                return True
-            except OSError as e:
-                log.error("Failed to delete archive %s: %s", handle, e)
-        return False
+        with self._lock:
+            arch_dir = self.paths.archived_dir(handle)
+            if arch_dir.exists():
+                try:
+                    shutil.rmtree(arch_dir)
+                    log.info("Deleted archived profile: %s", handle)
+                    EventBus.instance().archive_updated.emit()
+                    return True
+                except OSError as e:
+                    log.error("Failed to delete archive %s: %s", handle, e)
+            return False
 
     def export_profile(self, handle: str, output_dir: Path) -> Path | None:
         """
@@ -90,14 +126,15 @@ class ArchiveManager(QObject):
         - profile.csv (tabular data)
         - profile.html (standalone styled card with inline base64 images)
         """
-        arch_dir = self.paths.archived_dir(handle)
-        if not arch_dir.exists():
-            log.error("Cannot export %s: archive does not exist.", handle)
-            return None
+        with self._lock:
+            arch_dir = self.paths.archived_dir(handle)
+            if not arch_dir.exists():
+                log.error("Cannot export %s: archive does not exist.", handle)
+                return None
 
-        data = self.load_archived_profile(handle)
-        if not data:
-            return None
+            data = self.load_archived_profile(handle)
+            if not data:
+                return None
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         zip_name = f"SCDossier_{handle}_{timestamp}.zip"

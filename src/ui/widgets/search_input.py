@@ -124,6 +124,16 @@ class SearchInput(QLineEdit):
         self._glow_out.start()
         super().focusOutEvent(event)
 
+    def hideEvent(self, event) -> None:
+        self._glow_in.stop()
+        self._glow_out.stop()
+        super().hideEvent(event)
+
+    def closeEvent(self, event) -> None:
+        self._glow_in.stop()
+        self._glow_out.stop()
+        super().closeEvent(event)
+
     def mousePressEvent(self, event) -> None:
         super().mousePressEvent(event)
         self.setFocus()

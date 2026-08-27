@@ -115,9 +115,9 @@ def build_executable():
     # Load signing config (returns None if disabled/missing — no impact on build)
     sign_cfg = load_sign_config()
 
-    # Base command
+    # Base command — use current interpreter's PyInstaller to avoid PATH mismatch
     cmd = [
-        "pyinstaller",
+        sys.executable, "-m", "PyInstaller",
         "--name=SCDossier",
         "--windowed",     # No console window
         "--noconfirm",    # Overwrite output without asking
@@ -212,10 +212,17 @@ def build_executable():
                 print(f"Found Inno Setup at {iscc_exe}. Compiling installer...")
                 iscc_cmd = [iscc_exe, f"/dMyAppVersion={APP_VERSION}"]
 
-                # Pass signing params to Inno Setup via preprocessor defines
-                # If sign_cfg is present, installer.iss will use SignTool automatically
                 if sign_cfg:
                     iscc_cmd.append("/dENABLE_SIGNING=1")
+                    # Pass signtool command to iscc via /S parameter
+                    signtool_cmd = (
+                        f'signtool sign /fd SHA256 /tr {sign_cfg["timestamp_url"]} '
+                        f'/td SHA256 /d $qSC Dossier$q /f $q{sign_cfg["pfx_path"]}$q'
+                    )
+                    if sign_cfg["pfx_password"]:
+                        signtool_cmd += f' /p $q{sign_cfg["pfx_password"]}$q'
+                    signtool_cmd += " $f"
+                    iscc_cmd.append(f"/Ssigntool={signtool_cmd}")
 
                 iscc_cmd.append("installer.iss")
                 iscc_result = subprocess.run(iscc_cmd, capture_output=False, text=True)

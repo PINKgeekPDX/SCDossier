@@ -9,6 +9,17 @@ import os
 import sys
 import logging
 import subprocess
+import time
+import warnings
+
+# Suppress RequestsDependencyWarning and ONNX Runtime Windows 11 warnings
+try:
+    from requests.exceptions import RequestsDependencyWarning
+    warnings.filterwarnings("ignore", category=RequestsDependencyWarning)
+except ImportError:
+    pass
+warnings.filterwarnings("ignore", category=UserWarning, module="onnxruntime.*")
+warnings.filterwarnings("ignore", message=".*Windows.*version.*ONNX Runtime.*")
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QRect, QSharedMemory, Qt
 
@@ -76,13 +87,52 @@ def main():
     # 1.5 Single Instance Lock
     app._single_instance_lock = QSharedMemory("SCDossierSingleInstanceLock")
     if app._single_instance_lock.attach():
-        log.warning("SC Dossier is already running. Exiting this instance.")
-        QMessageBox.information(None, "SC Dossier", "SC Dossier is already running in the background.\n\nCheck your system tray or click the overlay to open it.")
-        sys.exit(0)
+        # Verify the other process is actually alive (not a stale lock from a crash)
+        import ctypes
+        app._single_instance_lock.lock()
+        try:
+            raw_pid = bytes(app._single_instance_lock.data()[:4])
+            existing_pid = int.from_bytes(raw_pid, byteorder='little')
+        except Exception:
+            existing_pid = 0
+        app._single_instance_lock.unlock()
+
+        process_alive = False
+        if existing_pid > 0:
+            try:
+                # OpenProcess with PROCESS_QUERY_LIMITED_INFORMATION (0x1000)
+                kernel32 = ctypes.windll.kernel32
+                handle = kernel32.OpenProcess(0x1000, False, existing_pid)
+                if handle:
+                    kernel32.CloseHandle(handle)
+                    process_alive = True
+            except Exception:
+                pass
+
+        if process_alive:
+            log.warning("SC Dossier is already running. Exiting this instance.")
+            QMessageBox.information(None, "SC Dossier", "SC Dossier is already running in the background.\n\nCheck your system tray or click the overlay to open it.")
+            sys.exit(0)
+        else:
+            log.warning("Stale single-instance lock found (PID %d dead). Reclaiming.", existing_pid)
+            # Detach from stale shared memory so we can recreate it
+            app._single_instance_lock.detach()
         
-    if not app._single_instance_lock.create(1):
-        log.error(f"Failed to create single instance lock: {app._single_instance_lock.errorString()}")
-        sys.exit(1)
+    if not app._single_instance_lock.isAttached():
+        if not app._single_instance_lock.create(4):
+            log.error(f"Failed to create single instance lock: {app._single_instance_lock.errorString()}")
+            sys.exit(1)
+
+    # Write current PID into shared memory for liveness checks by future instances
+    import ctypes
+    app._single_instance_lock.lock()
+    try:
+        pid_bytes = os.getpid().to_bytes(4, byteorder='little')
+        buf = app._single_instance_lock.data()
+        buf[:4] = pid_bytes
+    except Exception:
+        pass
+    app._single_instance_lock.unlock()
 
     # Launch Splash Screen
     splash = SplashScreen()
@@ -110,6 +160,7 @@ def main():
     splash.update_progress("Instantiating core architecture...", 65)
     controller = AppController()
     main_window = MainWindow(controller)
+    controller.set_main_window(main_window)
     toolbar = OverlayToolbar()
     toolbar.set_main_window_ref(main_window)
 
@@ -130,16 +181,10 @@ def main():
 
     # 4. Connect Toolbar Events
     splash.update_progress("Wiring up event bus...", 80)
-    def _bring_main_window_to_front():
-        main_window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+    def _show_main_window():
         main_window.show()
         main_window.raise_()
         main_window.activateWindow()
-        main_window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
-        main_window.show()
-
-    def _show_main_window():
-        _bring_main_window_to_front()
         toolbar.hide()
         # Always navigate to search tab when showing window
         EventBus.instance().navigate_to_tab.emit("search")
@@ -158,7 +203,9 @@ def main():
 
         def _on_captured(path):
             EventBus.instance().capture_completed.emit(str(path))
-            _bring_main_window_to_front()
+            main_window.show()
+            main_window.raise_()
+            main_window.activateWindow()
             toolbar.hide()
 
         def _on_cancelled():
@@ -176,7 +223,7 @@ def main():
     main_window.window_hidden.connect(toolbar.show)
 
     def _open_settings():
-        _bring_main_window_to_front()
+        _show_main_window()
         toolbar.hide()
         EventBus.instance().navigate_to_tab.emit("settings")
 
@@ -225,41 +272,15 @@ def main():
     if geom.isValid():
         main_window.setGeometry(geom)
 
-    # Setup Global Hotkey Manager
-    from src.core.hotkey_manager import GlobalHotkeyManager
-    _hotkey_manager = GlobalHotkeyManager()
+    # Connect capture hotkey signal to start capture
     EventBus.instance().capture_hotkey_pressed.connect(_start_capture)
 
     # App exit handler to clean up hotkeys
     app.aboutToQuit.connect(lambda: EventBus.instance().app_exit.emit())
 
-    # 9. Initialize Reputation System (only if user has opted in)
-    # Must be done after UI is created so EventBus signals are received
+    # 9. Reputation System — initialized by AppController if enabled.
+    # Show splash progress only; actual init is handled by the controller.
     splash.update_progress("Initializing Reputation System...", 90)
-    _rep_startup = None
-    if sm.reputation_enabled:
-        try:
-            from src.app.constants import REP_SUPABASE_URL, REP_ANON_KEY
-            from src.services.reputation_service import ReputationService
-            from src.services.reputation_worker import ReputationStartupWorker
-
-            url = REP_SUPABASE_URL
-            key = REP_ANON_KEY
-
-            if url and key:
-                ReputationService.initialize(url, key)
-                _rep_startup = ReputationStartupWorker()
-                _rep_startup.start()
-                log.info("ReputationService initialized; startup worker launched.")
-            else:
-                log.warning(
-                    "Reputation is enabled but REP_SUPABASE_URL/REP_ANON_KEY are not set. "
-                    "Reputation system will be unavailable."
-                )
-                EventBus.instance().reputation_system_status.emit("error")
-        except Exception as e:
-            log.error("Failed to initialize ReputationService: %s", e)
-            EventBus.instance().reputation_system_status.emit("error")
 
     # 10. Global settings_changed listener (hot-reload outside SettingsTab)
     def _on_settings_changed(key: str, value: object) -> None:
@@ -290,7 +311,7 @@ def main():
                 pass
             if not sc_running and value is True:
                 toolbar.hide()
-                _bring_main_window_to_front()
+                _show_main_window()
             elif value is False:
                 toolbar.show()
         elif key == "log_level":
@@ -322,16 +343,19 @@ def main():
             main_window.hide()
         elif sm.auto_hide_toolbar_without_game:
             toolbar.hide()
-            _bring_main_window_to_front()
+            _show_main_window()
         else:
             toolbar.show()
-            _bring_main_window_to_front()
+            _show_main_window()
 
     splash.fade_out_finished.connect(_finalize_startup)
     splash.fade_out()
 
     log.info("SC Dossier fully initialized. Entering event loop.")
-    sys.exit(app.exec())
+    start_time = time.time()
+    exit_code = app.exec()
+    end_time = time.time()
+    log.info(f"App exited with code {exit_code} after {end_time-start_time:.1f} seconds")
 
 
 if __name__ == "__main__":

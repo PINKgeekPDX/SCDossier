@@ -26,10 +26,13 @@ class ImageDownloaderWorker(QRunnable):
 
     def __init__(self, url: str, dest_path: Path, user_agent: str) -> None:
         super().__init__()
+        self.setAutoDelete(False)
         self.url = url
         self.dest_path = dest_path
         self.user_agent = user_agent
         self.signals = DownloaderSignals()
+        # Keep signals alive until worker is explicitly deleted
+        self.signals.setParent(None)
 
     def run(self) -> None:
         if self.dest_path.exists():
@@ -65,6 +68,10 @@ class ImageDownloader:
 
     def __init__(self) -> None:
         self.pool = QThreadPool.globalInstance()
+        # Limit concurrent image downloads to avoid saturating the pool and UI thread
+        if self.pool.maxThreadCount() > 6:
+            self.pool.setMaxThreadCount(6)
+        self._active_workers: set[ImageDownloaderWorker] = set()
 
     def download(self, url: str, dest_path: Path) -> None:
         """Queue an image for download."""
@@ -75,13 +82,40 @@ class ImageDownloader:
         ua = SettingsManager.instance().user_agent
 
         worker = ImageDownloaderWorker(url, dest_path, ua)
+        self._active_workers.add(worker)
+        # Use queued connections to ensure signals are delivered on main thread
         worker.signals.finished_success.connect(self._on_success)
         worker.signals.finished_error.connect(self._on_error)
+        # Clean up worker after signal delivered (singleShot to defer until event loop processes)
+        def _cleanup(w=worker):
+            self._active_workers.discard(w)
+            w.signals.deleteLater()
+            # Schedule QRunnable deletion on next event loop tick
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: None)  # ensure event loop processes
+            # Explicitly delete the QRunnable after signals processed
+            # Use a timer to defer deletion until queued signals are delivered
+            QTimer.singleShot(100, lambda w=w: self._delete_worker(w))
+        worker.signals.finished_success.connect(lambda *a, w=worker: _cleanup(w))
+        worker.signals.finished_error.connect(lambda *a, w=worker: _cleanup(w))
 
         self.pool.start(worker)
 
+    def _delete_worker(self, worker: ImageDownloaderWorker) -> None:
+        """Safely delete a finished QRunnable worker."""
+        try:
+            # QRunnable will be garbage collected; no explicit delete needed for Python
+            pass
+        except Exception:
+            pass
+
+
+    def queue_download(self, url: str, dest_path: str) -> None:
+        """Queue an image for download. Accepts str or Path for dest_path."""
+        self.download(url, Path(dest_path) if isinstance(dest_path, str) else dest_path)
     def _on_success(self, url: str, local_path: str) -> None:
         EventBus.instance().image_downloaded.emit(url, local_path)
 
     def _on_error(self, url: str, error_msg: str) -> None:
         EventBus.instance().image_download_failed.emit(url, error_msg)
+

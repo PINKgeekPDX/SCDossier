@@ -132,6 +132,9 @@ class ReleaseListWorker(QThread):
 
     def run(self) -> None:
         try:
+            if self.isInterruptionRequested():
+                return
+
             log.info("Fetching releases for channel: %s", self._channel)
             data = _github_request(GITHUB_API_RELEASES)
             log.info("GitHub returned %d releases", len(data))
@@ -186,6 +189,9 @@ class UpdaterWorker(QThread):
 
     def run(self) -> None:
         try:
+            if self.isInterruptionRequested():
+                return
+
             if self._channel == "beta":
                 self._check_beta()
             else:
@@ -198,6 +204,9 @@ class UpdaterWorker(QThread):
 
     def _check_live(self) -> None:
         """Live channel — use /releases/latest."""
+        if self.isInterruptionRequested():
+            return
+
         data = _github_request(GITHUB_API_LATEST, timeout=10)
         tag = data.get("tag_name", "")
         latest_version = _strip_tag(tag)
@@ -218,6 +227,9 @@ class UpdaterWorker(QThread):
 
     def _check_beta(self) -> None:
         """Beta channel — fetch all releases and find latest beta."""
+        if self.isInterruptionRequested():
+            return
+
         data = _github_request(GITHUB_API_RELEASES, timeout=15)
 
         latest_beta = None
@@ -264,6 +276,9 @@ class UpdateDownloader(QThread):
 
     def run(self) -> None:
         try:
+            if self.isInterruptionRequested():
+                return
+
             temp_dir = Path(tempfile.gettempdir()) / "SCDossier_Update"
             temp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -286,6 +301,9 @@ class UpdateDownloader(QThread):
 
                 with open(local_path, "wb") as f:
                     while True:
+                        if self.isInterruptionRequested():
+                            return
+
                         chunk = response.read(chunk_size)
                         if not chunk:
                             break

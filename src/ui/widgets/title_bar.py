@@ -11,11 +11,11 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
-from src.app.constants import APP_NAME, TITLEBAR_HEIGHT
+from src.app.constants import APP_NAME, TITLEBAR_HEIGHT, COLOR_RESET_YELLOW, TITLEBAR_ANIM_TIMER_INTERVAL_MS
 
 log = logging.getLogger(__name__)
 
-_CLEAR_BTN_COLOR = "#FFFF00"
+_CLEAR_BTN_COLOR = COLOR_RESET_YELLOW
 
 # Shared button base style
 _BTN_BASE = (
@@ -63,7 +63,7 @@ class CustomTitleBar(QWidget):
         self._anim_step = 0
         self._anim_timer = QTimer(self)
         self._anim_timer.timeout.connect(self._update_animation)
-        self._anim_timer.start(120)  # slightly slower pulse
+        self._anim_timer.start(TITLEBAR_ANIM_TIMER_INTERVAL_MS)  # slightly slower pulse
 
         self._build_ui()
 

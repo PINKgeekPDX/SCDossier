@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime, timezone
+from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -11,12 +12,21 @@ log = logging.getLogger(__name__)
 
 
 def _fetch_with_retry(url: str, headers: dict, max_attempts: int = 3,
-                      timeout_sec: int = 10, proxy: str | None = None) -> requests.Response | None:
+                      timeout_sec: int = 10, proxy: str | None = None,
+                      total_timeout_sec: int = 60) -> requests.Response | None:
     delays = [1, 2, 4]
     proxies = {"http": proxy, "https": proxy} if proxy else None
+    start = time.monotonic()
     for attempt in range(max_attempts):
+        elapsed = time.monotonic() - start
+        if elapsed >= total_timeout_sec:
+            log.warning("Total retry timeout (%ds) exceeded for %s after %d attempts",
+                        total_timeout_sec, url, attempt)
+            return None
+        remaining = total_timeout_sec - elapsed
+        effective_timeout = min(timeout_sec, remaining)
         try:
-            resp = requests.get(url, headers=headers, timeout=timeout_sec, proxies=proxies)
+            resp = requests.get(url, headers=headers, timeout=effective_timeout, proxies=proxies)
             if resp.status_code == 404:
                 return resp
             if resp.status_code == 403:
@@ -106,10 +116,13 @@ class OrgSearchWorker(QThread):
 
     def run(self) -> None:
         headers = {"User-Agent": self.user_agent}
-        url = f"{RSI_ORG_LISTING_URL}?search={self.query}"
+        url = f"{RSI_ORG_LISTING_URL}?search={quote(self.query, safe='')}"
 
         try:
             resp = _fetch_with_retry(url, headers, timeout_sec=self.timeout_sec, proxy=self.proxy)
+
+            if self.isInterruptionRequested():
+                return
 
             if resp is None:
                 self.finished_error.emit("Failed to fetch org listing after 3 attempts.")
@@ -169,7 +182,7 @@ class OrgScraperWorker(QThread):
         headers = {"User-Agent": self.user_agent}
         data = {
             "sid": self.sid,
-            "page_url": RSI_ORG_URL.format(sid=self.sid),
+            "page_url": RSI_ORG_URL.format(sid=quote(self.sid, safe="")),
             "scraped_at": datetime.now(timezone.utc).isoformat(),
             "name": self.sid,
             "logo_url": "",
@@ -204,6 +217,9 @@ class OrgScraperWorker(QThread):
                 timeout_sec=self.timeout_sec, proxy=self.proxy
             )
 
+            if self.isInterruptionRequested():
+                return
+
             if resp is None:
                 self.finished_error.emit(
                     f"Failed to fetch org '{self.sid}' after 3 attempts."
@@ -220,6 +236,9 @@ class OrgScraperWorker(QThread):
                 self.finished_error.emit(
                     "RSI WEBSITE BLOCKED REQUEST - TRY AGAIN LATER"
                 )
+                return
+
+            if self.isInterruptionRequested():
                 return
 
             soup = BeautifulSoup(resp.text, "lxml")
@@ -275,7 +294,10 @@ class OrgScraperWorker(QThread):
             # Scrape members with new working GET pagination
             page = 1
             while True:
-                members_url = f"https://robertsspaceindustries.com/orgs/{self.sid}/members?page={page}"
+                if self.isInterruptionRequested():
+                    return
+
+                members_url = f"https://robertsspaceindustries.com/orgs/{quote(self.sid, safe='')}/members?page={page}"
                 resp_members = _fetch_with_retry(
                     members_url, headers,
                     timeout_sec=self.timeout_sec, proxy=self.proxy

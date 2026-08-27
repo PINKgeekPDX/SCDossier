@@ -2,6 +2,7 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
+from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -12,12 +13,21 @@ log = logging.getLogger(__name__)
 
 
 def _fetch_with_retry(url: str, headers: dict, max_attempts: int = 3,
-                      timeout_sec: int = 10, proxy: str | None = None) -> requests.Response | None:
+                      timeout_sec: int = 10, proxy: str | None = None,
+                      total_timeout_sec: int = 60) -> requests.Response | None:
     delays = [1, 2, 4]
     proxies = {"http": proxy, "https": proxy} if proxy else None
+    start = time.monotonic()
     for attempt in range(max_attempts):
+        elapsed = time.monotonic() - start
+        if elapsed >= total_timeout_sec:
+            log.warning("Total retry timeout (%ds) exceeded for %s after %d attempts",
+                        total_timeout_sec, url, attempt)
+            return None
+        remaining = total_timeout_sec - elapsed
+        effective_timeout = min(timeout_sec, remaining)
         try:
-            resp = requests.get(url, headers=headers, timeout=timeout_sec, proxies=proxies)
+            resp = requests.get(url, headers=headers, timeout=effective_timeout, proxies=proxies)
             if resp.status_code == 404:
                 return resp
             if resp.status_code == 403:
@@ -40,6 +50,40 @@ def _fetch_with_retry(url: str, headers: dict, max_attempts: int = 3,
     return None
 
 
+def scrape_player_orgs_sync(handle: str, user_agent: str, delay_ms: int = 0, timeout_sec: int = 10, proxy: str | None = None) -> list[str]:
+    """Synchronously scrape just the SIDs of the orgs a player belongs to."""
+    if handle is None or handle == "":
+        log.debug("scrape_player_orgs_sync: handle is None/empty; skipping org scrape.")
+        return []
+    headers = {"User-Agent": user_agent}
+    orgs = []
+    
+    url_main = RSI_CITIZEN_URL.format(handle=quote(handle, safe=""))
+    resp = _fetch_with_retry(url_main, headers, timeout_sec=timeout_sec, proxy=proxy)
+    if not resp or resp.status_code != 200:
+        status = getattr(resp, "status_code", "unknown")
+        raise requests.HTTPError(f"Failed to fetch citizen profile page: HTTP {status}")
+        
+    soup = BeautifulSoup(resp.text, "lxml")
+    main_org_elem = soup.select_one("div.main-org.right-col")
+    if main_org_elem:
+        _parse_org_entries(main_org_elem, orgs, is_main=True)
+        
+    if delay_ms > 0:
+        time.sleep(delay_ms / 1000.0)
+
+    url_orgs = RSI_CITIZEN_ORGS_URL.format(handle=quote(handle, safe=""))
+    resp_orgs = _fetch_with_retry(url_orgs, headers, timeout_sec=timeout_sec, proxy=proxy)
+    if not resp_orgs or resp_orgs.status_code != 200:
+        status = getattr(resp_orgs, "status_code", "unknown")
+        raise requests.HTTPError(f"Failed to fetch citizen orgs page: HTTP {status}")
+        
+    soup_orgs = BeautifulSoup(resp_orgs.text, "lxml")
+    _parse_secondary_orgs(soup_orgs, orgs)
+        
+    return [o["sid"] for o in orgs if o.get("sid")]
+
+
 class PlayerScraperWorker(QThread):
 
     finished_success = pyqtSignal(dict)
@@ -59,7 +103,7 @@ class PlayerScraperWorker(QThread):
         headers = {"User-Agent": self.user_agent}
         data = {
             "handle": self.handle,
-            "page_url": RSI_CITIZEN_URL.format(handle=self.handle),
+            "page_url": RSI_CITIZEN_URL.format(handle=quote(self.handle, safe="")),
             "scraped_at": datetime.now(timezone.utc).isoformat(),
             "moniker": self.handle,
             "enlisted": None,
@@ -77,16 +121,22 @@ class PlayerScraperWorker(QThread):
             url_main = data["page_url"]
             resp = _fetch_with_retry(url_main, headers, timeout_sec=self.timeout_sec, proxy=self.proxy)
 
+            if self.isInterruptionRequested():
+                return
+
             if resp is None:
                 self.finished_error.emit(f"Failed to fetch profile for '{self.handle}' after 3 attempts.")
                 return
 
             if resp.status_code == 404:
-                self.finished_error.emit(f"Player '{self.handle}' not found (404).")
+                self.finished_error.emit(f"Player {self.handle} not found")
                 return
 
             if resp.status_code == 403:
                 self.finished_error.emit("RSI WEBSITE BLOCKED REQUEST - TRY AGAIN LATER")
+                return
+
+            if self.isInterruptionRequested():
                 return
 
             soup = BeautifulSoup(resp.text, "lxml")
@@ -149,18 +199,27 @@ class PlayerScraperWorker(QThread):
             if bio_elem:
                 data["bio"] = bio_elem.get_text(strip=True)
 
+            if self.isInterruptionRequested():
+                return
+
             self.progress.emit(0.5)
 
             main_org_elem = soup.select_one("div.main-org.right-col")
             if main_org_elem:
                 _parse_org_entries(main_org_elem, data["orgs"], is_main=True)
 
+            if self.isInterruptionRequested():
+                return
+
             self.progress.emit(0.7)
 
             time.sleep(self.delay_ms / 1000.0)
 
+            if self.isInterruptionRequested():
+                return
+
             try:
-                url_orgs = RSI_CITIZEN_ORGS_URL.format(handle=data["handle"])
+                url_orgs = RSI_CITIZEN_ORGS_URL.format(handle=quote(data["handle"], safe=""))
                 resp_orgs = _fetch_with_retry(url_orgs, headers, timeout_sec=self.timeout_sec, proxy=self.proxy)
 
                 if resp_orgs and resp_orgs.status_code == 200:

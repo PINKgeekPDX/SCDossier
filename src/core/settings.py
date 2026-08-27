@@ -32,6 +32,13 @@ from src.app.constants import (
 
 log = logging.getLogger(__name__)
 
+# Keys that must be saved immediately to prevent data loss on crash
+_CRITICAL_KEYS: frozenset[str] = frozenset({
+    "ocr_hotkey", "toolbar_interact_hotkey", "toolbar_drag_hotkey",
+    "pin_state", "pin_on_startup",
+    "toolbar", "window",
+})
+
 # ---------------------------------------------------------------------------
 # Default Settings Schema
 # ---------------------------------------------------------------------------
@@ -50,7 +57,6 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "last_tab": TabId.SEARCH.value,
     "pin_state": False,
     "pin_on_startup": False,
-    "minimize_to_tray_on_close": True,
     "show_tray_notifications": True,
     "auto_hide_toolbar_without_game": True,
     "ocr_engine": OCREngine.RAPIDOCR.value,
@@ -203,7 +209,10 @@ class SettingsManager(QObject):
     def set(self, key: str, value: Any) -> None:
         """Set a top-level settings value and schedule auto-save."""
         self._data[key] = value
-        self._mark_dirty()
+        if key in _CRITICAL_KEYS:
+            self._save_immediate()
+        else:
+            self._mark_dirty()
         try:
             from src.core.events import EventBus
             EventBus.instance().settings_changed.emit(key, value)
@@ -227,10 +236,15 @@ class SettingsManager(QObject):
                 node[k] = {}
             node = node[k]
         node[keys[-1]] = value
-        self._mark_dirty()
+        if keys[0] in _CRITICAL_KEYS:
+            self._save_immediate()
+        else:
+            self._mark_dirty()
         try:
             from src.core.events import EventBus
-            EventBus.instance().settings_changed.emit(keys[0], self._data[keys[0]])
+            # Emit the full dotted path so listeners can match specific sub-keys
+            full_key = ".".join(keys)
+            EventBus.instance().settings_changed.emit(full_key, value)
         except Exception:
             pass
 
@@ -424,14 +438,6 @@ class SettingsManager(QObject):
         self.set("app_font_family", v)
 
     # General / behaviour
-    @property
-    def minimize_to_tray_on_close(self) -> bool:
-        return bool(self.get("minimize_to_tray_on_close", True))
-
-    @minimize_to_tray_on_close.setter
-    def minimize_to_tray_on_close(self, v: bool) -> None:
-        self.set("minimize_to_tray_on_close", v)
-
     @property
     def pin_on_startup(self) -> bool:
         return bool(self.get("pin_on_startup", False))

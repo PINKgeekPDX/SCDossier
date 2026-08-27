@@ -102,6 +102,7 @@ class MainWindow(BaseWindow):
         # navigate_to_tab handled entirely by _on_navigate_requested (sets sidebar + stack)
         EventBus.instance().navigate_to_tab.connect(self._on_navigate_requested)
         EventBus.instance().status_message.connect(self.status_bar.set_status)
+        EventBus.instance().local_handle_detected.connect(self._on_local_handle_detected)
 
     def _on_hide_requested(self) -> None:
         self.window_hidden.emit()
@@ -126,25 +127,49 @@ class MainWindow(BaseWindow):
 
     def _send_welcome_message(self) -> None:
         """Send WELCOME: PLAYERNAME as the first queue message in white."""
+        # Use cached handle only — never block main thread with file I/O.
+        # The StartupWorker will detect the handle asynchronously and emit
+        # local_handle_detected, which will upgrade PILOT to the real handle.
         handle = ""
         try:
             from src.services.reputation_service import ReputationService
             if ReputationService.is_initialized():
-                svc = ReputationService.instance()
-                local_handle = svc.local_player_handle
-                if not local_handle:
-                    svc.detect_local_player_handle()
-                    local_handle = svc.local_player_handle
-                handle = local_handle
+                handle = ReputationService.instance().local_player_handle or ""
         except Exception:
             pass
 
+        self._welcome_handle = handle
         if handle:
             text = f"WELCOME: {handle}"
         else:
             text = "WELCOME: PILOT"
 
         self.status_bar.push_message(text, "", "#FFFFFF", 5000)
+
+    @pyqtSlot(str)
+    def _on_local_handle_detected(self, handle: str) -> None:
+        """Update the welcome message when the local handle is detected."""
+        if not handle:
+            return
+        # Deduplicate: if we already sent a welcome, suppress duplicates.
+        # Exception: if the first welcome was the PILOT placeholder, allow
+        # upgrade to the real handle (replace, don't duplicate).
+        if getattr(self, "_welcome_sent", False):
+            prev = getattr(self, "_welcome_handle", "")
+            if prev and prev.lower() == handle.lower():
+                return  # identical handle — suppress duplicate
+            if prev and prev.upper() != "PILOT" and prev != "":
+                return  # already welcomed with a real handle — suppress
+            # Previous was PILOT/empty and now we have a real handle — allow upgrade
+            # but mark as sent so showEvent won't send a third
+            self._welcome_sent = True
+            self._welcome_handle = handle
+            self.status_bar.push_message(f"WELCOME: {handle}", "", "#FFFFFF", 5000)
+            return
+        self._welcome_sent = True
+        self._welcome_handle = handle
+        self.status_bar.push_message(f"WELCOME: {handle}", "", "#FFFFFF", 5000)
+
 
     def _on_tab_selected(self, tab_id: str) -> None:
         if tab_id == "search":
@@ -186,6 +211,7 @@ class MainWindow(BaseWindow):
             self.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
         self.show()
 
+
     def _pop_to_top(self) -> None:
         import sys
         if sys.platform == "win32":
@@ -218,7 +244,9 @@ class MainWindow(BaseWindow):
     def closeEvent(self, event) -> None:
         sm = SettingsManager.instance()
 
-        if sm.minimize_to_tray_on_close and not QApplication.closingDown():
+        # Always hide to toolbar instead of quitting — the tray icon keeps
+        # the app alive and the overlay toolbar is the primary interaction surface.
+        if not QApplication.closingDown():
             event.ignore()
             self.window_hidden.emit()
             self.hide()

@@ -4,7 +4,7 @@ SyncService — diffs live profile against archived profile and merges updates.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from PyQt6.QtCore import QObject
 
 from src.services.cache_manager import CacheManager
@@ -22,6 +22,21 @@ class SyncService(QObject):
     def __init__(self, cache_manager: CacheManager, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.cache = cache_manager
+
+    def is_stale(self, profile_data: dict, max_age_hours: int = 24) -> bool:
+        """
+        Check if a profile's scraped_at is older than max_age_hours.
+        Returns True if the profile should be re-scraped.
+        """
+        scraped_at_str = profile_data.get("scraped_at")
+        if not scraped_at_str:
+            return True
+        try:
+            scraped_at = datetime.fromisoformat(scraped_at_str.replace("Z", "+00:00"))
+            age = datetime.now(timezone.utc) - scraped_at
+            return age > timedelta(hours=max_age_hours)
+        except (ValueError, TypeError):
+            return True
 
     def sync_profile(self, handle: str, live_data: dict) -> bool:
         """

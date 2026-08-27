@@ -513,7 +513,9 @@ class OrgTab(QWidget):
         main_layout.addWidget(action_bar)
         main_layout.addWidget(scroll)
 
-        self.overlay = ProgressOverlay(self)
+        self.overlay = ProgressOverlay(scroll)
+        scroll.installEventFilter(self.overlay)
+        self.overlay.hide()
 
     def _build_detail(self) -> None:
         dl = QVBoxLayout(self.detail_container)
@@ -777,8 +779,11 @@ class OrgTab(QWidget):
     def _connect_signals(self) -> None:
         bus = EventBus.instance()
         bus.org_loaded.connect(self._on_org_loaded)
+        bus.org_scrape_completed.connect(self._on_org_loaded)
+        bus.org_scrape_failed.connect(self._on_org_failed)
+        bus.scrape_failed.connect(self._on_org_failed)
         bus.org_candidates_found.connect(self._on_org_candidates)
-        bus.status_message.connect(self._on_status_msg)
+        bus.status_push.connect(self._on_status_msg)
         bus.image_downloaded.connect(self._on_image_downloaded)
 
     def _set_banner_pixmap(self, path: str) -> None:
@@ -814,17 +819,24 @@ class OrgTab(QWidget):
         if not self._current_data:
             return
         data = self._current_data
-        if data.get("banner_local") == local_path:
+        if data.get("logo_url") == url or data.get("logo_local") == local_path:
+            data["logo_local"] = local_path
+            self.logo.set_image(local_path)
+            # return ? No, allow checking members
+        if data.get("banner_url") == url or data.get("banner_local") == local_path:
+            data["banner_local"] = local_path
             self._set_banner_pixmap(local_path)
-            return
-        if data.get("focus_primary_local") == local_path:
+            # return
+        if data.get("focus_primary_url") == url or data.get("focus_primary_local") == local_path:
+            data["focus_primary_local"] = local_path
             self._set_focus_icon(self.focus_primary_icon, self.focus_primary_lbl,
                                  data.get("focus_primary"), local_path)
-            return
-        if data.get("focus_secondary_local") == local_path:
+            # return
+        if data.get("focus_secondary_url") == url or data.get("focus_secondary_local") == local_path:
+            data["focus_secondary_local"] = local_path
             self._set_focus_icon(self.focus_secondary_icon, self.focus_secondary_lbl,
                                  data.get("focus_secondary"), local_path)
-            return
+            # return
         # Notify any member card whose avatar just finished downloading
         for card in self._member_cards:
             card.update_avatar(url, local_path)
@@ -911,13 +923,18 @@ class OrgTab(QWidget):
             sid = list_widget.currentItem().data(Qt.ItemDataRole.UserRole)
             EventBus.instance().request_org_scrape.emit(sid)
 
-    @pyqtSlot(str, str)
-    def _on_status_msg(self, msg: str, severity: str) -> None:
-        if severity == "info" and "RETRIEVING ORG" in msg:
+    @pyqtSlot(str, str, str, int)
+    def _on_status_msg(self, msg: str, tooltip: str, color: str, duration: int) -> None:
+        upper = msg.upper()
+        if "INITIALIZING" in upper or "RETRIEVING" in upper or "SEARCHING" in upper:
             self.overlay.set_message(msg)
             self.overlay.show_overlay()
-        elif severity in ("success", "error"):
+        elif any(k in upper for k in ("SUCCESS", "ERROR", "FAILED", "NOT FOUND")):
             self.overlay.hide_overlay()
+
+    @pyqtSlot(str, str)
+    def _on_org_failed(self, handle_or_sid: str, error: str) -> None:
+        self.overlay.hide_overlay()
 
     def _on_refresh_members(self) -> None:
         """Re-trigger org scrape for the currently loaded org SID."""

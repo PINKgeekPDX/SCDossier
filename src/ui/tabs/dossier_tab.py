@@ -27,6 +27,7 @@ from src.ui.widgets.progress_overlay import ProgressOverlay
 from src.ui.widgets.search_input import SearchInput
 from src.ui.widgets.glass_card import GlassCard
 from src.ui.widgets.wrap_layout import WrapLayout
+from src.ui.widgets.disposition_chip import DispositionChip
 from src.ui.tabs.reputation_tab import ReputationTab
 import os
 from src.core.settings import SettingsManager
@@ -53,10 +54,22 @@ class DossierSubTabBar(QWidget):
         super().__init__(parent)
         self._active: str = "dossier"
         self._hovered: str | None = None
+        self._reputation_visible: bool = True
         self.setFixedHeight(32)
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+
+    def set_reputation_visible(self, visible: bool) -> None:
+        """Show or hide the REPUTATION sub-tab."""
+        if self._reputation_visible != visible:
+            self._reputation_visible = visible
+            if not visible and self._active == "reputation":
+                self._active = "dossier"
+            self.update()
+
+    def is_reputation_visible(self) -> bool:
+        return self._reputation_visible
 
     # ------------------------------------------------------------------
     # Public API
@@ -79,11 +92,16 @@ class DossierSubTabBar(QWidget):
         """Return bounding rect for each tab button."""
         from PyQt6.QtCore import QRect
         w = self.width()
-        tab_w = w // 2
-        return {
-            "dossier":    QRect(0,         0, tab_w,      self.height()),
-            "reputation": QRect(tab_w,     0, w - tab_w,  self.height()),
-        }
+        if self._reputation_visible:
+            tab_w = w // 2
+            return {
+                "dossier":    QRect(0,         0, tab_w,      self.height()),
+                "reputation": QRect(tab_w,     0, w - tab_w,  self.height()),
+            }
+        else:
+            return {
+                "dossier": QRect(0, 0, w, self.height()),
+            }
 
     def _tab_at(self, x: int) -> str | None:
         for tid, rect in self._tab_rects().items():
@@ -348,8 +366,11 @@ class DossierTab(QWidget):
         main_layout.addWidget(self.sub_tab_bar)
         main_layout.addWidget(self.stack)
 
-        # ProgressOverlay MUST be last — covers the full DossierTab (not the stack)
-        self.overlay = ProgressOverlay(self)
+        # ProgressOverlay is a child of the stacked widget's content container
+        # so it scales/positions within the dossier content area only
+        self.overlay = ProgressOverlay(self.stack)
+        self.stack.installEventFilter(self.overlay)
+        self.overlay.hide()
 
     def _build_detail(self) -> None:
         dl = QVBoxLayout(self.detail_container)
@@ -371,6 +392,7 @@ class DossierTab(QWidget):
             f"color: {P.ON_SURFACE}; background: transparent; border: none;"
         )
         self.moniker_lbl.setWordWrap(True)
+        
         self.handle_lbl = QLabel("—")
         self.handle_lbl.setFont(headline_md())
         self.handle_lbl.setStyleSheet(
@@ -382,6 +404,13 @@ class DossierTab(QWidget):
         header_layout.addWidget(self.avatar)
         header_layout.addLayout(name_vbox)
         header_layout.addStretch()
+
+        self._disposition_chip = DispositionChip()
+        self._disposition_chip.setVisible(False)
+        header_layout.addWidget(
+            self._disposition_chip,
+            alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+        )
 
         # RSI brand icon decoration
         from src.core.paths import get_asset_path
@@ -451,23 +480,72 @@ class DossierTab(QWidget):
     def _connect_signals(self) -> None:
         bus = EventBus.instance()
         bus.scrape_completed.connect(self._on_scrape_completed)
+        bus.scrape_failed.connect(self._on_scrape_failed)
         bus.image_downloaded.connect(self._on_image_downloaded)
-        bus.status_message.connect(self._on_status_msg)
+        bus.status_push.connect(self._on_status_msg)
         bus.archive_updated.connect(self._on_archive_updated)
+        bus.reputation_loaded.connect(self._on_reputation_loaded)
+        bus.reputation_load_failed.connect(self._on_reputation_failed)
+        bus.settings_changed.connect(self._on_settings_changed)
         # Sub-tab navigation
         self.sub_tab_bar.tab_changed.connect(self._on_sub_tab_changed)
+        # Initialize reputation tab visibility
+        self._update_reputation_visibility()
 
     # ------------------------------------------------------------------
     # Sub-tab navigation (NEW, T4)
     # ------------------------------------------------------------------
 
+    def _update_reputation_visibility(self) -> None:
+        """Show/hide reputation sub-tab based on settings."""
+        visible = SettingsManager.instance().reputation_enabled
+        self.sub_tab_bar.set_reputation_visible(visible)
+        # If reputation becomes hidden while on that tab, switch to dossier
+        if not visible and self.stack.currentIndex() == 1:
+            self.stack.setCurrentIndex(0)
+            self.sub_tab_bar.set_active("dossier")
+
+    @pyqtSlot(str, object)
+    def _on_settings_changed(self, key: str, value: object) -> None:
+        if key == "reputation_enabled":
+            self._update_reputation_visibility()
+
     @pyqtSlot(str)
     def _on_sub_tab_changed(self, tab_id: str) -> None:
         """Switch the stacked widget page in response to sub-tab clicks."""
+        # Block reputation tab when disabled
+        if tab_id == "reputation" and not SettingsManager.instance().reputation_enabled:
+            return
         if tab_id == "dossier":
             self.stack.setCurrentIndex(0)
         elif tab_id == "reputation":
             self.stack.setCurrentIndex(1)
+
+    @pyqtSlot(str, dict)
+    def _on_reputation_loaded(self, handle: str, data: dict) -> None:
+        """Update disposition chip when reputation data is loaded."""
+        if handle.lower() != self.current_handle.lower():
+            return
+        hostile = data.get("hostile_count", 0)
+        friendly = data.get("friendly_count", 0)
+        if hostile > friendly and hostile > 0:
+            disposition = "hostile"
+        elif friendly > 0 and hostile <= friendly:
+            disposition = "friendly"
+        else:
+            disposition = "unknown"
+        self._disposition_chip.set_disposition(disposition, hostile, friendly)
+        self._disposition_chip.setVisible(True)
+
+    @pyqtSlot(str, str)
+    def _on_reputation_failed(self, handle: str, error_msg: str) -> None:
+        """Handle reputation fetch failure."""
+        if self.current_handle and handle.lower() == self.current_handle.lower():
+            if "no reputation data" in error_msg.lower():
+                self._disposition_chip.set_disposition("unknown", 0, 0)
+                self._disposition_chip.setVisible(True)
+            else:
+                self._disposition_chip.setVisible(False)
 
     # ------------------------------------------------------------------
     # Existing public / slot methods (UNCHANGED — extended where needed)
@@ -503,13 +581,18 @@ class DossierTab(QWidget):
         if self.current_handle:
             EventBus.instance().request_archive.emit(self.current_handle)
 
-    @pyqtSlot(str, str)
-    def _on_status_msg(self, msg: str, severity: str) -> None:
-        if severity == "info" and ("INITIALIZING" in msg or "RETRIEVING" in msg):
+    @pyqtSlot(str, str, str, int)
+    def _on_status_msg(self, msg: str, tooltip: str, color: str, duration: int) -> None:
+        upper = msg.upper()
+        if "INITIALIZING" in upper or "RETRIEVING" in upper or "SEARCHING" in upper:
             self.overlay.set_message(msg)
             self.overlay.show_overlay()
-        elif severity in ("success", "error"):
+        elif any(k in upper for k in ("SUCCESS", "ERROR", "FAILED", "NOT FOUND")):
             self.overlay.hide_overlay()
+
+    @pyqtSlot(str, str)
+    def _on_scrape_failed(self, handle: str, error: str) -> None:
+        self.overlay.hide_overlay()
 
     @pyqtSlot(dict)
     def _on_scrape_completed(self, data: dict) -> None:
@@ -524,6 +607,7 @@ class DossierTab(QWidget):
 
         self.moniker_lbl.setText(data.get("moniker", "—"))
         self.handle_lbl.setText(f"@{data.get('handle', '—')}")
+        self._disposition_chip.setVisible(False)
 
         if data.get("avatar_local"):
             self.avatar.set_image(data["avatar_local"])
@@ -569,8 +653,8 @@ class DossierTab(QWidget):
 
         self._update_archive_glow()
 
-        # Trigger reputation fetch if available (T5 sets self.reputation_tab)
-        if hasattr(self, 'reputation_tab') and self.current_handle:
+        # Trigger reputation fetch if enabled
+        if hasattr(self, 'reputation_tab') and self.current_handle and SettingsManager.instance().reputation_enabled:
             self.reputation_tab.load_player(self.current_handle)
             EventBus.instance().request_reputation_fetch.emit(self.current_handle)
 
@@ -629,24 +713,27 @@ class DossierTab(QWidget):
 
         data = self._current_data
 
-        if data.get("avatar_local") == local_path:
+        if data.get("avatar_url") == url or data.get("avatar_local") == local_path:
+            data["avatar_local"] = local_path
             self.avatar.set_image(local_path)
-            return
-
+            # Continue checking in case an org logo shares the same URL
+            
         for b in data.get("badges", []):
-            if b.get("image_local") == local_path:
+            if b.get("image_url") == url or b.get("image_local") == local_path:
+                b["image_local"] = local_path
                 self.badges_wrap.clear()
                 for badge in data.get("badges", []):
                     chip = BadgeChip(name=badge.get("name", ""), image_path=badge.get("image_local"))
                     self.badges_wrap.addWidget(chip)
-                return
+                break
 
         for o in data.get("orgs", []):
-            if o.get("logo_local") == local_path:
+            if o.get("logo_url") == url or o.get("logo_local") == local_path:
+                o["logo_local"] = local_path
                 self._clear_orgs()
                 for org in data.get("orgs", []):
                     self._add_org_widget(org)
-                return
+                break
 
     def _setup_archive_glow(self) -> None:
         from PyQt6.QtWidgets import QGraphicsDropShadowEffect

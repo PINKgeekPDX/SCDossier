@@ -1,0 +1,202 @@
+================================================================================
+SC DOSSIER — CHANGE NOTES: BETA (b0.4.2) → v1.0.0 (STABLE)
+Generated: 2026-08-27
+Branch: beta → working directory (not yet pushed per request)
+Version bump: b0.4.2 → 1.0.0 (removed beta signifier)
+Supabase: migrated from test (cbhfyjohjqlhvaclkgmx) to MAIN (epqkqmnxixybtwkczxfs)
+Build: SCDossier-Setup.exe (116 MB) + SCDossier-windows-v1.0.0.zip (115 MB)
+================================================================================
+
+SUMMARY
+--------------------------------------------------------------------------------
+v1.0.0 is the first stable release, graduating from beta. It is a major
+expansion of the Community Reputation System (5→9 categories, 15→49 tags) and a
+comprehensive UI/UX + stability overhaul. The rep system now exposes its full
+15-layer anti-abuse system via live countdowns and detailed logs; all loading
+states share a single scanline animation; and dozens of thread, overlay, and
+notification bugs are fixed. The Supabase backend was wiped and fully
+re-deployed to the MAIN project (scdossier-rep).
+
+================================================================================
+1. VERSIONING — 1.0.0 STABLE
+================================================================================
+- src/app/constants.py: APP_VERSION b0.4.2 → 1.0.0
+- pyproject.toml: version 0.4.1 → 1.0.0
+- installer.iss: MyAppVersion 0.4.2 → 1.0.0 (build.py passes /dMyAppVersion)
+- Build outputs now: dist/SCDossier-windows-v1.0.0.zip + Output/SCDossier-Setup.exe
+  (previously v0.4.2)
+
+================================================================================
+2. REPUTATION SYSTEM — EXPANDED CATEGORIES & TAGS
+================================================================================
+BEFORE (b0.4.2):
+  5 categories: Dangerous, Trustworthy, Pirate, Shady, Elusive
+  15 tags total
+
+AFTER (1.0.0):
+  9 categories / 49 tags:
+
+  ⚔ DANGEROUS (8 tags) — Combat Threat
+    Killed Me, Killed My Crew, Ambushed / Camped Me, Griefed / Harassed Me,
+    Spawn Killed Me, Team Killed (Friendly Fire), Combat Logged vs Me, Stalked / Followed Me
+
+  🎭 SHADY (7 tags) — Deception / Theft
+    Scammed Me, Lied / Deceived Me, Manipulated / Lured Me, Stole My Cargo/Ship,
+    Fake Trade / Bait Switch, Fake Auction / Price Fix, Hacked My Terminal/Ship
+
+  ☠ PIRACY (6 tags) — Hostile PvP / Robbery
+    Demanded Cargo / Tolls, Confirmed Pirate, Jacked My Ship, Raided My Cargo Hold,
+    Blockaded / Camped Port, Extorted / Shakedown
+
+  👻 ELUSIVE (5 tags) — Hard to Catch
+    Hard to Track / Elusive, Escaped Every Time, Quantum Dodged / Logged,
+    Stealthy / Ghost, Used HUD Hacks / Glitches
+
+  ✓ TRUSTWORTHY (4 tags) — Reliable / Honest
+    Trustworthy / Reliable, Honorable Fighter, Kept Their Word, Honest Trader
+
+  ⭐ COMPETENT (5 tags) — Skilled / Good at Game [NEW]
+    Skilled Pilot, Good Squad Leader, Great in Combat, Good Mining/Trade Partner, Revived / Healed Me
+
+  😊 POSITIVE (5 tags) — General Good Vibes [NEW]
+    Gave Free Stuff / Repaired, Helped Me Out, Encouraging / Supportive,
+    Calm Under Pressure, Solved a Problem For Me
+
+  🤝 FRIENDLY (5 tags) — Social / Welcoming [NEW]
+    Friendly Encounter, Welcoming to New Players, Good Conversation,
+    Made Me Laugh, Social / Knows Everyone
+
+  🤮 TOXIC (4 tags) — Bad Attitude / Disruptive [NEW]
+    Toxic Voice/Text Chat, Griefed Own Team, AFK / Leeching, False Reported Others
+
+* Server TAG_MAP and ALL_CATEGORIES updated in SCDossierRepServer/supabase/functions/submit-report
+* DB CHECK constraints migrated via 20260826000000/01/02 (competent/toxic + positive/friendly)
+* Disposition inference now covers all 49 tags.
+
+================================================================================
+3. ANTI-ABUSE SYSTEM — FULL BREAKDOWN (15 layers, now visible)
+================================================================================
+Rate Limiting:
+  1. Daily Limit — 1 report / player / IP / 24h (live HH:MM:SS)
+  2. Monthly Limit — 2 reports / player / IP / 30d
+  3. Velocity Check — Max 5 reports / IP / hour
+  4. Org Cooldown — 3-6 reports / org / 24h, scales with org size (tiny 3, small 4, normal 6, large 5)
+
+Retaliation & Brigading Prevention:
+  5. Retaliation Cooldown — 7-day block on mutual reports
+  6. Mutual Report Detection — Flags within 24h, weight 0.1x
+  7. Org Mutual Threshold — ≥5 members of same org report same target → weight 0.5x
+
+Trust & Weighting:
+  8. Reporter Weight — New 0.5x, +0.05 per report up to 1.0x
+  9. Reporter Reputation — High toxic reduces influence
+  10. Org Size Normalization — Larger orgs stricter
+
+Context & Validation:
+  11. Disposition Notoriety — 5 hostile → 14-day friendly cooldown
+  12. Disposition Consistency — Hostile/friendly tags cannot mix (400)
+  13. Activity Validation — Must have been active in-game within 24h (Game.log mtime)
+  14. Self-Report Block — Cannot report own handle (client+server)
+  15. Score Decay — 2%/month after 6 months inactivity; fresh reports reset
+
+UI Surfacing:
+  - Report button instantly disables with live countdown + verbose tooltip
+  - check-rate-limit now returns reason + reasonDetail (DAILY_LIMIT, RETALIATION, VELOCITY, ORG_LIMIT, MONTHLY_LIMIT)
+  - App logs every block with reason | detail | cooldown | monthly
+
+================================================================================
+4. UI/UX REDESIGN & CONSISTENCY
+================================================================================
+Reputation Tab — Full Redesign (SCPINK):
+  - AnimatedProgressBar (OutCubic, 30fps, glow dot, rounded track, 9 cats)
+  - ReputationBar tighter spacing, headline fonts, 10px height
+  - ReportDialog: glass + tech brackets, scrollable 320px grid, category-colored chips
+  - All 9 categories in definition order
+
+Loading Animations — Unified to Single Scanline (ProgressOverlay):
+  - DossierTab: parent stack + eventFilter → content area only (was full tab)
+  - OrgTab: parent scroll + eventFilter (was full tab)
+  - ReputationTab: removed custom spinner/SubmissionStatusCard → same ProgressOverlay
+        "CHECKING REPUTATION DATABASE..." / "SUBMITTING REPORT..." / "RELOADING REPUTATION..."
+  - 8s safety timeout auto-hides on player not found; hide on NOT FOUND/FAILED/ERROR/SUCCESS
+
+Status Bar:
+  - Pill stacking left-to-right, staggered 250ms, flashing at 3s, hover tooltip, click expand (white 12px bold, colored border)
+  - Badge shows SHORT generalized text; popup shows VERBOSE full details
+  - Deduplication prevents double WELCOME
+  - Initial sync checks SettingsManager (shows OFFLINE not DISABLED when enabled)
+
+Other Polish:
+  - Search input border glow, nav sidebar collapse retained (distinct contexts)
+  - Improved spacing/margins/sizing production quality
+
+================================================================================
+5. BUG FIXES & STABILITY (vs beta)
+================================================================================
+Critical Crashes Fixed:
+  - QPainterPath NameError flood → restored QPainterPath/QBrush + isVisible guards
+  - OCR `'>' not supported str/float` → cast conf to float
+  - QThread: Destroyed while still running → removed parent, fixed early `= None` clearing while running, queued next handle via singleShot(0), added deleteLater + finished-clear lambdas
+  - Double WELCOME → main_window sets _welcome_sent in both paths + status_bar deduplicates
+  - ImageDownloader pool saturation → capped to 6 threads, waitForDone(3000) on exit
+  - Resize lockup → eventFilter checks geometry != parent rect before setGeometry; resizeEvent no longer sets geometry
+  - Org click no animation → controller _start_org_scrape emits RETRIEVING ORG
+  - Player not-found infinite loop → 8s timeout + hide on NOT FOUND
+  - Rep disabled despite enabled → status_bar initial sync + reputation_tab showEvent re-sync
+
+Notification Queue:
+  - All status_push now short badge + verbose tooltip (OCR ERROR, REPORT FAILED, RETRIEVING DOSSIER, SEARCHING ORG, etc.)
+  - Failed scrape now "Player {handle} not found" (simple)
+
+Performance:
+  - Removed blocking Game.log I/O from main thread (welcome, is_self checks now non-blocking)
+  - Throttled AnimatedProgressBar 60fps→30fps
+  - Limited concurrent image downloads
+  - Reduced hotkey/pulse timers where possible
+
+================================================================================
+6. SUPABASE BACKEND — MIGRATION TO MAIN
+================================================================================
+Previous (beta): Test project cbhfyjohjqlhvaclkgmx (SCDossier-rep-test, East US Ohio)
+Current (1.0.0): MAIN project epqkqmnxixybtwkczxfs (scdossier-rep, West US Oregon)
+  - Constants switched: REP_SUPABASE_URL + REP_ANON_KEY now point to epqk...
+  - DB wiped via `supabase db reset --linked --yes` (truncate cascades, re-applied all 17 migrations)
+  - All 6 Edge Functions redeployed to MAIN:
+        check-rate-limit (v10), daily-backup, keep-alive, register-handle, score-decay, submit-report (v13)
+  - Functions updated for 49 tags / 9 categories
+
+================================================================================
+7. BUILD & PACKAGING — v1.0.0
+================================================================================
+Build System (build.py):
+  - Fixed to use sys.executable -m PyInstaller (was picking wrong Python via PATH)
+  - PyInstaller 6.19, Python 3.13.12, Platform Windows-11
+  - Collects rapidocr_onnxruntime, onnxruntime, numpy, supabase + hidden imports
+  - Inno Setup 6 (ISCC.exe) compiles installer.iss with /dMyAppVersion=1.0.0
+  - Outputs:
+        dist/SCDossier-windows-v1.0.0.zip (115,763,887 bytes)
+        Output/SCDossier-Setup.exe (116,244,069 bytes)
+
+To Build:
+  python build.py  (from C:\Users\Administrator\Desktop\projects\SCDossier)
+
+To Run:
+  python run_quick.py  (auto-elevates via UAC if needed; Star Citizen elevated → app must be elevated)
+
+================================================================================
+8. FILES CHANGED (vs beta)
+================================================================================
+README.md, build.py, installer.iss, pyproject.toml, src/app/constants.py,
+src/app/controller.py, src/app/main_window.py, src/core/events.py,
+src/core/settings.py, src/main.py, src/services/*, src/ui/*,
+SCDossierRepServer/supabase/functions/*, supabase/migrations/*, tests/*
+
+================================================================================
+9. NEXT STEPS
+================================================================================
+- Git push NOT performed (per request) — all changes remain in working directory on beta
+- To release: git add, commit, tag v1.0.0, push to origin/main, create GitHub Release with dist/*.zip
+- Consider bumping APP_VERSION in future via single source (constants.py)
+
+================================================================================
+END OF CHANGE NOTES — v1.0.0 STABLE

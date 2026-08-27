@@ -22,6 +22,7 @@ from src.ui.theme.fonts import font_inter, label_caps, headline_lg, headline_md,
 from src.ui.widgets.avatar_widget import AvatarWidget
 from src.ui.widgets.data_field import DataField
 from src.ui.widgets.badge_chip import BadgeChip
+from src.ui.widgets.disposition_chip import DispositionChip
 from src.ui.widgets.wrap_layout import WrapLayout
 from src.ui.widgets.tech_label import TechLabel
 from src.ui.widgets.glass_card import GlassCard
@@ -274,6 +275,8 @@ class ArchivesTab(QWidget):
         self.refresh_list()
         EventBus.instance().archive_updated.connect(self.refresh_list)
         EventBus.instance().scrape_completed.connect(self._on_profile_loaded)
+        EventBus.instance().reputation_loaded.connect(self._on_reputation_loaded)
+        EventBus.instance().reputation_load_failed.connect(self._on_reputation_load_failed)
 
     def _build_ui(self) -> None:
         main_layout = QVBoxLayout(self)
@@ -453,6 +456,13 @@ class ArchivesTab(QWidget):
         header_layout.addLayout(info_vbox)
         header_layout.addStretch()
 
+        self._disposition_chip = DispositionChip()
+        self._disposition_chip.setVisible(False)
+        header_layout.addWidget(
+            self._disposition_chip,
+            alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+        )
+
         self.detail_header_card.content_layout.addLayout(header_layout)
         dl.addWidget(self.detail_header_card)
 
@@ -561,6 +571,7 @@ class ArchivesTab(QWidget):
         self.stack.setCurrentIndex(0)
 
         self.reputation_tab.load_player(handle)
+        self._disposition_chip.setVisible(False)
         EventBus.instance().request_reputation_fetch.emit(handle)
 
         self.detail_moniker.setText(data.get("moniker", "—"))
@@ -700,3 +711,29 @@ class ArchivesTab(QWidget):
             self.stack.setCurrentIndex(0)
         elif tab_id == "reputation":
             self.stack.setCurrentIndex(1)
+
+    @pyqtSlot(str, dict)
+    def _on_reputation_loaded(self, handle: str, data: dict) -> None:
+        if handle != self._selected_handle:
+            return
+            
+        hostile_count = data.get("hostile_count", 0)
+        friendly_count = data.get("friendly_count", 0)
+        
+        if hostile_count > friendly_count and hostile_count > 0:
+            disposition = "hostile"
+        elif friendly_count > 0 and hostile_count <= friendly_count:
+            disposition = "friendly"
+        else:
+            disposition = "unknown"
+        self._disposition_chip.set_disposition(disposition, hostile_count, friendly_count)
+        self._disposition_chip.setVisible(True)
+        
+    @pyqtSlot(str, str)
+    def _on_reputation_load_failed(self, handle: str, err: str) -> None:
+        if handle != self._selected_handle:
+            return
+            
+        # Still show the chip, but it will be gray (unknown)
+        self._disposition_chip.set_disposition("unknown", 0, 0)
+        self._disposition_chip.setVisible(True)

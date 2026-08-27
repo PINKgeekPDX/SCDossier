@@ -26,13 +26,15 @@ class EventBus(QObject):
 
     # ------------------------------------------------------------------
     # Search Signals
-    # ------------------------------------------------------------------
 
     # User requested a player profile search (handle string)
     search_player_requested = pyqtSignal(str)
 
     # User requested an org search (name or SID query string)
     search_org_requested = pyqtSignal(str)
+
+    # Search history updated (query, mode)
+    search_history_updated = pyqtSignal(str, str)
 
     # ------------------------------------------------------------------
     # Data Loaded Signals
@@ -41,8 +43,17 @@ class EventBus(QObject):
     # Scrape completed successfully (dict)
     scrape_completed = pyqtSignal(dict)
 
+    # Scrape failed (handle, error_message)
+    scrape_failed = pyqtSignal(str, str)
+
     # Org profile data is ready for display (OrgProfile dict)
     org_loaded = pyqtSignal(dict)
+
+    # Org scrape completed successfully (data dict)
+    org_scrape_completed = pyqtSignal(dict)
+
+    # Org scrape failed (sid, error_message)
+    org_scrape_failed = pyqtSignal(str, str)
 
     # Multiple org candidates found (list of {name, sid} dicts)
     # UI should show a picker dialog and emit search_org_requested(sid)
@@ -67,6 +78,7 @@ class EventBus(QObject):
     
     # Archive action requests
     request_archive = pyqtSignal(str)
+    request_unarchive = pyqtSignal(str)
     request_sync = pyqtSignal(str)
     request_load_archive = pyqtSignal(str)
     request_delete_archive = pyqtSignal(str)
@@ -85,7 +97,7 @@ class EventBus(QObject):
     # Request main window to show and switch to a specific tab (TabId.value)
     navigate_to_tab = pyqtSignal(str)
 
-    # Emitted when the global hotkey is pressed
+    # Emitted when the global hotkey is pressed for capture
     capture_hotkey_pressed = pyqtSignal()
 
     # Emitted when the toolbar interact hotkey is pressed/released
@@ -96,6 +108,17 @@ class EventBus(QObject):
     toolbar_drag_pressed = pyqtSignal()
     toolbar_drag_released = pyqtSignal()
 
+    # OCR completed (extracted handle string)
+    ocr_completed = pyqtSignal(str)
+
+    # OCR failed (error message string)
+    ocr_failed = pyqtSignal(str)
+
+    # Local player handle detected from game.log
+    local_handle_detected = pyqtSignal(str)
+
+    # ------------------------------------------------------------------
+    # Reputation System Signals
     # ------------------------------------------------------------------
     # Status / Feedback Signals
     # ------------------------------------------------------------------
@@ -141,6 +164,12 @@ class EventBus(QObject):
 
     # Reputation data load failed (handle, error_message)
     reputation_load_failed = pyqtSignal(str, str)
+    
+    # Rate limit check completed (handle, data_dict)
+    reputation_rate_limit_loaded = pyqtSignal(str, dict)
+    
+    # Rate limit check failed (handle, error_message)
+    reputation_rate_limit_failed = pyqtSignal(str, str)
 
     # An interaction report was successfully submitted (handle)
     reputation_report_submitted = pyqtSignal(str)
@@ -148,13 +177,16 @@ class EventBus(QObject):
     # An interaction report submission failed (handle, error_message)
     reputation_report_failed = pyqtSignal(str, str)
 
+    # A cooldown was activated for the current player (duration_seconds)
+    reputation_cooldown_activated = pyqtSignal(int)
+
     # Reputation system connection status changed
     # Values: "online" | "offline" | "error" | "disabled"
     reputation_system_status = pyqtSignal(str)
 
-    # User requested to submit a report (handle, list_of_tag_ids)
+    # User requested to submit a report (handle, list_of_tag_ids, disposition)
     # Emitted by ReputationTab after ReportDialog is accepted
-    reputation_report_requested = pyqtSignal(str, list)
+    reputation_report_requested = pyqtSignal(str, list, str)
     
     # Request a standalone reputation fetch without a full player scrape
     request_reputation_fetch = pyqtSignal(str)
@@ -184,3 +216,4 @@ class EventBus(QObject):
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+

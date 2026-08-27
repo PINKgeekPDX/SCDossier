@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import label_caps, font_inter
 from src.core.events import EventBus
+from src.app.constants import PROGRESS_SCAN_TIMER_INTERVAL_MS
 
 
 class ProgressOverlay(QWidget):
@@ -74,7 +75,13 @@ class ProgressOverlay(QWidget):
         """Scanline animation using QTimer."""
         self._scan_timer = QTimer(self)
         self._scan_timer.timeout.connect(self._advance_scanline)
-        self._scan_timer.setInterval(16)  # ~60fps
+        self._scan_timer.setInterval(PROGRESS_SCAN_TIMER_INTERVAL_MS)  # ~60fps
+
+        # Safety timeout — auto-hide if no response within 8s (e.g., player not found)
+        self._timeout_timer = QTimer(self)
+        self._timeout_timer.setSingleShot(True)
+        self._timeout_timer.setInterval(8000)
+        self._timeout_timer.timeout.connect(self.hide_overlay)
 
     def _advance_scanline(self) -> None:
         self._scan_y += self._scan_direction * 3.0
@@ -104,15 +111,24 @@ class ProgressOverlay(QWidget):
         self.show()
         self._scan_y = 0.0
         self._scan_timer.start()
+        self._timeout_timer.start()
 
     def hide_overlay(self) -> None:
         """Hide the overlay and stop animation."""
         self._scan_timer.stop()
+        self._timeout_timer.stop()
         self.hide()
 
+    def eventFilter(self, source, event) -> bool:
+        """Track parent resize so overlay scales with its container."""
+        if source is self.parent() and event.type() == event.Type.Resize:
+            pr = self.parent().rect()
+            if self.geometry() != pr:
+                self.setGeometry(pr)
+        return False
+
     def resizeEvent(self, event) -> None:
-        if self.parent():
-            self.setGeometry(self.parent().rect())
+        # Overlay itself should not force parent geometry — just keep scan in bounds
         super().resizeEvent(event)
 
     # ------------------------------------------------------------------
@@ -120,10 +136,14 @@ class ProgressOverlay(QWidget):
     # ------------------------------------------------------------------
 
     def paintEvent(self, event) -> None:
+        rect = self.rect()
+        if rect.width() <= 0 or rect.height() <= 0 or not self.isVisible():
+            return
         painter = QPainter(self)
+        if not painter.isActive():
+            return
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        rect = self.rect()
         w, h = rect.width(), rect.height()
 
         # --- Dark overlay backdrop ---

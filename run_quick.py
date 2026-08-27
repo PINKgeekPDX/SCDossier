@@ -8,6 +8,11 @@ def elevate_if_not_admin():
     """Relaunch the script with Administrator privileges if not already elevated."""
     if sys.platform != 'win32':
         return
+    
+    # Skip elevation if --no-elevate flag is passed
+    if '--no-elevate' in sys.argv:
+        return
+    
     try:
         if ctypes.windll.shell32.IsUserAnAdmin():
             return

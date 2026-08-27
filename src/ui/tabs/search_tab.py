@@ -17,6 +17,7 @@ from src.core.events import EventBus
 from src.ui.theme import palette as P
 from src.ui.theme.fonts import headline_xl, font_inter, label_caps
 from src.ui.widgets.search_input import SearchInput
+from src.app.constants import SEARCH_ANIM_TIMER_INTERVAL_MS
 
 from src.core.paths import get_asset_path
 from src.core.settings import SettingsManager
@@ -103,7 +104,7 @@ class AnimatedSearchInput(SearchInput):
 
         self._anim_timer = QTimer(self)
         self._anim_timer.timeout.connect(self._animate_border)
-        self._anim_timer.setInterval(30)
+        self._anim_timer.setInterval(SEARCH_ANIM_TIMER_INTERVAL_MS)
 
         self.setFixedHeight(46)   # was 56
         self.setFont(font_inter(13))  # was 16
@@ -413,6 +414,8 @@ class SearchTab(QWidget):
             return
         # Add to search history
         self._add_to_search_history(query)
+        # Notify the bus that history was updated (query, mode)
+        EventBus.instance().search_history_updated.emit(query, self._mode)
         
         if self._mode == "player":
             EventBus.instance().search_player_requested.emit(query)

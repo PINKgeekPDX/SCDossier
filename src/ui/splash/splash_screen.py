@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt, QPropertyAnimation, QRectF, pyqtSignal
 from PyQt6.QtGui import QPixmap, QColor, QPainter, QPainterPath, QRadialGradient
 
 from src.core.paths import get_asset_path
-from src.ui.theme.palette import PRIMARY_CONTAINER, GLASS_BG_DARK, ON_SURFACE, PRIMARY
+from src.ui.theme.palette import PRIMARY_CONTAINER, ON_SURFACE, PRIMARY
 
 
 class SplashScreen(QWidget):
@@ -79,10 +79,10 @@ class SplashScreen(QWidget):
         self.status_block.setFixedWidth(400)
         self.status_block.setFixedHeight(34)
         self.status_block.setObjectName("SplashStatusBlock")
-        self.status_block.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # Use a solid color for the background - WA_TranslucentBackground can conflict with rgba in stylesheets
         self.status_block.setStyleSheet(f"""
             QWidget#SplashStatusBlock {{
-                background-color: {GLASS_BG_DARK};
+                background-color: rgba(5, 11, 15, 217);
                 border: 1px solid rgba(0, 170, 255, 0.3);
                 border-top: none;
                 border-top-left-radius: 0px;

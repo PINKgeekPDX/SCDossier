@@ -1,4 +1,5 @@
 import json
+import logging
 
 from PyQt6.QtCore import Qt, QUrl, pyqtSlot
 from PyQt6.QtGui import QColor, QFont, QDesktopServices, QIcon, QPixmap
@@ -24,6 +25,8 @@ from src.app.constants import APP_NAME, APP_VERSION
 
 _STATUS_SUCCESS = "#00FF88"
 _STATUS_WARNING = "#FFAA00"
+
+log = logging.getLogger(__name__)
 
 
 class SettingsTab(QWidget):
@@ -204,10 +207,6 @@ class SettingsTab(QWidget):
 
         cb_top = QHBoxLayout()
         cb_top.setSpacing(16)
-        self.minimize_tray_cb = QCheckBox()
-        self.minimize_tray_cb.setStyleSheet(self._cb_style())
-        cb_top.addWidget(self._cb_row("MINIMIZE TO TRAY", self.minimize_tray_cb,
-            "When closing the window, minimize to system tray instead of quitting"))
         self.pin_startup_cb = QCheckBox()
         self.pin_startup_cb.setStyleSheet(self._cb_style())
         cb_top.addWidget(self._cb_row("PIN ON STARTUP", self.pin_startup_cb,
@@ -1084,7 +1083,6 @@ class SettingsTab(QWidget):
         dhk_val = self.sm.toolbar_drag_hotkey
         self.drag_hk_lbl.setText(dhk_val.upper() if dhk_val else "None")
 
-        self.minimize_tray_cb.setChecked(self.sm.minimize_to_tray_on_close)
         self.pin_startup_cb.setChecked(self.sm.pin_on_startup)
         self.tray_notif_cb.setChecked(self.sm.show_tray_notifications)
         self.auto_hide_toolbar_cb.setChecked(self.sm.auto_hide_toolbar_without_game)
@@ -1118,7 +1116,6 @@ class SettingsTab(QWidget):
 
     def _connect_signals(self) -> None:
         # General
-        self.minimize_tray_cb.toggled.connect(lambda v: setattr(self.sm, 'minimize_to_tray_on_close', v))
         self.pin_startup_cb.toggled.connect(lambda v: setattr(self.sm, 'pin_on_startup', v))
         self.tray_notif_cb.toggled.connect(lambda v: setattr(self.sm, 'show_tray_notifications', v))
         self.auto_hide_toolbar_cb.toggled.connect(lambda v: setattr(self.sm, 'auto_hide_toolbar_without_game', v))
@@ -1239,8 +1236,7 @@ class SettingsTab(QWidget):
                 padding: 4px 8px;
             }}
         """)
-        # About section link
-        self._about_github_lbl.setStyleSheet("background:transparent;border:none;")
+        # About section link — styled inline in _build_about_card
 
     # ------------------------------------------------------------------
     # Slots

@@ -38,7 +38,7 @@ def service(mock_supabase_client):
     rep_module.create_client = lambda url, key: mock_supabase_client
     rep_module._SUPABASE_AVAILABLE = True
     from src.services.reputation_service import ReputationService
-    svc = ReputationService.initialize("https://example.supabase.co", "anon-key-fake")
+    svc = ReputationService.initialize("https://example.com", "anon-key-fake")
     yield svc, mock_supabase_client
     # Restore — leave create_client patched state; singleton reset handles the rest
 
@@ -69,6 +69,11 @@ class TestFetchReputation:
             {"category": "pirate",      "score": 4,  "report_count": 1},
             {"category": "shady",       "score": 0,  "report_count": 0},
             {"category": "elusive",     "score": 3,  "report_count": 1},
+            {"category": "competent",   "score": 6,  "report_count": 2},
+            {"category": "toxic",       "score": 2,  "report_count": 1},
+            {"category": "spawn_killed", "score": 2, "report_count": 1},
+            {"category": "fake_auction", "score": 4, "report_count": 2},
+            {"category": "escort",      "score": 2,  "report_count": 1},
         ]
         (client.from_.return_value
                .select.return_value
@@ -91,6 +96,11 @@ class TestFetchReputation:
                     {"category": "pirate",      "score": 4,  "report_count": 1},
                     {"category": "shady",       "score": 0,  "report_count": 0},
                     {"category": "elusive",     "score": 3,  "report_count": 1},
+                    {"category": "competent",   "score": 6,  "report_count": 2},
+                    {"category": "toxic",       "score": 2,  "report_count": 1},
+                    {"category": "spawn_killed", "score": 2, "report_count": 1},
+                    {"category": "fake_auction", "score": 4, "report_count": 2},
+                    {"category": "escort",      "score": 2,  "report_count": 1},
                 ]
             return mock
 
@@ -106,7 +116,7 @@ class TestFetchReputation:
         assert result["pirate"]["score"] == 4
 
     def test_fetch_returns_none_when_player_not_found(self, service):
-        """fetch_reputation returns None when the player is not in the DB."""
+        """fetch_reputation returns {} (empty dict) when the player is not in the DB."""
         svc, client = service
 
         def from_side_effect(table):
@@ -119,7 +129,7 @@ class TestFetchReputation:
 
         result = svc.fetch_reputation("unknown_player")
 
-        assert result is None
+        assert result == {}
 
     def test_fetch_returns_none_on_network_exception(self, service):
         """fetch_reputation returns None on network error — does NOT raise."""
@@ -129,8 +139,8 @@ class TestFetchReputation:
 
         result = svc.fetch_reputation("any_player")
 
-        # Must not raise — returns None
-        assert result is None
+        # Must not raise — returns empty dict on error
+        assert result == {}
 
 
 # ---------------------------------------------------------------------------
@@ -138,45 +148,59 @@ class TestFetchReputation:
 # ---------------------------------------------------------------------------
 
 class TestNormalizeScore:
+    """Tests for _normalize_score(score, report_count, category).
+
+    Formula: denominator = max(report_count * max_pts, max_pts * 50)
+             pct = int(score / denominator * 100)
+             clamped to [0, 100]
+
+    Category max_pts (sum of tag points per category):
+        dangerous=11, shady=11, pirate=10, elusive=6, trustworthy=6, competent=6, positive=6, friendly=6, toxic=6
+    """
 
     def test_normalize_mid_range(self):
         """_normalize_score computes correct percentage for mid-range values."""
         from src.services.reputation_service import ReputationService
-        # score=18, report_count=5 → 18/(5*6)*100 = 60%
-        result = ReputationService._normalize_score(18, 5)
-        assert result == 60
+        # dangerous: max_pts=11, denom=max(5*11, 11*50)=max(55,550)=550
+        # pct = int(275/550*100) = 50
+        result = ReputationService._normalize_score(275, 5, "dangerous")
+        assert result == 50
 
     def test_normalize_clamps_at_100(self):
         """_normalize_score clamps at 100 — never exceeds 100%."""
         from src.services.reputation_service import ReputationService
-        # Very high score should be capped
-        result = ReputationService._normalize_score(1000, 1)
+        # dangerous: max_pts=11, denom=max(1*11, 550)=550
+        # pct = int(550/550*100) = 100
+        result = ReputationService._normalize_score(550, 1, "dangerous")
         assert result == 100
 
     def test_normalize_returns_zero_when_no_reports(self):
         """_normalize_score returns 0 when report_count is 0."""
         from src.services.reputation_service import ReputationService
-        result = ReputationService._normalize_score(10, 0)
+        result = ReputationService._normalize_score(10, 0, "shady")
         assert result == 0
 
     def test_normalize_zero_score(self):
         """_normalize_score returns 0 when score is 0."""
         from src.services.reputation_service import ReputationService
-        result = ReputationService._normalize_score(0, 5)
+        result = ReputationService._normalize_score(0, 5, "pirate")
         assert result == 0
 
-    def test_normalize_single_max_tag(self):
-        """Score of 6 with 1 report (pirate_confirmed, max single tag) = 100%."""
+    def test_normalize_ceiling_at_max_reports(self):
+        """At 50 max-score reports, player reaches 100%."""
         from src.services.reputation_service import ReputationService
-        # 6 / (1 * 6) * 100 = 100
-        result = ReputationService._normalize_score(6, 1)
+        # pirate: max_pts=10, denom=max(1*10, 10*50)=max(10,500)=500
+        # pct = int(500/500*100) = 100
+        result = ReputationService._normalize_score(500, 1, "pirate")
         assert result == 100
 
     def test_normalize_typical_low_score(self):
-        """Low-threat scenario: score=3, report_count=3 → 3/(3*6)*100 = 16%."""
+        """Low-threat scenario with many reports but low score."""
         from src.services.reputation_service import ReputationService
-        result = ReputationService._normalize_score(3, 3)
-        assert result == 16
+        # dangerous: max_pts=11, denom=max(10*11, 550)=max(110,550)=550
+        # pct = int(11/550*100) = 2
+        result = ReputationService._normalize_score(11, 10, "dangerous")
+        assert result == 2
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +219,7 @@ class TestReputationServiceInit:
         """initialize() raises ReputationServiceError when anon_key is empty."""
         from src.services.reputation_service import ReputationService, ReputationServiceError
         with pytest.raises(ReputationServiceError):
-            ReputationService.initialize("https://x.supabase.co", "")
+            ReputationService.initialize("https://example.com", "")
 
     def test_instance_raises_before_initialization(self):
         """instance() raises RuntimeError before initialize() is called."""
@@ -214,7 +238,7 @@ class TestReputationServiceInit:
         rep_module.create_client = lambda url, key: MagicMock()
         rep_module._SUPABASE_AVAILABLE = True
         from src.services.reputation_service import ReputationService
-        ReputationService.initialize("https://x.supabase.co", "fake-key")
+        ReputationService.initialize("https://example.com", "fake-key")
         assert ReputationService.is_initialized() is True
 
     @patch("os.path.exists")

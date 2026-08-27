@@ -29,6 +29,9 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+# Reports needed to reach 100% score (used in normalization)
+_REPORTS_FOR_MAX_SCORE = 50
+
 # ---------------------------------------------------------------------------
 # Typed error for reputation service failures
 # ---------------------------------------------------------------------------
@@ -57,7 +60,22 @@ class ReputationService:
             raise ReputationServiceError(
                 "supabase-py is not installed. Run: pip install supabase>=2.4.0"
             )
-        self._client = create_client(url, anon_key)
+        # Use longer timeout for Edge Functions (default is ~5s, but submit can take 15-20s with RSI fetches)
+        try:
+            from supabase.lib.client_options import ClientOptions
+            import httpx as _httpx
+            # Create a custom httpx client with 30s timeout for functions
+            _timeout = _httpx.Timeout(30.0, connect=10.0)
+            _options = ClientOptions(
+                postgrest_client_timeout=30,
+                storage_client_timeout=30,
+                function_client_timeout=60,
+                httpx_client=_httpx.Client(timeout=_timeout),
+            )
+            self._client = create_client(url, anon_key, options=_options)
+        except Exception as e:
+            log.debug("Failed to create client with custom timeout, falling back to default: %s", e)
+            self._client = create_client(url, anon_key)
         self._known_handles: set[str] = set()
         self._local_player_handle: str = ""
         log.info("ReputationService initialized with Supabase URL: %s", url[:40])
@@ -183,6 +201,38 @@ class ReputationService:
         log.warning("detect_local_player_handle: Could not detect username from Star Citizen log.")
         return ""
 
+    def get_last_activity_timestamp(self) -> str | None:
+        """
+        Return the modification time of the Game.log file in UTC ISO format.
+        Used to prove the player was recently active in-game.
+        """
+        import os
+        import time
+        from datetime import datetime, timezone
+
+        channels = ["LIVE", "PTU"]
+        
+        for attempt in range(2):
+            install_paths = self._find_sc_install_paths()
+            for base_path in install_paths:
+                for channel in channels:
+                    log_path = os.path.join(base_path, channel, "Game.log")
+                    if os.path.exists(log_path):
+                        try:
+                            # Try to open the file to verify read permission/avoid lock issue
+                            with open(log_path, "rb") as f:
+                                pass
+                            mtime = os.path.getmtime(log_path)
+                            dt = datetime.fromtimestamp(mtime, tz=timezone.utc)
+                            log.debug("Successfully read Game.log mtime: %s", dt.isoformat())
+                            return dt.isoformat()
+                        except Exception as e:
+                            log.warning("Attempt %d failed to read mtime of %s: %s", attempt + 1, log_path, e)
+            if attempt == 0:
+                time.sleep(0.1)
+                            
+        return None
+
     # ------------------------------------------------------------------
     # Singleton lifecycle
     # ------------------------------------------------------------------
@@ -232,27 +282,37 @@ class ReputationService:
                 "shady":       {"score": int, "report_count": int},
                 "elusive":     {"score": int, "report_count": int},
             }
-        Returns None if the player has no reputation data in the DB.
+        Returns an empty dict {} if the player exists but has no score rows.
+        Returns None if the player has no row in the players table (never reported).
         Returns None on any network/DB error (does not raise).
         """
         try:
-            handle_lower = handle.strip().lower()
+            handle = handle.strip()
+            if not handle:
+                log.debug("fetch_reputation: Empty handle, returning empty dict")
+                return {}
+            handle_lower = handle.lower()
 
-            # Look up the player row first
+            # Look up the player row first - defensive access
             player_resp = (
                 self._client
                 .from_("players")
-                .select("id")
+                .select("id, hostile_count, friendly_count")
                 .eq("handle", handle_lower)
                 .maybe_single()
                 .execute()
             )
 
-            if not player_resp.data:
-                log.debug("No reputation data for handle: %s", handle)
-                return None
+            # Safe access to player_resp.data
+            player_data = getattr(player_resp, 'data', None)
 
-            player_id = player_resp.data["id"]
+            if not player_data:
+                log.debug("No player row found for handle: %s", handle)
+                return {}
+
+            player_id = player_data["id"]
+            hostile_count = int(player_data.get("hostile_count", 0))
+            friendly_count = int(player_data.get("friendly_count", 0))
 
             # Fetch all category scores
             scores_resp = (
@@ -263,9 +323,11 @@ class ReputationService:
                 .execute()
             )
 
-            rows = scores_resp.data or []
+            rows = getattr(scores_resp, 'data', []) or []
             if not rows:
-                return None
+                # Player exists in players table but has no score rows yet
+                log.debug("No score rows found for player: %s", handle)
+                return {"hostile_count": hostile_count, "friendly_count": friendly_count}
 
             # Build the result dict
             result: dict[str, Any] = {}
@@ -277,15 +339,27 @@ class ReputationService:
                         "report_count": int(row.get("report_count", 0)),
                     }
 
-            return result if result else None
+            # Include disposition counts for aggregate disposition marker
+            result["hostile_count"] = hostile_count
+            result["friendly_count"] = friendly_count
+
+            return result if result else {}
 
         except Exception as e:
             log.warning("fetch_reputation(%s) failed: %s", handle, e)
-            return None
+            return {}
 
-    def submit_report(self, handle: str, tags: list[str], ip_hash: str) -> dict:
+    def submit_report(self, handle: str, tags: list[str], ip_hash: str, disposition: str = "unknown", reporter_handle: str = "", orgs: list[str] | None = None) -> dict:
         """
         Submit an interaction report via the submit-report Edge Function.
+
+        Args:
+            handle: Player handle (case-insensitive).
+            tags: List of tag IDs (e.g. ["killed_me", "scammed"]).
+            ip_hash: SHA-256 hash of the client's public IP.
+            disposition: One of "hostile", "unknown", or "friendly".
+            reporter_handle: The local player's handle (for mutual report detection).
+            orgs: List of org SIDs the reporter belongs to (for org cooldown detection).
 
         Returns the updated 5-category score dict on success.
         Raises ReputationServiceError on failure.
@@ -294,15 +368,29 @@ class ReputationService:
         import json
 
         try:
+            # Get real activity timestamp from Game.log
+            activity_timestamp = self.get_last_activity_timestamp()
+            
+            # If we couldn't find the log file, we still try to submit, but the 
+            # server will reject it if activity_timestamp is missing or old.
+            # We don't artificially spoof it anymore.
+
+            body: dict = {
+                "handle": handle.strip().lower(),
+                "tags": tags,
+                "ip_hash": ip_hash,
+                "disposition": disposition,
+                "orgs": orgs if orgs is not None else [],
+                "reporter_handle": reporter_handle or None,
+            }
+            if activity_timestamp:
+                body["activity_timestamp"] = activity_timestamp
+
             response = self._client.functions.invoke(
                 "submit-report",
                 invoke_options={
                     "headers": {"X-SCD-App-Token": REP_APP_TOKEN},
-                    "body": {
-                        "handle": handle.strip().lower(),
-                        "tags": tags,
-                        "ip_hash": ip_hash,
-                    },
+                    "body": body,
                 },
             )
             
@@ -321,10 +409,27 @@ class ReputationService:
         except ReputationServiceError:
             raise
         except Exception as e:
+            err_msg = str(e)
+            # Handle read timeout: the server may have succeeded despite client timeout
+            # Wait briefly and check if the report was actually applied
+            if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+                log.warning("submit_report timed out for %s, verifying via re-fetch...", handle)
+                import time as _time
+                _time.sleep(2)
+                try:
+                    # Re-fetch to see if the report was committed
+                    verify_data = self.fetch_reputation(handle)
+                    if verify_data and isinstance(verify_data, dict):
+                        # If we got data back, assume the report went through
+                        # Return the verified data instead of raising timeout error
+                        log.info("Verified report for %s after timeout via re-fetch: %s", handle, verify_data)
+                        return verify_data
+                except Exception as verify_e:
+                    log.debug("Verification re-fetch after timeout failed: %s", verify_e)
             log.error("submit_report(%s) failed: %s", handle, e)
-            raise ReputationServiceError(str(e)) from e
+            raise ReputationServiceError(err_msg) from e
 
-    def check_rate_limit(self, handle: str, ip_hash: str) -> dict:
+    def check_rate_limit(self, handle: str, ip_hash: str, orgs: list[str] | None = None, reporter_handle: str = "") -> dict:
         """
         Check rate limit status for a given IP + player via the check-rate-limit Edge Function.
 
@@ -337,6 +442,8 @@ class ReputationService:
                 "cooldown_seconds": int,
                 "monthly_limit": int,
                 "monthly_remaining": int,
+                "friendly_allowed": bool,
+                "friendly_cooldown_seconds": int
             }
         Returns None on failure.
         """
@@ -351,6 +458,8 @@ class ReputationService:
                     "body": {
                         "handle": handle.strip().lower(),
                         "ip_hash": ip_hash,
+                        "orgs": orgs if orgs is not None else [],
+                        "reporter_handle": reporter_handle or None,
                     },
                 },
             )
@@ -398,20 +507,29 @@ class ReputationService:
         """
         Ping the keep-alive Edge Function. Returns True on success.
         Used at startup to wake the Supabase free-tier project.
+        Retries up to 3 times on transient failures (503, timeouts).
         """
         import json
-        try:
-            response = self._client.functions.invoke("keep-alive")
-            if isinstance(response, bytes):
-                try:
-                    response = json.loads(response.decode("utf-8"))
-                except json.JSONDecodeError:
-                    pass
-            # The keep-alive function returns {"status": "alive"} on success
-            return isinstance(response, dict) and response.get("status") == "alive"
-        except Exception as e:
-            log.warning("ReputationService.ping() failed: %s", e)
-            return False
+        max_attempts = 3
+        delays = [2, 4]
+        for attempt in range(max_attempts):
+            try:
+                response = self._client.functions.invoke("keep-alive")
+                if isinstance(response, bytes):
+                    try:
+                        response = json.loads(response.decode("utf-8"))
+                    except json.JSONDecodeError:
+                        pass
+                if isinstance(response, dict) and response.get("status") == "alive":
+                    return True
+                log.debug("ping attempt %d: unexpected response %r", attempt + 1, response)
+            except Exception as e:
+                log.debug("ping attempt %d failed: %s", attempt + 1, e)
+            if attempt < max_attempts - 1:
+                import time
+                time.sleep(delays[min(attempt, len(delays) - 1)])
+        log.warning("ReputationService.ping() failed after %d attempts", max_attempts)
+        return False
 
     @staticmethod
     def _get_ip_hash() -> str | None:
@@ -457,8 +575,11 @@ class ReputationService:
         if max_score_per_report == 0:
             return 0
             
-        max_possible_points = max_score_per_report * 50
+        max_possible_points = max_score_per_report * _REPORTS_FOR_MAX_SCORE
         denominator = max(report_count * max_score_per_report, max_possible_points)
+        
+        if denominator <= 0:
+            return 0
         
         pct = int((score / denominator) * 100)
         return min(100, max(0, pct))

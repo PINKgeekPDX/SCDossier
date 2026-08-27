@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import sys
 
 from PyQt6.QtCore import (
     Qt, QPoint, QPointF, QRectF, QRect, QTimer,
@@ -222,6 +223,8 @@ class OverlayToolbar(QWidget):
 
         self._interact_held = False
         self._drag_held = False
+        self._toolbar_activated = False  # True when toolbar is the active window
+        self._game_hwnd = None  # Store the game window handle to restore later
 
         self._fade_anim = QPropertyAnimation(self, b"windowOpacity", self)
         self._fade_anim.setDuration(200)
@@ -254,6 +257,49 @@ class OverlayToolbar(QWidget):
         bus.toolbar_drag_pressed.connect(self._on_drag_pressed)
         bus.toolbar_drag_released.connect(self._on_drag_released)
         bus.settings_changed.connect(self._on_settings_changed)
+
+    def _activate_toolbar(self) -> None:
+        """Activate the toolbar window so mouse clicks register immediately."""
+        if self._toolbar_activated:
+            return
+        if sys.platform != "win32":
+            self.activateWindow()
+            self._toolbar_activated = True
+            return
+        
+        import ctypes
+        user32 = ctypes.windll.user32
+        
+        # Store the current foreground window (the game) before activating toolbar
+        self._game_hwnd = user32.GetForegroundWindow()
+        
+        # Activate the toolbar window
+        hwnd = int(self.winId())
+        # Use SetForegroundWindow — works reliably when the calling process is the foreground process
+        # or when the process was recently activated
+        user32.SetForegroundWindow(hwnd)
+        self._toolbar_activated = True
+
+    def _deactivate_toolbar(self) -> None:
+        """Restore the game window as the active window."""
+        if not self._toolbar_activated:
+            return
+        if sys.platform != "win32":
+            self._toolbar_activated = False
+            return
+        
+        import ctypes
+        user32 = ctypes.windll.user32
+        
+        # Restore the game window if we have its handle
+        if self._game_hwnd and self._game_hwnd != int(self.winId()):
+            try:
+                user32.SetForegroundWindow(self._game_hwnd)
+            except Exception:
+                pass
+        
+        self._game_hwnd = None
+        self._toolbar_activated = False
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
@@ -325,16 +371,22 @@ class OverlayToolbar(QWidget):
     def _on_interact_pressed(self) -> None:
         self._interact_held = True
         self._update_interaction_state()
+        # Immediately activate toolbar so mouse becomes visible (game releases cursor)
+        self._activate_toolbar()
         
         from PyQt6.QtGui import QCursor
-        pos = self.mapFromGlobal(QCursor.pos())
-        child = self.childAt(pos)
+        pos = QCursor.pos()
+        local_pos = self.mapFromGlobal(pos)
+        child = self.childAt(local_pos)
         if isinstance(child, ToolbarButton):
             child._animate(1.0)
 
     @pyqtSlot()
     def _on_interact_released(self) -> None:
         self._interact_held = False
+        # Only deactivate if drag is not also held
+        if not self._drag_held:
+            self._deactivate_toolbar()
         self._update_interaction_state()
         
         for btn in (self._expand_btn, self._capture_btn):
@@ -345,10 +397,15 @@ class OverlayToolbar(QWidget):
     def _on_drag_pressed(self) -> None:
         self._drag_held = True
         self._update_interaction_state()
+        # Activate toolbar so mouse becomes visible for dragging
+        self._activate_toolbar()
 
     @pyqtSlot()
     def _on_drag_released(self) -> None:
         self._drag_held = False
+        # Only deactivate if interact is not also held
+        if not self._interact_held:
+            self._deactivate_toolbar()
         if self._drag_active:
             self._drag_active = False
             self.releaseMouse()
@@ -419,10 +476,23 @@ class OverlayToolbar(QWidget):
         expand_icon = get_asset_path("assets/icons/Icons/MOBIGLAS.png")
         self._expand_btn = ToolbarButton(expand_icon, "Open SC Dossier", self)
         self._expand_btn.clicked.connect(self.expand_requested.emit)
+        self._expand_btn.clicked.connect(self._on_button_clicked)
 
         capture_icon = get_asset_path("assets/icons/Icons/TARGET_LOCK.png")
         self._capture_btn = ToolbarButton(capture_icon, "OCR Screen Capture", self)
         self._capture_btn.clicked.connect(self.capture_requested.emit)
+        self._capture_btn.clicked.connect(self._on_button_clicked)
+
+    @pyqtSlot()
+    def _on_button_clicked(self) -> None:
+        """Called after a toolbar button is clicked — clear activation state without restoring game.
+        
+        The button actions (expand → show main window, capture → show region selector)
+        will handle window activation themselves. We just clear the stored game handle
+        so the subsequent key-release doesn't restore the game over the new window.
+        """
+        self._game_hwnd = None
+        self._toolbar_activated = False
 
     def _set_orientation(self, edge: ScreenEdge) -> None:
         old = self.layout()
@@ -519,14 +589,6 @@ class OverlayToolbar(QWidget):
         except Exception as exc:
             log.debug("Could not save toolbar position: %s", exc)
 
-    def mousePressEvent(self, e) -> None:
-        if e.button() == Qt.MouseButton.LeftButton and self._drag_held:
-            self._drag_active   = True
-            self._drag_start_pos    = e.globalPosition().toPoint()
-            self._drag_start_window = self.pos()
-            self.grabMouse()
-            e.accept()
-
     def mouseMoveEvent(self, e) -> None:
         if self._drag_active:
             if not (e.buttons() & Qt.MouseButton.LeftButton):
@@ -537,6 +599,18 @@ class OverlayToolbar(QWidget):
             delta = e.globalPosition().toPoint() - self._drag_start_pos
             self.move(self._drag_start_window + delta)
             e.accept()
+            return
+
+    def mousePressEvent(self, e) -> None:
+        if e.button() == Qt.MouseButton.LeftButton and self._drag_held:
+            self._drag_active   = True
+            self._drag_start_pos    = e.globalPosition().toPoint()
+            self._drag_start_window = self.pos()
+            self.grabMouse()
+            e.accept()
+
+    def leaveEvent(self, e) -> None:
+        super().leaveEvent(e)
 
     def mouseReleaseEvent(self, e) -> None:
         if self._drag_active:

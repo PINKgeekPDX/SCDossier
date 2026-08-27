@@ -175,6 +175,9 @@ class TestReputationSubmitWorker:
             "TestHandle",
             ["killed_me", "ambushed"],
             "abc123deadbeef" * 4,
+            disposition="unknown",
+            reporter_handle=mock_service.local_player_handle,
+            orgs=[]
         )
 
     def test_run_emits_finished_error_on_service_error(self, mock_service):

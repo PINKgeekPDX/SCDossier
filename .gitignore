@@ -26,3 +26,6 @@ tests/
 src/settings.json
 sign_config.json
 sign_config.json.example
+.env
+.env.local
+.env.*.local
