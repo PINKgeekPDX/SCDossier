@@ -1,10 +1,9 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/PINKgeekPDX/SCDossier/main/src/assets/appicon.png" width="180" alt="[![scdossier](https://img.shields.io/badge/SC-Dossier-FF0055?style=flat)](#)
  Logo">
-[![](https://visitcount.itsvg.in/api?id=PINKgeekPDX&label=Repo%20Views&color=0&icon=7&pretty=false)](https://visitcount.itsvg.in)
-
+  
  **`A Star Citizen Companion App`**
-
+  
   [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-00AAFF?style=for-the-badge)](https://github.com/PINKgeekPDX/SCDossier/releases)
   [![License](https://img.shields.io/badge/License-MIT-00FF66?style=for-the-badge)](LICENSE)
   [![Status](https://img.shields.io/badge/Status-Active-FF0055?style=for-the-badge)](#)
